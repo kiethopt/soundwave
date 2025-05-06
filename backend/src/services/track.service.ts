@@ -6,7 +6,7 @@ import { paginate } from '../utils/handle-utils';
 import * as emailService from './email.service';
 import { client, setCache } from '../middleware/cache.middleware';
 import { trackSelect } from '../utils/prisma-selects';
-import { getIO } from '../config/socket';
+import { getIO, getUserSockets } from '../config/socket';
 import { getOrCreateArtistProfile } from './artist.service';
 import * as mm from 'music-metadata';
 import { Essentia, EssentiaWASM } from 'essentia.js';
@@ -595,40 +595,44 @@ export class TrackService {
       },
     });
 
-    try {
-        const followers = await prisma.userFollow.findMany({
-          where: {
-            followingArtistId: artistProfileId,
-            followingType: 'ARTIST',
-          },
-          select: { followerId: true },
+    const sendNotifications = async () => {
+      const followers = await prisma.userFollow.findMany({
+        where: {
+          followingArtistId: artistProfileId,
+          followingType: 'ARTIST',
+        },
+        select: { followerId: true },
+      });
+
+      const followerIds = followers.map((f) => f.followerId);
+      if (followerIds.length > 0) {
+        const followerUsers = await prisma.user.findMany({
+          where: { id: { in: followerIds }, isActive: true },
+          select: { id: true, email: true },
         });
 
-        const followerIds = followers.map((f) => f.followerId);
-        if (followerIds.length > 0) {
-          const followerUsers = await prisma.user.findMany({
-            where: { id: { in: followerIds }, isActive: true },
-            select: { id: true, email: true },
-          });
+        const notificationsData: Prisma.NotificationCreateManyInput[] = followerUsers.map((follower) => ({
+          type: NotificationType.NEW_TRACK,
+          message: `${artistName} just released a new track: ${title}`,
+          recipientType: RecipientType.USER,
+          userId: follower.id,
+          artistId: artistProfileId,
+          senderId: artistProfileId,
+          trackId: newTrack.id,
+        }));
 
-          const notificationsData: Prisma.NotificationCreateManyInput[] = followerUsers.map((follower) => ({
-            type: NotificationType.NEW_TRACK,
-            message: `${artistName} just released a new track: ${title}`,
-            recipientType: RecipientType.USER,
-            userId: follower.id,
-            artistId: artistProfileId,
-            senderId: artistProfileId,
-            trackId: newTrack.id,
-          }));
-
+        if (notificationsData.length > 0) {
           await prisma.notification.createMany({ data: notificationsData });
+        }
 
-          const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
-          const io = getIO();
+        const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
+        const io = getIO();
+        const userSocketsMap = getUserSockets(); // Assuming getUserSockets is available
 
-          for (const user of followerUsers) {
-            const room = `user-${user.id}`;
-            io.to(room).emit('notification', {
+        for (const user of followerUsers) {
+          const targetSocketId = userSocketsMap.get(user.id);
+          if (targetSocketId) {
+            io.to(targetSocketId).emit('notification', {
               type: NotificationType.NEW_TRACK,
               message: `${artistName} just released a new track: ${newTrack.title}`,
               trackId: newTrack.id,
@@ -643,25 +647,29 @@ export class TrackService {
                  coverUrl: newTrack.coverUrl
               }
             });
+          }
 
-            if (user.email) {
-              const emailOptions = emailService.createNewReleaseEmail(
-                user.email,
-                artistName,
-                'track',
-                newTrack.title,
-                releaseLink,
-                newTrack.coverUrl
-              );
-              emailService.sendEmail(emailOptions).catch(emailError => {
-                 console.error(`Failed to send new track email to ${user.email}:`, emailError);
-              });
-            }
+          if (user.email) {
+            const emailOptions = emailService.createNewReleaseEmail(
+              user.email,
+              artistName,
+              'track',
+              newTrack.title,
+              releaseLink,
+              newTrack.coverUrl
+            );
+            emailService.sendEmail(emailOptions).catch(emailError => {
+               console.error(`Failed to send new track email to ${user.email}:`, emailError);
+            });
           }
         }
-    } catch (notificationError) {
-        console.error("Error sending new track notifications:", notificationError);
-    }
+      }
+    };
+
+    // Trigger notifications without awaiting
+    sendNotifications().catch(notificationError => {
+      console.error("Error sending new track notifications:", notificationError);
+    });
 
     return newTrack;
   }
@@ -824,35 +832,65 @@ export const updateTrack = async (req: Request, id: string) => {
     }
 
     // --- Update Featured Artists ---
-    if (req.body.featuredArtists !== undefined) {
+    const featuredArtistIdsFromBody = req.body.featuredArtistIds as string[] | undefined;
+    const featuredArtistNamesFromBody = req.body.featuredArtistNames as string[] | undefined;
+
+    // Only update featured artists if at least one of the relevant fields is present in the request body.
+    // Sending empty arrays for both means "remove all featured artists".
+    // If neither key is present, featured artists are not modified.
+    if (featuredArtistIdsFromBody !== undefined || featuredArtistNamesFromBody !== undefined) {
         await tx.trackArtist.deleteMany({ where: { trackId: id } });
 
-        const artistsInput = req.body.featuredArtists;
-        const artistsArray = !artistsInput
-            ? []
-            : Array.isArray(artistsInput)
-            ? artistsInput.map(String) 
-            : typeof artistsInput === 'string'
-            ? artistsInput.split(',').map((faId: string) => faId.trim()).filter(Boolean)
-            : [];
+        const resolvedFeaturedArtistIds = new Set<string>();
 
-        if (artistsArray.length > 0) {
+        // Process IDs from featuredArtistIds[]
+        if (featuredArtistIdsFromBody && Array.isArray(featuredArtistIdsFromBody) && featuredArtistIdsFromBody.length > 0) {
             const existingArtists = await tx.artistProfile.findMany({
-                where: { id: { in: artistsArray } },
+                where: { id: { in: featuredArtistIdsFromBody } },
                 select: { id: true },
             });
-            const validArtistIds = existingArtists.map(a => a.id);
-            const invalidArtistIds = artistsArray.filter(aId => !validArtistIds.includes(aId));
-            if (invalidArtistIds.length > 0) {
-                throw new Error(`Invalid featured artist IDs: ${invalidArtistIds.join(', ')}`);
-            }
+            const validArtistIds = new Set(existingArtists.map(a => a.id));
+            
+            featuredArtistIdsFromBody.forEach(artistId => {
+                if (validArtistIds.has(artistId) && artistId !== currentTrack.artistId) {
+                    resolvedFeaturedArtistIds.add(artistId);
+                } else if (!validArtistIds.has(artistId)) {
+                    console.warn(`[updateTrack] Invalid featured artist ID provided and skipped: ${artistId}`);
+                } else if (artistId === currentTrack.artistId) {
+                    console.warn(`[updateTrack] Main artist ID (${artistId}) cannot be a featured artist on their own track.`);
+                }
+            });
+        }
 
+        // Process names from featuredArtistNames[]
+        if (featuredArtistNamesFromBody && Array.isArray(featuredArtistNamesFromBody) && featuredArtistNamesFromBody.length > 0) {
+            for (const name of featuredArtistNamesFromBody) {
+                if (typeof name === 'string' && name.trim() !== '') {
+                    try {
+                        // Assuming getOrCreateArtistProfile can accept a transaction client (tx)
+                        const profile = await getOrCreateArtistProfile(name.trim(), tx); 
+                        if (profile.id !== currentTrack.artistId) {
+                            resolvedFeaturedArtistIds.add(profile.id);
+                        } else {
+                           console.warn(`[updateTrack] Main artist (${name}) cannot be a featured artist on their own track.`);
+                        }
+                    } catch (error) {
+                        console.error(`[updateTrack] Error processing featured artist name "${name}":`, error);
+                        // Depending on requirements, you might want to collect these errors and report them,
+                        // or re-throw to fail the transaction. For now, just logging.
+                    }
+                }
+            }
+        }
+
+        const finalArtistIdsToLink = Array.from(resolvedFeaturedArtistIds);
+        if (finalArtistIdsToLink.length > 0) {
             await tx.trackArtist.createMany({
-                data: validArtistIds.map((artistId: string) => ({
+                data: finalArtistIdsToLink.map((artistId: string) => ({
                     trackId: id,
                     artistId: artistId,
                 })),
-                skipDuplicates: true,
+                skipDuplicates: true, 
             });
         }
     }

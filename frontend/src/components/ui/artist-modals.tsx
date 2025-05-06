@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ArtistCreatableSelect } from '@/components/ui/ArtistCreatableSelect';
 import { Textarea } from '@/components/ui/textarea';
 
 // Edit Album Modal for Artists
@@ -357,7 +358,7 @@ export function EditAlbumModal({
                         aria-label="Toggle album visibility"
                       />
                     </div>
-               </div>
+            </div>
         </div>
         </form>
 
@@ -402,6 +403,13 @@ export function EditAlbumModal({
 }
 
 // Edit Track Modal for Artists
+
+// Define the type for selected artists (can have ID or just name)
+interface SelectedArtist {
+  id?: string;
+  name: string;
+}
+
 interface EditTrackModalProps {
   track: Track | null;
   isOpen: boolean;
@@ -426,7 +434,7 @@ export function EditTrackModal({
   const [formData, setFormData] = useState<Partial<Track>>({});
   const [isActive, setIsActive] = useState<boolean>(track?.isActive || false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<string[]>([]);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<SelectedArtist[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -442,7 +450,12 @@ export function EditTrackModal({
       });
       setIsActive(track.isActive);
       setSelectedGenres(track.genres?.map(g => g.genre.id) || []);
-      setSelectedFeaturedArtists(track.featuredArtists?.map(fa => fa.artistProfile.id) || []);
+      setSelectedFeaturedArtists(
+        track.featuredArtists?.map(fa => ({
+          id: fa.artistProfile.id,
+          name: fa.artistProfile.artistName
+        })) || []
+      );
       setSelectedLabelId(track.labelId || null);
       setCoverPreview(track.coverUrl || null);
       setLabelDisplayName(track.label?.name || 'No Label Assigned');
@@ -520,8 +533,12 @@ export function EditTrackModal({
 
     // Featured Artists
     if (selectedFeaturedArtists.length > 0) {
-      selectedFeaturedArtists.forEach(artistId => {
-        form.append('featuredArtists[]', artistId);
+      selectedFeaturedArtists.forEach(artist => {
+        if (artist.id) {
+          form.append('featuredArtistIds[]', artist.id);
+        } else {
+          form.append('featuredArtistNames[]', artist.name);
+        }
       });
     }
 
@@ -695,12 +712,11 @@ export function EditTrackModal({
               {/* Featured Artists */}
               <div className="space-y-2 col-span-2">
                 <UILabel className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>Featured Artists</UILabel>
-                <SearchableSelect
-                  options={availableArtists.map(artist => ({ id: artist.id, name: artist.name }))}
+                <ArtistCreatableSelect
+                  existingArtists={availableArtists}
                   value={selectedFeaturedArtists}
                   onChange={setSelectedFeaturedArtists}
-                  placeholder="Select featured artists"
-                  multiple={true}
+                  placeholder="Search or add featured artists..."
                 />
               </div>
 

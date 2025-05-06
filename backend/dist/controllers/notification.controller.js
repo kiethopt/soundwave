@@ -104,6 +104,20 @@ const getNotifications = async (req, res) => {
     const notifications = await db_1.default.notification.findMany({
         where: { OR: whereConditions },
         orderBy: { createdAt: 'desc' },
+        select: {
+            id: true,
+            type: true,
+            message: true,
+            isRead: true,
+            recipientType: true,
+            userId: true,
+            artistId: true,
+            senderId: true,
+            trackId: true,
+            albumId: true,
+            claimId: true,
+            createdAt: true,
+        }
     });
     res.json(notifications);
 };

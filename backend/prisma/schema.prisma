@@ -252,6 +252,7 @@ model Notification {
   senderId      String?
   trackId       String?
   albumId       String?
+  claimId       String?
   count         Int?             @default(1)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -265,6 +266,7 @@ model Notification {
   @@index([senderId])
   @@index([trackId])
   @@index([albumId])
+  @@index([claimId])
   @@index([createdAt])
   @@map("notifications")
 }
@@ -423,6 +425,10 @@ enum NotificationType {
   ARTIST_REQUEST_REJECT
   ACCOUNT_ACTIVATED
   ACCOUNT_DEACTIVATED
+  ARTIST_REQUEST_SUBMITTED
+  CLAIM_REQUEST_SUBMITTED
+  CLAIM_REQUEST_APPROVED
+  CLAIM_REQUEST_REJECTED
 }
 
 enum FollowingType {

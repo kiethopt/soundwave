@@ -1,17 +1,21 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArtistService = void 0;
 exports.getOrCreateArtistProfile = getOrCreateArtistProfile;
+const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const upload_service_1 = require("./upload.service");
 const date_fns_1 = require("date-fns");
-const prisma = new client_1.PrismaClient();
-async function getOrCreateArtistProfile(artistNameOrId) {
+async function getOrCreateArtistProfile(artistNameOrId, tx) {
+    const db = tx || db_1.default;
     const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId);
     if (isLikelyId) {
-        const existingProfile = await prisma.artistProfile.findUnique({
+        const existingProfile = await db.artistProfile.findUnique({
             where: { id: artistNameOrId },
         });
         if (existingProfile) {
@@ -19,7 +23,7 @@ async function getOrCreateArtistProfile(artistNameOrId) {
         }
     }
     const nameToSearch = artistNameOrId;
-    let artistProfile = await prisma.artistProfile.findFirst({
+    let artistProfile = await db.artistProfile.findFirst({
         where: {
             artistName: {
                 equals: nameToSearch,
@@ -31,7 +35,7 @@ async function getOrCreateArtistProfile(artistNameOrId) {
         return artistProfile;
     }
     console.log(`Creating placeholder artist profile for: ${nameToSearch}`);
-    artistProfile = await prisma.artistProfile.create({
+    artistProfile = await db.artistProfile.create({
         data: {
             artistName: nameToSearch,
             role: client_1.Role.ARTIST,
@@ -60,7 +64,7 @@ class ArtistService {
         if (user.role === client_1.Role.ADMIN) {
             return { canEdit: true };
         }
-        const artistProfile = await prisma.artistProfile.findUnique({
+        const artistProfile = await db_1.default.artistProfile.findUnique({
             where: { id: artistProfileId },
             select: { userId: true, isVerified: true },
         });
@@ -84,14 +88,14 @@ class ArtistService {
             id: { not: currentArtistId },
         };
         const [artists, total] = await Promise.all([
-            prisma.artistProfile.findMany({
+            db_1.default.artistProfile.findMany({
                 where: whereCondition,
                 skip: offset,
                 take: limit,
                 select: prisma_selects_1.artistProfileSelect,
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma.artistProfile.count({ where: whereCondition }),
+            db_1.default.artistProfile.count({ where: whereCondition }),
         ]);
         return {
             artists,
@@ -110,7 +114,7 @@ class ArtistService {
             console.log(`[Redis] Serving artist profile from cache: ${id}`);
             return JSON.parse(cachedData);
         }
-        const artist = await prisma.artistProfile.findUnique({
+        const artist = await db_1.default.artistProfile.findUnique({
             where: { id },
             select: prisma_selects_1.artistProfileSelect,
         });
@@ -130,7 +134,7 @@ class ArtistService {
                 return JSON.parse(cachedData);
             }
         }
-        const artistProfile = await prisma.artistProfile.findUnique({
+        const artistProfile = await db_1.default.artistProfile.findUnique({
             where: { id },
             select: { id: true, isVerified: true, userId: true },
         });
@@ -142,14 +146,14 @@ class ArtistService {
             whereCondition.isActive = true;
         }
         const [albums, total] = await Promise.all([
-            prisma.album.findMany({
+            db_1.default.album.findMany({
                 where: whereCondition,
                 skip: offset,
                 take: limit,
                 select: prisma_selects_1.albumSelect,
                 orderBy: { releaseDate: 'desc' },
             }),
-            prisma.album.count({ where: whereCondition }),
+            db_1.default.album.count({ where: whereCondition }),
         ]);
         const response = {
             albums,
@@ -175,7 +179,7 @@ class ArtistService {
                 return JSON.parse(cachedData);
             }
         }
-        const artistProfile = await prisma.artistProfile.findUnique({
+        const artistProfile = await db_1.default.artistProfile.findUnique({
             where: { id },
             select: { id: true, isVerified: true, userId: true },
         });
@@ -187,14 +191,14 @@ class ArtistService {
             whereCondition.isActive = true;
         }
         const [tracks, total] = await Promise.all([
-            prisma.track.findMany({
+            db_1.default.track.findMany({
                 where: whereCondition,
                 skip: offset,
                 take: limit,
                 select: prisma_selects_1.trackSelect,
                 orderBy: { releaseDate: 'desc' },
             }),
-            prisma.track.count({ where: whereCondition }),
+            db_1.default.track.count({ where: whereCondition }),
         ]);
         const response = {
             tracks,
@@ -229,14 +233,14 @@ class ArtistService {
             bannerUrl = result.secure_url;
         }
         if (data.genreIds?.length) {
-            const existingGenres = await prisma.genre.findMany({
+            const existingGenres = await db_1.default.genre.findMany({
                 where: { id: { in: data.genreIds } },
             });
             if (existingGenres.length !== data.genreIds.length) {
                 throw new Error('One or more genres do not exist');
             }
         }
-        const updatedArtistProfile = await prisma.artistProfile.update({
+        const updatedArtistProfile = await db_1.default.artistProfile.update({
             where: { id },
             data: {
                 artistName: data.artistName,
@@ -286,7 +290,7 @@ class ArtistService {
         trendStartDate5Y.setMonth(0, 1);
         trendStartDate5Y.setHours(0, 0, 0, 0);
         const [artistData, totalPlaysData, albumsData, topTracksData, listenerHistoryForTopListeners, followerRecords, likeRecords, playlistAddRecords, playHistoryForListenerTrend] = await Promise.all([
-            prisma.artistProfile.findUnique({
+            db_1.default.artistProfile.findUnique({
                 where: { id: artistProfileId },
                 select: {
                     artistName: true,
@@ -302,13 +306,13 @@ class ArtistService {
                     },
                 },
             }),
-            prisma.track.aggregate({
+            db_1.default.track.aggregate({
                 where: { artistId: artistProfileId, isActive: true },
                 _sum: {
                     playCount: true,
                 },
             }),
-            prisma.album.findMany({
+            db_1.default.album.findMany({
                 where: {
                     artistId: artistProfileId,
                     isActive: true,
@@ -326,7 +330,7 @@ class ArtistService {
                     },
                 },
             }),
-            prisma.track.findMany({
+            db_1.default.track.findMany({
                 where: { artistId: artistProfileId, isActive: true },
                 select: {
                     id: true,
@@ -344,7 +348,7 @@ class ArtistService {
                 orderBy: { playCount: 'desc' },
                 take: 5,
             }),
-            prisma.history.groupBy({
+            db_1.default.history.groupBy({
                 by: ['userId'],
                 where: {
                     type: client_1.HistoryType.PLAY,
@@ -370,7 +374,7 @@ class ArtistService {
                 },
                 take: 7,
             }),
-            prisma.userFollow.findMany({
+            db_1.default.userFollow.findMany({
                 where: {
                     followingArtistId: artistProfileId,
                     followingType: client_1.FollowingType.ARTIST,
@@ -383,7 +387,7 @@ class ArtistService {
                     createdAt: true,
                 },
             }),
-            prisma.userLikeTrack.findMany({
+            db_1.default.userLikeTrack.findMany({
                 where: {
                     track: {
                         artistId: artistProfileId,
@@ -398,7 +402,7 @@ class ArtistService {
                     createdAt: true,
                 },
             }),
-            prisma.playlistTrack.findMany({
+            db_1.default.playlistTrack.findMany({
                 where: {
                     track: {
                         artistId: artistProfileId,
@@ -419,7 +423,7 @@ class ArtistService {
                     }
                 },
             }),
-            prisma.history.findMany({
+            db_1.default.history.findMany({
                 where: {
                     type: client_1.HistoryType.PLAY,
                     track: {
@@ -443,7 +447,7 @@ class ArtistService {
         if (!artistData) {
             throw new Error('Artist profile not found');
         }
-        const monthlyStreamDataPromise = prisma.history.groupBy({
+        const monthlyStreamDataPromise = db_1.default.history.groupBy({
             by: ['createdAt'],
             where: {
                 type: client_1.HistoryType.PLAY,
@@ -460,7 +464,7 @@ class ArtistService {
                 createdAt: 'asc',
             }
         });
-        const yearlyStreamDataPromise = prisma.history.groupBy({
+        const yearlyStreamDataPromise = db_1.default.history.groupBy({
             by: ['createdAt'],
             where: {
                 type: client_1.HistoryType.PLAY,
@@ -478,7 +482,7 @@ class ArtistService {
             }
         });
         const topListenerIds = listenerHistoryForTopListeners.map(item => item.userId);
-        const topListenersDetails = topListenerIds.length > 0 ? await prisma.user.findMany({
+        const topListenersDetails = topListenerIds.length > 0 ? await db_1.default.user.findMany({
             where: { id: { in: topListenerIds } },
             select: prisma_selects_1.userSelect,
         }) : [];
@@ -567,7 +571,7 @@ class ArtistService {
         const followerTrend = processTotalCountTrend6M(followerRecords, 'createdAt');
         const likeTrend = processTotalCountTrend6M(likeRecords, 'createdAt');
         const playlistAddTrend = processUniqueUserTrend6M(playlistAddRecords);
-        const genreCounts = await prisma.trackGenre.groupBy({
+        const genreCounts = await db_1.default.trackGenre.groupBy({
             by: ['genreId'],
             where: {
                 track: {
@@ -587,7 +591,7 @@ class ArtistService {
         let genreDistribution = [];
         if (genreCounts.length > 0) {
             const genreIds = genreCounts.map(gc => gc.genreId);
-            const genreDetails = await prisma.genre.findMany({
+            const genreDetails = await db_1.default.genre.findMany({
                 where: { id: { in: genreIds } },
                 select: { id: true, name: true }
             });
@@ -705,7 +709,7 @@ class ArtistService {
         };
     }
     static async getRelatedArtists(id) {
-        const artistProfile = await prisma.artistProfile.findUnique({
+        const artistProfile = await db_1.default.artistProfile.findUnique({
             where: { id },
             select: { genres: { select: { genreId: true } } },
         });
@@ -713,7 +717,7 @@ class ArtistService {
             throw new Error('Artist not found');
         }
         const genreIds = artistProfile.genres.map((genre) => genre.genreId);
-        return prisma.artistProfile.findMany({
+        return db_1.default.artistProfile.findMany({
             where: {
                 genres: { some: { genreId: { in: genreIds } } },
                 isVerified: true,

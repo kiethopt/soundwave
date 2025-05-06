@@ -59,6 +59,12 @@ export const albumSelect = {
       updatedAt: true,
       artistId: true,
       albumId: true,
+      album: {
+        select: {
+          id: true,
+          type: true
+        }
+      },
       label: {
         select: {
           id: true,

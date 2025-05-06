@@ -1,4 +1,4 @@
-import { Role, ClaimStatus, AlbumType } from '@prisma/client';
+import { Role, ClaimStatus, Prisma, NotificationType, RecipientType, AlbumType } from '@prisma/client';
 import { Request } from 'express';
 import prisma from '../config/db';
 import {
@@ -17,11 +17,13 @@ import * as path from 'path';
 import { SystemComponentStatus } from '../types/system.types';
 import { client as redisClient } from '../middleware/cache.middleware';
 import { transporter as nodemailerTransporter } from './email.service';
-import { Prisma, User as PrismaUser, PlaylistType } from '@prisma/client';
+import { User as PrismaUser, PlaylistType } from '@prisma/client';
 import { ArtistProfile } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { subMonths, endOfMonth } from 'date-fns';
 import * as emailService from './email.service';
+import { getIO } from '../config/socket';
+import { getUserSockets } from '../config/socket';
 import { uploadFile } from './upload.service';
 import * as mm from 'music-metadata';
 import { Essentia, EssentiaWASM } from 'essentia.js';
@@ -806,6 +808,7 @@ export const approveArtistRequest = async (requestId: string) => {
         message: 'Your request to become an Artist has been approved!',
         recipientType: 'USER',
         userId: userForNotification.id,
+        artistId: updatedProfile.id
       },
     }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
 
@@ -1322,7 +1325,7 @@ export const approveArtistClaim = async (claimId: string, adminUserId: string) =
       status: true,
       claimingUserId: true,
       artistProfileId: true,
-      artistProfile: { select: { userId: true, isVerified: true } } // Check target profile status
+      artistProfile: { select: { userId: true, isVerified: true, artistName: true } } // Lấy thêm artistName
     }
   });
 
@@ -1370,7 +1373,6 @@ export const approveArtistClaim = async (claimId: string, adminUserId: string) =
         isVerified: true, // Mark as verified
         verifiedAt: new Date(),
         role: Role.ARTIST, // Ensure role is ARTIST
-        // Reset any pending verification request fields if they exist (optional but good practice)
         verificationRequestedAt: null,
         requestedLabelName: null,
       },
@@ -1407,7 +1409,47 @@ export const approveArtistClaim = async (claimId: string, adminUserId: string) =
       }
     });
 
-    // TODO: Add notification/email logic here later
+    // --- START: Gửi thông báo và socket cho User được duyệt --- 
+    try {
+      const notificationData = {
+        data: {
+          type: NotificationType.CLAIM_REQUEST_APPROVED,
+          message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' has been approved.`,
+          recipientType: RecipientType.USER,
+          userId: updatedClaim.claimingUserId, // ID của User được duyệt
+          artistId: updatedClaim.artistProfileId, // ID của Artist Profile
+          senderId: adminUserId, // ID của Admin duyệt,
+          isRead: false
+        },
+        select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true } // Select fields needed for socket
+      };
+
+      const notification = await tx.notification.create(notificationData);
+
+      // Emit socket event
+      const io = getIO();
+      const targetSocketId = getUserSockets().get(updatedClaim.claimingUserId);
+      if (targetSocketId) {
+         console.log(`[Socket Emit] Sending CLAIM_REQUEST_APPROVED notification to user ${updatedClaim.claimingUserId} via socket ${targetSocketId}`);
+         io.to(targetSocketId).emit('notification', {
+         id: notification.id,
+         type: notification.type,
+         message: notification.message,
+         recipientType: notification.recipientType,
+         isRead: notification.isRead,
+         createdAt: notification.createdAt.toISOString(),
+         artistId: notification.artistId,
+         senderId: notification.senderId
+         });
+      } else {
+          console.log(`[Socket Emit] User ${updatedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_APPROVED socket event.`);
+      }
+
+    } catch (notificationError) {
+      console.error("[Notify/Socket Error] Failed processing claim approval notification/socket:", notificationError);
+      // Do not throw error here to let the main transaction succeed
+    }
+    // --- END: Gửi thông báo và socket cho User được duyệt --- 
 
     return {
       message: `Claim approved. Profile '${updatedProfile.artistName}' is now linked to user ${updatedClaim.claimingUserId}.`,
@@ -1421,7 +1463,12 @@ export const approveArtistClaim = async (claimId: string, adminUserId: string) =
 export const rejectArtistClaim = async (claimId: string, adminUserId: string, reason: string) => {
   const claimRequest = await prisma.artistClaimRequest.findUnique({
     where: { id: claimId },
-     select: { id: true, status: true, claimingUserId: true }
+     select: {
+       id: true,
+       status: true,
+       claimingUserId: true,
+       artistProfile: { select: { id: true, artistName: true } } // Lấy artistName
+      }
   });
 
   if (!claimRequest) {
@@ -1444,10 +1491,49 @@ export const rejectArtistClaim = async (claimId: string, adminUserId: string, re
       reviewedAt: new Date(),
       reviewedByAdminId: adminUserId,
     },
-    select: { id: true, claimingUserId: true } // Select needed IDs
+    select: { id: true, claimingUserId: true, artistProfileId: true }
   });
 
-  // TODO: Add notification/email logic here later
+  // --- START: Gửi thông báo và socket cho User bị từ chối --- 
+  if (rejectedClaim && claimRequest) { // Ensure we have needed data
+    try {
+      const notification = await prisma.notification.create({
+        data: {
+          type: NotificationType.CLAIM_REQUEST_REJECTED,
+          message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' was rejected. Reason: ${reason.trim()}`,
+          recipientType: RecipientType.USER,
+          userId: rejectedClaim.claimingUserId, // ID của User bị từ chối
+          artistId: rejectedClaim.artistProfileId, // ID của Artist Profile
+          senderId: adminUserId,
+          isRead: false
+        },
+        select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+      });
+
+      // Emit socket event after notification is created
+      const io = getIO();
+      const targetSocketId = getUserSockets().get(rejectedClaim.claimingUserId);
+      if (targetSocketId) {
+        console.log(`[Socket Emit] Sending CLAIM_REQUEST_REJECTED notification to user ${rejectedClaim.claimingUserId} via socket ${targetSocketId}`);
+        io.to(targetSocketId).emit('notification', {
+          id: notification.id,
+          type: notification.type,
+          message: notification.message,
+          recipientType: notification.recipientType,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt.toISOString(),
+          artistId: notification.artistId,
+          senderId: notification.senderId,
+          rejectionReason: reason.trim()
+        });
+      } else {
+        console.log(`[Socket Emit] User ${rejectedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_REJECTED socket event.`);
+      }
+    } catch (notificationError) {
+      console.error("[Notify/Socket Error] Failed processing claim rejection notification/socket:", notificationError);
+    }
+  }
+  // --- END: Gửi thông báo và socket cho User bị từ chối --- 
 
   return {
     message: 'Artist claim request rejected successfully.',

@@ -36,8 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
+exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+=======
 exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -50,10 +54,15 @@ const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
+<<<<<<< HEAD
+const socket_1 = require("../config/socket");
+const socket_2 = require("../config/socket");
+=======
 const upload_service_1 = require("./upload.service");
 const mm = __importStar(require("music-metadata"));
 const essentia_js_1 = require("essentia.js");
 const mpg123_decoder_1 = require("mpg123-decoder");
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const VALID_GEMINI_MODELS = [
     'gemini-2.5-flash-preview-04-17',
     'gemini-2.5-pro-preview-03-25',
@@ -675,6 +684,7 @@ const approveArtistRequest = async (requestId) => {
                 message: 'Your request to become an Artist has been approved!',
                 recipientType: 'USER',
                 userId: userForNotification.id,
+                artistId: updatedProfile.id
             },
         }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
         if (userForNotification.email) {
@@ -1145,7 +1155,11 @@ const approveArtistClaim = async (claimId, adminUserId) => {
             status: true,
             claimingUserId: true,
             artistProfileId: true,
+<<<<<<< HEAD
+            artistProfile: { select: { userId: true, isVerified: true, artistName: true } }
+=======
             artistProfile: { select: { userId: true, isVerified: true } }
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         }
     });
     if (!claimRequest) {
@@ -1215,6 +1229,45 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                 reviewedByAdminId: adminUserId,
             }
         });
+<<<<<<< HEAD
+        try {
+            const notificationData = {
+                data: {
+                    type: client_1.NotificationType.CLAIM_REQUEST_APPROVED,
+                    message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' has been approved.`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: updatedClaim.claimingUserId,
+                    artistId: updatedClaim.artistProfileId,
+                    senderId: adminUserId,
+                    isRead: false
+                },
+                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+            };
+            const notification = await tx.notification.create(notificationData);
+            const io = (0, socket_1.getIO)();
+            const targetSocketId = (0, socket_2.getUserSockets)().get(updatedClaim.claimingUserId);
+            if (targetSocketId) {
+                console.log(`[Socket Emit] Sending CLAIM_REQUEST_APPROVED notification to user ${updatedClaim.claimingUserId} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId
+                });
+            }
+            else {
+                console.log(`[Socket Emit] User ${updatedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_APPROVED socket event.`);
+            }
+        }
+        catch (notificationError) {
+            console.error("[Notify/Socket Error] Failed processing claim approval notification/socket:", notificationError);
+        }
+=======
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         return {
             message: `Claim approved. Profile '${updatedProfile.artistName}' is now linked to user ${updatedClaim.claimingUserId}.`,
             claimId: updatedClaim.id,
@@ -1227,7 +1280,16 @@ exports.approveArtistClaim = approveArtistClaim;
 const rejectArtistClaim = async (claimId, adminUserId, reason) => {
     const claimRequest = await db_1.default.artistClaimRequest.findUnique({
         where: { id: claimId },
+<<<<<<< HEAD
+        select: {
+            id: true,
+            status: true,
+            claimingUserId: true,
+            artistProfile: { select: { id: true, artistName: true } }
+        }
+=======
         select: { id: true, status: true, claimingUserId: true }
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
     });
     if (!claimRequest) {
         throw new Error('Artist claim request not found.');
@@ -1246,8 +1308,51 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
             reviewedAt: new Date(),
             reviewedByAdminId: adminUserId,
         },
+<<<<<<< HEAD
+        select: { id: true, claimingUserId: true, artistProfileId: true }
+    });
+    if (rejectedClaim && claimRequest) {
+        try {
+            const notification = await db_1.default.notification.create({
+                data: {
+                    type: client_1.NotificationType.CLAIM_REQUEST_REJECTED,
+                    message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' was rejected. Reason: ${reason.trim()}`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: rejectedClaim.claimingUserId,
+                    artistId: rejectedClaim.artistProfileId,
+                    senderId: adminUserId,
+                    isRead: false
+                },
+                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+            });
+            const io = (0, socket_1.getIO)();
+            const targetSocketId = (0, socket_2.getUserSockets)().get(rejectedClaim.claimingUserId);
+            if (targetSocketId) {
+                console.log(`[Socket Emit] Sending CLAIM_REQUEST_REJECTED notification to user ${rejectedClaim.claimingUserId} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId,
+                    rejectionReason: reason.trim()
+                });
+            }
+            else {
+                console.log(`[Socket Emit] User ${rejectedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_REJECTED socket event.`);
+            }
+        }
+        catch (notificationError) {
+            console.error("[Notify/Socket Error] Failed processing claim rejection notification/socket:", notificationError);
+        }
+    }
+=======
         select: { id: true, claimingUserId: true }
     });
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
     return {
         message: 'Artist claim request rejected successfully.',
         claimId: rejectedClaim.id,
@@ -1255,6 +1360,8 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
     };
 };
 exports.rejectArtistClaim = rejectArtistClaim;
+<<<<<<< HEAD
+=======
 async function convertMp3BufferToPcmF32(audioBuffer) {
     try {
         const decoder = new mpg123_decoder_1.MPEGDecoder();
@@ -1595,4 +1702,5 @@ const processBulkUpload = async (files) => {
     return results;
 };
 exports.processBulkUpload = processBulkUpload;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 //# sourceMappingURL=admin.service.js.map

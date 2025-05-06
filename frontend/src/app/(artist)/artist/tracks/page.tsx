@@ -519,7 +519,7 @@ export default function SimpleTrackManagement() {
                       <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                         {track.title}
                       </td>
-                      <td className="py-4 px-6">{track.album?.title || 'Single'}</td>
+                      <td className="py-4 px-6">{track.album?.title || ''}</td>
                       <td className="py-4 px-6">
                         {track.genres?.map(g => g.genre.name).join(', ')}
                       </td>
@@ -535,7 +535,7 @@ export default function SimpleTrackManagement() {
                       </td>
                       <td className="py-4 px-6">
                          <div className="flex items-center justify-center gap-1">
-                           <Button
+                           {/* <Button
                              variant="ghost"
                              size="icon"
                              className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
@@ -544,7 +544,7 @@ export default function SimpleTrackManagement() {
                              disabled={loading || actionLoading !== null}
                            >
                              <Trash2 className="h-4 w-4" />
-                           </Button>
+                           </Button> */}
                            <Button
                              variant="ghost"
                              size="icon"

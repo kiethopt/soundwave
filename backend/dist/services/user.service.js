@@ -36,7 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
+exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+=======
 exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getDiscoverGenres = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -354,20 +358,27 @@ const followTarget = async (follower, followingId) => {
                     },
                 });
                 const io = (0, socket_1.getIO)();
-                const room = `user-${followedUserIdForPusher}`;
-                io.to(room).emit('notification', {
-                    id: notification.id,
-                    type: 'NEW_FOLLOW',
-                    message: notificationMessage,
-                    recipientType: notificationRecipientType,
-                    isRead: false,
-                    createdAt: notification.createdAt.toISOString(),
-                    sender: {
-                        id: follower.id,
-                        name: follower.name || follower.username,
-                        avatar: follower.avatar
-                    }
-                });
+                const userSocketsMap = (0, socket_1.getUserSockets)();
+                const targetSocketId = userSocketsMap.get(followedUserIdForPusher);
+                if (targetSocketId) {
+                    console.log(`[Socket Emit] Sending NEW_FOLLOW notification to user ${followedUserIdForPusher} via socket ${targetSocketId}`);
+                    io.to(targetSocketId).emit('notification', {
+                        id: notification.id,
+                        type: 'NEW_FOLLOW',
+                        message: notificationMessage,
+                        recipientType: notificationRecipientType,
+                        isRead: false,
+                        createdAt: notification.createdAt.toISOString(),
+                        sender: {
+                            id: follower.id,
+                            name: follower.name || follower.username,
+                            avatar: follower.avatar
+                        }
+                    });
+                }
+                else {
+                    console.log(`[Socket Emit] User ${followedUserIdForPusher} not connected, skipping NEW_FOLLOW socket event.`);
+                }
             }
             catch (error) {
                 console.error('Error creating or sending notification:', error);
@@ -606,8 +617,51 @@ const requestArtistRole = async (user, data, avatarFile) => {
                     genre: { connect: { id: genreId } },
                 })),
             },
+            isVerified: false,
         },
+        include: { user: { select: { name: true, username: true } } }
     });
+    try {
+        const admins = await db_1.default.user.findMany({ where: { role: client_1.Role.ADMIN } });
+        const notificationPromises = admins.map(async (admin) => {
+            const notificationRecord = await db_1.default.notification.create({
+                data: {
+                    type: client_1.NotificationType.ARTIST_REQUEST_SUBMITTED,
+                    message: `User '${createdProfile.user?.name || createdProfile.user?.username || user.id}' requested to become artist: ${artistName}.`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: admin.id,
+                    senderId: user.id,
+                    artistId: createdProfile.id,
+                },
+                select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true }
+            });
+            return { adminId: admin.id, notification: notificationRecord };
+        });
+        const createdNotifications = await Promise.all(notificationPromises);
+        const io = (0, socket_1.getIO)();
+        const userSocketsMap = (0, socket_1.getUserSockets)();
+        createdNotifications.forEach(({ adminId, notification }) => {
+            const adminSocketId = userSocketsMap.get(adminId);
+            if (adminSocketId) {
+                console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
+                io.to(adminSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId,
+                    sender: { id: user.id, name: user.name || user.username },
+                    artistProfile: { id: createdProfile.id, artistName: artistName, avatar: createdProfile.avatar }
+                });
+            }
+        });
+    }
+    catch (notificationError) {
+        console.error("[Notify Error] Failed to create admin notifications for artist request:", notificationError);
+    }
     const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
     if (adminNotificationEmail) {
         try {
@@ -1455,14 +1509,55 @@ const submitArtistClaim = async (userId, artistProfileId, proof) => {
             id: true,
             status: true,
             submittedAt: true,
-            artistProfile: {
-                select: {
-                    id: true,
-                    artistName: true,
-                }
-            }
+            claimingUser: { select: { id: true, name: true, username: true, avatar: true } },
+            artistProfile: { select: { id: true, artistName: true, avatar: true } }
         }
     });
+    try {
+        const admins = await db_1.default.user.findMany({ where: { role: client_1.Role.ADMIN } });
+        const userName = newClaim.claimingUser.name || newClaim.claimingUser.username || userId;
+        const artistName = newClaim.artistProfile.artistName;
+        const notificationPromises = admins.map(async (admin) => {
+            const notificationRecord = await db_1.default.notification.create({
+                data: {
+                    type: client_1.NotificationType.CLAIM_REQUEST_SUBMITTED,
+                    message: `User '${userName}' submitted a claim request for artist '${artistName}'.`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: admin.id,
+                    senderId: userId,
+                    artistId: artistProfileId,
+                    claimId: newClaim.id,
+                },
+                select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true, claimId: true }
+            });
+            return { adminId: admin.id, notification: notificationRecord };
+        });
+        const createdClaimNotifications = await Promise.all(notificationPromises);
+        const io = (0, socket_1.getIO)();
+        const userSocketsMap = (0, socket_1.getUserSockets)();
+        createdClaimNotifications.forEach(({ adminId, notification }) => {
+            const adminSocketId = userSocketsMap.get(adminId);
+            if (adminSocketId) {
+                console.log(`[Socket Emit] Sending CLAIM_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
+                io.to(adminSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId,
+                    claimId: notification.claimId,
+                    sender: { id: userId, name: userName, avatar: newClaim.claimingUser.avatar },
+                    artistProfile: { id: newClaim.artistProfile.id, artistName: artistName, avatar: newClaim.artistProfile.avatar }
+                });
+            }
+        });
+    }
+    catch (notificationError) {
+        console.error("[Notify Error] Failed to create admin notifications for claim request:", notificationError);
+    }
     return newClaim;
 };
 exports.submitArtistClaim = submitArtistClaim;

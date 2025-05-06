@@ -1087,3 +1087,7 @@ export const reorderPlaylistTracks = async (
     };
   }
 };
+
+export function updateVibeRewindPlaylist(userId: string) {
+  throw new Error('Function not implemented.');
+}

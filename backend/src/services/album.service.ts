@@ -5,7 +5,9 @@ import { Role, AlbumType, Prisma, HistoryType, NotificationType, RecipientType }
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
 import * as emailService from './email.service';
 import { paginate } from 'src/utils/handle-utils';
-import { getIO } from '../config/socket';
+import { getIO, getUserSockets } from '../config/socket';
+import { getOrCreateArtistProfile } from './artist.service';
+import * as mm from 'music-metadata';
 
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
   if (!user) return false;
@@ -201,56 +203,69 @@ export const createAlbum = async (req: Request) => {
     select: albumSelect,
   });
 
-  const followers = await prisma.userFollow.findMany({
-    where: { followingArtistId: targetArtistProfileId, followingType: 'ARTIST' },
-    select: { followerId: true },
-  });
-
-  const followerIds = followers.map((f) => f.followerId);
-  const followerUsers = await prisma.user.findMany({
-    where: { id: { in: followerIds } },
-    select: { id: true, email: true },
-  });
-
-  const notificationsData = followers.map((follower) => ({
-    type: NotificationType.NEW_ALBUM,
-    message: `${artistName} just released a new album: ${title}`,
-    recipientType: RecipientType.USER,
-    userId: follower.followerId,
-    artistId: targetArtistProfileId,
-    senderId: targetArtistProfileId,
-    albumId: album.id,
-  }));
-
-  if (notificationsData.length > 0) {
-    await prisma.notification.createMany({ data: notificationsData });
-  }
-
-  const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+  // Emit WebSocket event after creation
   const io = getIO();
-  for (const user of followerUsers) {
-    const room = `user-${user.id}`;
-    io.to(room).emit('notification', {
-      type: NotificationType.NEW_ALBUM,
-      message: `${artistName} just released a new album: ${album.title}`,
-      albumId: album.id,
+  io.emit('album:created', { album });
+
+  // --- Asynchronous Notification/Email Sending ---
+  const sendNotifications = async () => {
+    const followers = await prisma.userFollow.findMany({
+      where: { followingArtistId: targetArtistProfileId, followingType: 'ARTIST' },
+      select: { followerId: true },
     });
 
-    if (user.email) {
-      const emailOptions = emailService.createNewReleaseEmail(
-        user.email,
-        artistName,
-        'album',
-        album.title,
-        releaseLink,
-        album.coverUrl
-      );
-      await emailService.sendEmail(emailOptions);
-    }
-  }
+    const followerIds = followers.map((f) => f.followerId);
+    if (followerIds.length === 0) return;
 
-  // Emit WebSocket event after creation
-  io.emit('album:created', { album });
+    const followerUsers = await prisma.user.findMany({
+      where: { id: { in: followerIds }, isActive: true }, // Ensure users are active
+      select: { id: true, email: true },
+    });
+
+    const notificationsData = followerUsers.map((follower) => ({
+      type: NotificationType.NEW_ALBUM,
+      message: `${artistName} just released a new album: ${title}`,
+      recipientType: RecipientType.USER,
+      userId: follower.id,
+      artistId: targetArtistProfileId,
+      senderId: targetArtistProfileId,
+      albumId: album.id,
+    }));
+
+    await prisma.notification.createMany({ data: notificationsData });
+
+    const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+    const io = getIO();
+    const userSocketsMap = getUserSockets(); // Assuming getUserSockets is available
+
+    for (const follower of followerUsers) {
+      const targetSocketId = userSocketsMap.get(follower.id);
+      if (targetSocketId) {
+         io.to(targetSocketId).emit('notification', {
+          type: NotificationType.NEW_ALBUM,
+          message: `${artistName} just released a new album: ${album.title}`,
+          albumId: album.id,
+        });
+      }
+
+      if (follower.email) {
+        const emailOptions = emailService.createNewReleaseEmail(
+          follower.email, // Use follower's email
+          artistName,
+          'album',
+          album.title,
+          releaseLink,
+          album.coverUrl
+        );
+        await emailService.sendEmail(emailOptions);
+      }
+    }
+  };
+
+  // Trigger notifications without awaiting
+  sendNotifications().catch(notificationError => {
+      console.error("Error sending new album notifications:", notificationError);
+  });
 
   return { message: 'Album created successfully', album };
 };
@@ -269,6 +284,7 @@ export const addTracksToAlbum = async (req: Request) => {
       type: true, 
       coverUrl: true, 
       isActive: true, 
+      releaseDate: true,
       labelId: true, // Select the labelId directly
       tracks: { select: { trackNumber: true } }
     }
@@ -277,6 +293,7 @@ export const addTracksToAlbum = async (req: Request) => {
   if (!albumWithLabel) throw new Error('Album not found');
   if (!canManageAlbum(user, albumWithLabel.artistId)) throw new Error('You can only add tracks to your own albums');
   
+  const mainArtistId = albumWithLabel.artistId; // Store the main artist ID
   const albumLabelId = albumWithLabel.labelId; // Use the fetched labelId
 
   const files = req.files as Express.Multer.File[];
@@ -289,48 +306,99 @@ export const addTracksToAlbum = async (req: Request) => {
 
   const maxTrackNumber = existingTracks.length > 0 ? Math.max(...existingTracks.map((t) => t.trackNumber || 0)) : 0;
 
-  const titles = Array.isArray(req.body.title) ? req.body.title : [req.body.title];
-  const releaseDates = Array.isArray(req.body.releaseDate) ? req.body.releaseDate : [req.body.releaseDate];
-  const featuredArtists = Array.isArray(req.body.featuredArtists)
-    ? req.body.featuredArtists.map((artists: string) => artists?.split(',').map((id: string) => id.trim()).filter(Boolean) ?? [])
-    : req.body.featuredArtists ? [req.body.featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)] : [];
-  const genres = Array.isArray(req.body.genres)
-    ? req.body.genres.map((genreIds: string) => genreIds?.split(',').map((id: string) => id.trim()).filter(Boolean) ?? [])
-    : req.body.genres ? [req.body.genres.split(',').map((id: string) => id.trim()).filter(Boolean)] : [];
+  // Get the flat arrays sent from the frontend
+  const titles = Array.isArray(req.body.titles) ? req.body.titles : [];
+  const trackNumbers = Array.isArray(req.body.trackNumbers) ? req.body.trackNumbers : []; // Might not be needed if we use index+max
+  const featuredArtistIdsJson = Array.isArray(req.body.featuredArtistIds) ? req.body.featuredArtistIds : [];
+  const featuredArtistNamesJson = Array.isArray(req.body.featuredArtistNames) ? req.body.featuredArtistNames : [];
+  const genreIdsJson = Array.isArray(req.body.genreIds) ? req.body.genreIds : [];
 
-  const mm = await import('music-metadata');
+  // Basic validation: number of files should match number of titles (primary metadata)
+  if (files.length !== titles.length) {
+    throw new Error(`Mismatch between uploaded files (${files.length}) and titles (${titles.length}).`);
+  }
+
+  console.time('[addTracksToAlbum] Total Processing Time'); // Start total timer
+
   const createdTracks = await Promise.all(
     files.map(async (file, index) => {
-      const metadata = await mm.parseBuffer(file.buffer);
-      const duration = Math.floor(metadata.format.duration || 0);
+      // Get metadata for the current track using the index
+      const titleForTrack = titles[index];
+      const featuredArtistIdsForTrack = JSON.parse(featuredArtistIdsJson[index] || '[]');
+      const featuredArtistNamesForTrack = JSON.parse(featuredArtistNamesJson[index] || '[]');
+      const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]');
+
+      if (!titleForTrack) { // Simplified check for title presence
+        console.error(`Missing title for track at index ${index}`);
+
+        throw new Error(`Missing title or metadata for track at index ${index} (file: ${file.originalname})`);
+      }
+
+      // Parse duration (already async)
+      console.time(`[addTracksToAlbum] Metadata Parse ${index}`); // Start timer BEFORE parsing
+      let duration = 0; // Default duration
+      try {
+        const metadata = await mm.parseBuffer(file.buffer); // Removed { duration: true } option
+        duration = Math.floor(metadata.format.duration || 0);
+        console.log(`[addTracksToAlbum] Track ${index} (${file.originalname}): Parsed duration = ${metadata.format.duration}, Saved duration = ${duration}`);
+        if (!metadata.format.duration) {
+           console.warn(`[addTracksToAlbum] Track ${index} (${file.originalname}): music-metadata could not find duration.`);
+        }
+      } catch (parseError) {
+        console.error(`[addTracksToAlbum] Track ${index} (${file.originalname}): Error parsing metadata:`, parseError);
+      }
+      console.timeEnd(`[addTracksToAlbum] Metadata Parse ${index}`);
+
+      // Upload audio file
+      console.time(`[addTracksToAlbum] Cloudinary Upload ${index}`);
       const uploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
+      console.timeEnd(`[addTracksToAlbum] Cloudinary Upload ${index}`);
 
       const existingTrack = await prisma.track.findFirst({
-        where: { title: titles[index], artistId: albumWithLabel.artistId },
+        where: { title: titleForTrack, artistId: mainArtistId },
       });
-      if (existingTrack) throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
+      // Consider allowing duplicate titles within an album, or keep this check
+      if (existingTrack) console.warn(`Track with title \"${titleForTrack}\" already exists for this artist.`);
 
       const newTrackNumber = maxTrackNumber + index + 1;
       
+      // Resolve featured artists for *this* track
+      console.time(`[addTracksToAlbum] Resolve Artists ${index}`);
+      const allFeaturedArtistIds = new Set<string>();
+
+      if (featuredArtistIdsForTrack.length > 0) {
+         const existingArtists = await prisma.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
+         existingArtists.forEach(artist => { if (artist.id !== mainArtistId) allFeaturedArtistIds.add(artist.id) });
+      }
+      if (featuredArtistNamesForTrack.length > 0) {
+        for (const name of featuredArtistNamesForTrack) {
+          try {
+            const profile = await getOrCreateArtistProfile(name);
+            if (profile.id !== mainArtistId) allFeaturedArtistIds.add(profile.id);
+          } catch (error) { console.error(`Error resolving artist name \"${name}\" for track ${index}:`, error); }
+        }
+      }
+      console.timeEnd(`[addTracksToAlbum] Resolve Artists ${index}`);
+
       const trackData: Prisma.TrackCreateInput = {
-          title: titles[index],
-          duration,
-          releaseDate: new Date(releaseDates[index] || Date.now()),
-          trackNumber: newTrackNumber,
-          coverUrl: albumWithLabel.coverUrl,
-          audioUrl: uploadResult.secure_url,
-          artist: { connect: { id: albumWithLabel.artistId } },
-          album: { connect: { id: albumId } },
-          type: albumWithLabel.type,
-          isActive: albumWithLabel.isActive,
-          featuredArtists: 
-            featuredArtists[index]?.length > 0
-              ? { create: featuredArtists[index].map((artistProfileId: string) => ({ artistProfile: { connect: { id: artistProfileId } } })) }
-              : undefined,
-          genres:
-            genres[index]?.length > 0
-              ? { create: genres[index].map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
-              : undefined,
+        title: titleForTrack,
+        duration,
+        releaseDate: new Date((albumWithLabel as any)?.releaseDate || Date.now()), 
+        trackNumber: newTrackNumber,
+        coverUrl: albumWithLabel.coverUrl,
+        audioUrl: uploadResult.secure_url,
+        artist: { connect: { id: mainArtistId } },
+        album: { connect: { id: albumId } },
+        type: albumWithLabel.type,
+        isActive: albumWithLabel.isActive,
+        featuredArtists:
+          allFeaturedArtistIds.size > 0
+            ? { create: Array.from(allFeaturedArtistIds).map(artistId => ({ artistProfile: { connect: { id: artistId } } })) }
+            : undefined,
+        genres:
+          genreIdsForTrack && genreIdsForTrack.length > 0 // Ensure it's an array and has items
+            ? { create: genreIdsForTrack.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
+            : undefined, // Use genres from metadata
       };
 
       // Automatically connect the track to the album's label if it exists
@@ -338,10 +406,12 @@ export const addTracksToAlbum = async (req: Request) => {
         trackData.label = { connect: { id: albumLabelId } }; // Use connect with ID
       }
 
+      console.time(`[addTracksToAlbum] DB Create Track ${index}`);
       const track = await prisma.track.create({
         data: trackData,
         select: trackSelect,
       });
+      console.timeEnd(`[addTracksToAlbum] DB Create Track ${index}`);
       return track;
     })
   );
@@ -358,6 +428,8 @@ export const addTracksToAlbum = async (req: Request) => {
   // Emit event after updating album stats
   const io = getIO();
   io.emit('album:updated', { album: updatedAlbum });
+
+  console.timeEnd('[addTracksToAlbum] Total Processing Time'); // End total timer
 
   return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
 };

@@ -397,6 +397,17 @@ class TrackService {
         let danceability = null;
         let energy = null;
         try {
+<<<<<<< HEAD
+            const audioMetadata = await mm.parseBuffer(audioFile.buffer);
+            duration = Math.round(audioMetadata.format.duration || 0);
+            console.log(`[TrackService.createTrack] (${audioFile.originalname}): Parsed duration = ${audioMetadata.format.duration}, Saved duration = ${duration}`);
+            if (!audioMetadata.format.duration) {
+                console.warn(`[TrackService.createTrack] (${audioFile.originalname}): music-metadata could not find duration.`);
+            }
+        }
+        catch (error) {
+            console.error(`[TrackService.createTrack] (${audioFile.originalname}): Error parsing audio metadata:`, error);
+=======
             const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
             duration = Math.round(metadata.format.duration || 0);
             tempo = null;
@@ -467,6 +478,7 @@ class TrackService {
             console.error('Error parsing basic audio metadata:', error);
             tempo = null;
             mood = null;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         }
         const allFeaturedArtistIds = new Set();
         if (featuredArtistIds.length > 0) {
@@ -524,7 +536,7 @@ class TrackService {
                 albumId: true
             },
         });
-        try {
+        const sendNotifications = async () => {
             const followers = await db_1.default.userFollow.findMany({
                 where: {
                     followingArtistId: artistProfileId,
@@ -547,26 +559,31 @@ class TrackService {
                     senderId: artistProfileId,
                     trackId: newTrack.id,
                 }));
-                await db_1.default.notification.createMany({ data: notificationsData });
+                if (notificationsData.length > 0) {
+                    await db_1.default.notification.createMany({ data: notificationsData });
+                }
                 const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
                 const io = (0, socket_1.getIO)();
+                const userSocketsMap = (0, socket_1.getUserSockets)();
                 for (const user of followerUsers) {
-                    const room = `user-${user.id}`;
-                    io.to(room).emit('notification', {
-                        type: client_1.NotificationType.NEW_TRACK,
-                        message: `${artistName} just released a new track: ${newTrack.title}`,
-                        trackId: newTrack.id,
-                        sender: {
-                            id: artistProfileId,
-                            name: artistName,
-                            avatar: mainArtist.avatar
-                        },
-                        track: {
-                            id: newTrack.id,
-                            title: newTrack.title,
-                            coverUrl: newTrack.coverUrl
-                        }
-                    });
+                    const targetSocketId = userSocketsMap.get(user.id);
+                    if (targetSocketId) {
+                        io.to(targetSocketId).emit('notification', {
+                            type: client_1.NotificationType.NEW_TRACK,
+                            message: `${artistName} just released a new track: ${newTrack.title}`,
+                            trackId: newTrack.id,
+                            sender: {
+                                id: artistProfileId,
+                                name: artistName,
+                                avatar: mainArtist.avatar
+                            },
+                            track: {
+                                id: newTrack.id,
+                                title: newTrack.title,
+                                coverUrl: newTrack.coverUrl
+                            }
+                        });
+                    }
                     if (user.email) {
                         const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', newTrack.title, releaseLink, newTrack.coverUrl);
                         emailService.sendEmail(emailOptions).catch(emailError => {
@@ -575,10 +592,10 @@ class TrackService {
                     }
                 }
             }
-        }
-        catch (notificationError) {
+        };
+        sendNotifications().catch(notificationError => {
             console.error("Error sending new track notifications:", notificationError);
-        }
+        });
         return newTrack;
     }
 }
@@ -707,28 +724,51 @@ const updateTrack = async (req, id) => {
                 });
             }
         }
-        if (req.body.featuredArtists !== undefined) {
+        const featuredArtistIdsFromBody = req.body.featuredArtistIds;
+        const featuredArtistNamesFromBody = req.body.featuredArtistNames;
+        if (featuredArtistIdsFromBody !== undefined || featuredArtistNamesFromBody !== undefined) {
             await tx.trackArtist.deleteMany({ where: { trackId: id } });
-            const artistsInput = req.body.featuredArtists;
-            const artistsArray = !artistsInput
-                ? []
-                : Array.isArray(artistsInput)
-                    ? artistsInput.map(String)
-                    : typeof artistsInput === 'string'
-                        ? artistsInput.split(',').map((faId) => faId.trim()).filter(Boolean)
-                        : [];
-            if (artistsArray.length > 0) {
+            const resolvedFeaturedArtistIds = new Set();
+            if (featuredArtistIdsFromBody && Array.isArray(featuredArtistIdsFromBody) && featuredArtistIdsFromBody.length > 0) {
                 const existingArtists = await tx.artistProfile.findMany({
-                    where: { id: { in: artistsArray } },
+                    where: { id: { in: featuredArtistIdsFromBody } },
                     select: { id: true },
                 });
-                const validArtistIds = existingArtists.map(a => a.id);
-                const invalidArtistIds = artistsArray.filter(aId => !validArtistIds.includes(aId));
-                if (invalidArtistIds.length > 0) {
-                    throw new Error(`Invalid featured artist IDs: ${invalidArtistIds.join(', ')}`);
+                const validArtistIds = new Set(existingArtists.map(a => a.id));
+                featuredArtistIdsFromBody.forEach(artistId => {
+                    if (validArtistIds.has(artistId) && artistId !== currentTrack.artistId) {
+                        resolvedFeaturedArtistIds.add(artistId);
+                    }
+                    else if (!validArtistIds.has(artistId)) {
+                        console.warn(`[updateTrack] Invalid featured artist ID provided and skipped: ${artistId}`);
+                    }
+                    else if (artistId === currentTrack.artistId) {
+                        console.warn(`[updateTrack] Main artist ID (${artistId}) cannot be a featured artist on their own track.`);
+                    }
+                });
+            }
+            if (featuredArtistNamesFromBody && Array.isArray(featuredArtistNamesFromBody) && featuredArtistNamesFromBody.length > 0) {
+                for (const name of featuredArtistNamesFromBody) {
+                    if (typeof name === 'string' && name.trim() !== '') {
+                        try {
+                            const profile = await (0, artist_service_1.getOrCreateArtistProfile)(name.trim(), tx);
+                            if (profile.id !== currentTrack.artistId) {
+                                resolvedFeaturedArtistIds.add(profile.id);
+                            }
+                            else {
+                                console.warn(`[updateTrack] Main artist (${name}) cannot be a featured artist on their own track.`);
+                            }
+                        }
+                        catch (error) {
+                            console.error(`[updateTrack] Error processing featured artist name "${name}":`, error);
+                        }
+                    }
                 }
+            }
+            const finalArtistIdsToLink = Array.from(resolvedFeaturedArtistIds);
+            if (finalArtistIdsToLink.length > 0) {
                 await tx.trackArtist.createMany({
-                    data: validArtistIds.map((artistId) => ({
+                    data: finalArtistIdsToLink.map((artistId) => ({
                         trackId: id,
                         artistId: artistId,
                     })),

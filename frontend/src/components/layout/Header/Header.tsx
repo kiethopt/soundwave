@@ -26,6 +26,37 @@ import { LogOut, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useSession } from '@/contexts/SessionContext';
+import { useSocket } from '@/contexts/SocketContext';
+import { Notification } from '@/types';
+
+// Define RecipientType locally for frontend use
+enum RecipientType { 
+  USER = 'USER',
+  ARTIST = 'ARTIST'
+}
+
+// Define expected Notification type from socket independently
+// Include all necessary fields from base Notification + potential additions
+interface SocketNotification {
+  id: string;
+  type: string; // Keep type flexible from base Notification if needed
+  message: string;
+  isRead: boolean;
+  // Allow USER/ARTIST + potential ADMIN as string, or undefined if not sent
+  recipientType?: RecipientType | 'ADMIN' | string; 
+  userId?: string; 
+  artistId?: string; 
+  senderId?: string; 
+  createdAt: string; 
+  updatedAt: string; 
+  // Add other fields from base Notification if necessary (e.g., claimId)
+  claimId?: string | null;
+  sender?: { 
+      id: string;
+      name?: string | null;
+      username?: string | null;
+   } | null;
+}
 
 export default function Header({
   onMenuClick,
@@ -43,8 +74,11 @@ export default function Header({
 
   // Notifications handling
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const { socket, isConnected } = useSocket();
+  const [notifications, setNotifications] = useState<SocketNotification[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const [hasUnread, setHasUnread] = useState(false);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
   // Search suggestions handling
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -75,14 +109,34 @@ export default function Header({
       if (!token || !user) return;
 
       const allNotificationsData = await api.notifications.getList(token);
-      const newUserData = await api.auth.getMe(token);
-      const relevantNotifications = filterNotificationsByProfile(allNotificationsData);
+      // console.log('[Header] Fetched All Notifications:', allNotificationsData);
 
-      setNotifications(relevantNotifications);
-      const currentUnreadCount = relevantNotifications.filter(n => !n.isRead).length;
+      // Sửa logic lọc cho Admin
+      let relevantNotifications;
+      if (user.role === 'ADMIN') {
+        // Admin thấy tất cả thông báo gửi đến userId của họ (thường là thông báo hệ thống/request)
+        relevantNotifications = allNotificationsData.filter(
+          (n: any) => n.userId === user.id && n.recipientType === 'USER'
+        );
+        // console.log('[Header] Filtered Admin Notifications:', relevantNotifications);
+      } else {
+        // Logic cũ cho non-admin users, lọc theo currentProfile
+        relevantNotifications = allNotificationsData.filter(
+          (n: any) => n.recipientType === user.currentProfile &&
+                      (n.recipientType === 'USER' ? n.userId === user.id : n.artistId === user.artistProfile?.id)
+        );
+        // console.log(`[Header] Filtered ${user.currentProfile} Notifications:`, relevantNotifications);
+      }
+
+      setNotifications(relevantNotifications.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const currentUnreadCount = relevantNotifications.filter((n:any) => !n.isRead).length;
       setNotificationCount(currentUnreadCount);
       localStorage.setItem('notificationCount', String(currentUnreadCount));
-      localStorage.setItem('userData', JSON.stringify(newUserData));
+
+      // Cập nhật lại userData nếu cần (ví dụ: sau khi switch profile)
+      // const newUserData = await api.auth.getMe(token);
+      // localStorage.setItem('userData', JSON.stringify(newUserData));
+
     } catch (error) {
       console.error('Error fetching/setting notifications:', error);
     }
@@ -95,39 +149,51 @@ export default function Header({
   }, [isAuthenticated, user]);
 
   useEffect(() => {
-    if (!user?.id || !isAuthenticated) return;
+    if (socket && isConnected) {
+       console.log("[Header] Setting up 'notification' listener on socket:", socket.id);
+       
+       const handleNotification = (data: SocketNotification) => { 
+          console.log(`[Header] Received notification event`, data);
+          const expectedUserId = user?.id;
 
-    const socket = getSocket();
+          let shouldProcess = false;
 
-    const handleNewNotification = (data: any) => {
-      console.log('Received new notification event via Socket.IO:', data);
-      if (!user || data.recipientType !== user.currentProfile) {
-        console.log(`Ignoring notification for ${data.recipientType} profile while viewing ${user?.currentProfile}`);
-        return;
-      }
-      setNotifications((prev) => {
-        if (prev.some(n => n.id === data.id)) return prev;
-        return [data, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      });
-      if (!data.isRead) {
-        setNotificationCount((prev) => {
-          const newCount = prev + 1;
-          localStorage.setItem('notificationCount', String(newCount));
-          return newCount;
-        });
-      }
-    };
+          if (user?.role === 'ADMIN') { // Admin logic
+             if (data?.userId === expectedUserId) { 
+                shouldProcess = true;
+                console.log(`[Header] Processing ADMIN notification for self:`, data); 
+             }
+          } else { // User/Artist logic
+             if (data?.recipientType === RecipientType.USER && data?.userId === expectedUserId) {
+                shouldProcess = true;
+                console.log(`[Header] Processing USER notification:`, data);
+             } else if (data?.recipientType === RecipientType.ARTIST && data?.artistId === user?.artistProfile?.id) {
+                shouldProcess = true;
+                console.log(`[Header] Processing ARTIST notification:`, data);
+             }
+          }
 
-    socket.on('notification', handleNewNotification);
+          if (shouldProcess) {
+             setNotifications(prev => [data, ...prev].slice(0, 50)); 
+             if (!data.isRead) { 
+               setHasUnread(true);
+             }
+             toast(data.message || 'New notification'); 
+          } else {
+             console.log(`[Header] Filtering: Ignoring notification. Data userId: ${data?.userId}, artistId: ${data?.artistId}, recipientType: ${data?.recipientType}. Expected User: ${expectedUserId}, Expected Artist: ${user?.artistProfile?.id}`);
+          }
+       };
 
-    const savedCount = Number(localStorage.getItem('notificationCount') || '0');
-    setNotificationCount(savedCount);
+      socket.on('notification', handleNotification);
 
-    return () => {
-      console.log('Cleaning up Header socket listeners');
-      socket.off('notification', handleNewNotification);
-    };
-  }, [user, isAuthenticated]);
+      return () => {
+        console.log("[Header] Cleaning up 'notification' listener on socket:", socket.id);
+        socket.off('notification', handleNotification);
+      };
+    } else {
+        console.log("[Header] Socket not available or not connected, skipping listener setup.");
+    }
+  }, [socket, isConnected, user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -206,7 +272,7 @@ export default function Header({
         setNotifications((prevRelevant) => {
             const existingIds = new Set(prevRelevant.map(n => n.id));
             const newRelevantToAdd = relevantNotifications.filter(n => !existingIds.has(n.id));
-            return [...newRelevantToAdd, ...prevRelevant].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            return [...newRelevantToAdd, ...prevRelevant].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         });
 
         const currentUnreadCount = relevantNotifications.filter(n => !n.isRead).length;
@@ -356,6 +422,36 @@ export default function Header({
 
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+  };
+
+  const handleMarkAsRead = async () => {
+     if (!socket || !isConnected) {
+         console.warn("[Header] Cannot mark as read: Socket not connected.");
+         toast.error("Cannot connect to update notifications.");
+         return;
+     }
+     if (notifications.length === 0 || !hasUnread) return;
+
+     const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
+     if (unreadIds.length === 0) {
+         setHasUnread(false);
+         return;
+     }
+
+     console.log("[Header] Emitting mark_notifications_read for IDs:", unreadIds);
+     socket.emit('mark_notifications_read', { notificationIds: unreadIds }, (ack: any) => {
+         if (ack?.success) {
+             console.log("[Header] Server acknowledged mark_notifications_read.");
+             setNotifications(prev => 
+                 prev.map(n => unreadIds.includes(n.id) ? { ...n, isRead: true } : n)
+             );
+             setHasUnread(false);
+             toast.success("Notifications marked as read.");
+         } else {
+             console.error("[Header] Failed to mark notifications as read (server ack failed):", ack?.error);
+             toast.error(ack?.error || "Failed to mark notifications as read.");
+         }
+     });
   };
 
   return (
