@@ -71,10 +71,7 @@ router
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus)
     .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus);
 router.get('/system-status', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getSystemStatus);
-<<<<<<< HEAD
-=======
 router.post('/bulk-upload-tracks', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.array('audioFiles', 50), upload_middleware_1.handleUploadError, admin_controller_1.bulkUploadTracks);
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 router.get('/artist-claims', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtistClaimRequests);
 router.get('/artist-claims/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getArtistClaimRequestDetail);
 router.post('/artist-claims/:id/approve', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveArtistClaimRequest);

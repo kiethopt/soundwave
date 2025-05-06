@@ -1,6 +1,6 @@
 'use client';
 
-import type { Album, ArtistProfile, Track, TrackEditForm, Genre } from '@/types';
+import type { Album, ArtistProfile, Track, Genre, SelectedArtist } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { useParams, useRouter } from 'next/navigation';
@@ -11,31 +11,13 @@ import {
   Calendar,
   Music,
   MoreVertical,
-  Eye,
-  EyeOff,
   Verified,
-  Edit,
-  Trash2,
+  Edit
 } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/contexts/ThemeContext';
-import io, { Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { EditTrackModal } from '@/components/ui/artist-modals';
-
-// Define the type for selected artists (can have ID or just name)
-interface SelectedArtist {
-  id?: string;
-  name: string;
-}
 
 export default function AlbumDetailPage() {
   const params = useParams();

@@ -383,6 +383,47 @@ model ArtistClaimRequest {
   @@map("artist_claim_requests")
 }
 
+model Report {
+  id          String       @id @default(cuid())
+  type        ReportType
+  description String
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  resolvedAt  DateTime?
+  
+  // Who submitted the report
+  reporterId  String
+  reporter    User         @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  // Who resolved the report (admin)
+  resolverId  String?
+  resolver    User?        @relation("AdminResolutions", fields: [resolverId], references: [id], onDelete: SetNull)
+  
+  // Resolution details
+  resolution  String?
+  
+  // What entity is being reported
+  trackId     String?
+  track       Track?       @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  
+  playlistId  String?
+  playlist    Playlist?    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  
+  albumId     String?
+  album       Album?       @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([resolverId])
+  @@index([trackId])
+  @@index([playlistId])
+  @@index([albumId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reports")
+}
+
 enum ClaimStatus {
   PENDING
   APPROVED
@@ -441,7 +482,6 @@ enum RecipientType {
   ARTIST
 }
 
-// New enum for report types
 enum ReportType {
   COPYRIGHT_VIOLATION
   INAPPROPRIATE_CONTENT
@@ -449,51 +489,8 @@ enum ReportType {
   OTHER
 }
 
-// New enum for report status
 enum ReportStatus {
   PENDING
   RESOLVED
   REJECTED
-}
-
-// New Report model
-model Report {
-  id          String       @id @default(cuid())
-  type        ReportType
-  description String
-  status      ReportStatus @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  resolvedAt  DateTime?
-  
-  // Who submitted the report
-  reporterId  String
-  reporter    User         @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
-  
-  // Who resolved the report (admin)
-  resolverId  String?
-  resolver    User?        @relation("AdminResolutions", fields: [resolverId], references: [id], onDelete: SetNull)
-  
-  // Resolution details
-  resolution  String?
-  
-  // What entity is being reported
-  trackId     String?
-  track       Track?       @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  
-  playlistId  String?
-  playlist    Playlist?    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  
-  albumId     String?
-  album       Album?       @relation(fields: [albumId], references: [id], onDelete: Cascade)
-
-  @@index([reporterId])
-  @@index([resolverId])
-  @@index([trackId])
-  @@index([playlistId])
-  @@index([albumId])
-  @@index([type])
-  @@index([status])
-  @@index([createdAt])
-  @@map("reports")
 }

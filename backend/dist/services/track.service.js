@@ -397,17 +397,6 @@ class TrackService {
         let danceability = null;
         let energy = null;
         try {
-<<<<<<< HEAD
-            const audioMetadata = await mm.parseBuffer(audioFile.buffer);
-            duration = Math.round(audioMetadata.format.duration || 0);
-            console.log(`[TrackService.createTrack] (${audioFile.originalname}): Parsed duration = ${audioMetadata.format.duration}, Saved duration = ${duration}`);
-            if (!audioMetadata.format.duration) {
-                console.warn(`[TrackService.createTrack] (${audioFile.originalname}): music-metadata could not find duration.`);
-            }
-        }
-        catch (error) {
-            console.error(`[TrackService.createTrack] (${audioFile.originalname}): Error parsing audio metadata:`, error);
-=======
             const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
             duration = Math.round(metadata.format.duration || 0);
             tempo = null;
@@ -478,7 +467,6 @@ class TrackService {
             console.error('Error parsing basic audio metadata:', error);
             tempo = null;
             mood = null;
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         }
         const allFeaturedArtistIds = new Set();
         if (featuredArtistIds.length > 0) {

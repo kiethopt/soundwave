@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -805,4 +806,7 @@ const reorderPlaylistTracks = async (playlistId, orderedTrackIds, requestingUser
     }
 };
 exports.reorderPlaylistTracks = reorderPlaylistTracks;
+function updateVibeRewindPlaylist(userId) {
+    throw new Error('Function not implemented.');
+}
 //# sourceMappingURL=playlist.service.js.map

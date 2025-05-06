@@ -36,11 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-<<<<<<< HEAD
-exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
-=======
 exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
@@ -604,8 +600,6 @@ const rejectArtistClaimRequest = async (req, res) => {
     }
 };
 exports.rejectArtistClaimRequest = rejectArtistClaimRequest;
-<<<<<<< HEAD
-=======
 const bulkUploadTracks = async (req, res) => {
     try {
         const files = req.files;
@@ -630,5 +624,4 @@ const bulkUploadTracks = async (req, res) => {
     }
 };
 exports.bulkUploadTracks = bulkUploadTracks;
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 //# sourceMappingURL=admin.controller.js.map
