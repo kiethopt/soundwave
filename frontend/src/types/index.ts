@@ -278,6 +278,12 @@ export interface Track {
   playCount: number;
   type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
+  tempo?: number;
+  mood?: string;
+  key?: string;
+  scale?: string;
+  danceability?: number;
+  energy?: number;
   createdAt: string;
   updatedAt: string;
   artistId: string;

@@ -25,7 +25,6 @@ import { usePlayHandler } from "@/hooks/usePlayHandler";
 
 // Define the names of playlists to filter out (use the same set as in TrackList)
 const filteredPlaylistNames = new Set([
-  "Vibe Rewind",
   "Welcome Mix",
   "Favorites",
 ]);

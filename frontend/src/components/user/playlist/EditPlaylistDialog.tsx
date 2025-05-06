@@ -88,7 +88,6 @@ export function EditPlaylistDialog({
     }
   }, [open, playlist]);
 
-  const isVibeRewind = playlist.name === "Vibe Rewind";
   const isFavorite = playlist.type === "FAVORITE";
   const canChangeImage = playlist.type === "NORMAL";
 

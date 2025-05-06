@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Role, ClaimStatus, Prisma, NotificationType, RecipientType } from '@prisma/client';
+=======
+import { Role, ClaimStatus, AlbumType } from '@prisma/client';
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 import { Request } from 'express';
 import prisma from '../config/db';
 import {
@@ -9,6 +13,7 @@ import {
   genreSelect,
   artistClaimRequestSelect,
   artistClaimRequestDetailsSelect,
+  trackSelect,
 } from '../utils/prisma-selects';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
@@ -21,8 +26,17 @@ import { ArtistProfile } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { subMonths, endOfMonth } from 'date-fns';
 import * as emailService from './email.service';
+<<<<<<< HEAD
 import { getIO } from '../config/socket';
 import { getUserSockets } from '../config/socket';
+=======
+import { uploadFile } from './upload.service';
+import * as mm from 'music-metadata';
+import { Essentia, EssentiaWASM } from 'essentia.js';
+import { MPEGDecoder, MPEGDecodedAudio } from 'mpg123-decoder';
+import { getOrCreateArtistProfile } from './artist.service';
+import { faker } from '@faker-js/faker';
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 
 // Define a list of valid models here
 const VALID_GEMINI_MODELS = [
@@ -1279,11 +1293,10 @@ export const getArtistClaimRequests = async (req: Request) => {
 
   const options = {
     where,
-    select: artistClaimRequestSelect, // Use the imported select
+    select: artistClaimRequestSelect,
     orderBy: { submittedAt: 'desc' },
   };
 
-  // Assuming ArtistClaimRequest model exists and using paginate function
   const result = await paginate<any>(prisma.artistClaimRequest, req, options);
 
   return {
@@ -1295,22 +1308,16 @@ export const getArtistClaimRequests = async (req: Request) => {
 export const getArtistClaimRequestDetail = async (claimId: string) => {
   const claimRequest = await prisma.artistClaimRequest.findUnique({
     where: { id: claimId },
-    select: artistClaimRequestDetailsSelect, // Use the imported select
+    select: artistClaimRequestDetailsSelect,
   });
 
   if (!claimRequest) {
     throw new Error('Artist claim request not found.');
   }
 
-  // Check if the profile is still claimable (not verified, not linked)
   if (claimRequest.artistProfile.user?.id || claimRequest.artistProfile.isVerified) {
-    // If the request is PENDING but profile is already claimed/verified, mark request as REJECTED maybe?
-    // Or just throw an error indicating it's no longer claimable. Let's throw for now.
     if (claimRequest.status === ClaimStatus.PENDING) {
        console.warn(`Claim request ${claimId} is pending but target profile ${claimRequest.artistProfile.id} seems already claimed/verified.`);
-       // Optionally auto-reject here
-       // await prisma.artistClaimRequest.update({ where: { id: claimId }, data: { status: ClaimStatus.REJECTED, rejectionReason: 'Profile already claimed or verified.' }});
-       // throw new Error('This artist profile is no longer available for claiming.');
     }
   }
 
@@ -1542,4 +1549,423 @@ export const rejectArtistClaim = async (claimId: string, adminUserId: string, re
   };
 };
 
-// --- End Artist Claim Request Management ---
+
+// Helper function to convert MP3 buffer to Float32Array PCM data for audio analysis
+async function convertMp3BufferToPcmF32(audioBuffer: Buffer): Promise<Float32Array | null> {
+  try {
+    const decoder = new MPEGDecoder();
+    await decoder.ready; // Wait for the decoder WASM to be ready
+
+    // Decode the entire buffer
+    // Need to convert Node Buffer to Uint8Array for the decode method
+    const uint8ArrayBuffer = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length);
+    const decoded: MPEGDecodedAudio = decoder.decode(uint8ArrayBuffer);
+
+    decoder.free(); // Release resources
+
+    if (decoded.errors.length > 0) {
+      console.error('MP3 Decoding errors:', decoded.errors);
+      return null;
+    }
+
+    // Essentia usually works best with mono audio for analysis like BPM.
+    // Let's average the channels if it's stereo.
+    if (decoded.channelData.length > 1) {
+      const leftChannel = decoded.channelData[0];
+      const rightChannel = decoded.channelData[1];
+      const monoChannel = new Float32Array(leftChannel.length);
+      for (let i = 0; i < leftChannel.length; i++) {
+        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+      }
+      return monoChannel;
+    } else if (decoded.channelData.length === 1) {
+      // Already mono
+      return decoded.channelData[0];
+    } else {
+      // No channel data?
+      console.error('MP3 Decoding produced no channel data.');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error during MP3 decoding or processing:', error);
+    return null; // Return null if any error occurs
+  }
+}
+
+// Helper function to determine genre based on audio analysis
+async function determineGenresFromAudioAnalysis(
+  tempo: number | null, 
+  mood: string | null, 
+  key: string | null, 
+  scale: string | null
+): Promise<string[]> {
+  // Get all available genres
+  const genres = await prisma.genre.findMany();
+  const genreMap = new Map(genres.map(g => [g.name.toLowerCase(), g.id]));
+  const selectedGenres: string[] = [];
+
+  // Map tempo ranges to genres
+  if (tempo !== null) {
+    if (tempo >= 70 && tempo < 85) {
+      // Slower tempos - often Hip Hop, R&B, Soul
+      addGenreIfExists('hip hop', genreMap, selectedGenres);
+      addGenreIfExists('r&b', genreMap, selectedGenres);
+      addGenreIfExists('soul', genreMap, selectedGenres);
+    } else if (tempo >= 85 && tempo < 100) {
+      // Medium slow tempos - often Pop, Soul, R&B
+      addGenreIfExists('pop', genreMap, selectedGenres);
+      addGenreIfExists('soul', genreMap, selectedGenres);
+      addGenreIfExists('r&b', genreMap, selectedGenres);
+    } else if (tempo >= 100 && tempo < 120) {
+      // Medium tempos - often Pop, Rock
+      addGenreIfExists('pop', genreMap, selectedGenres);
+      addGenreIfExists('rock', genreMap, selectedGenres);
+    } else if (tempo >= 120 && tempo < 140) {
+      // Medium fast tempos - often Dance, Pop, House
+      addGenreIfExists('dance', genreMap, selectedGenres);
+      addGenreIfExists('pop', genreMap, selectedGenres);
+      addGenreIfExists('house', genreMap, selectedGenres);
+      addGenreIfExists('electronic', genreMap, selectedGenres);
+    } else if (tempo >= 140) {
+      // Fast tempos - often EDM, Drum and Bass, Electronic
+      addGenreIfExists('electronic', genreMap, selectedGenres);
+      addGenreIfExists('drum and bass', genreMap, selectedGenres);
+      addGenreIfExists('edm', genreMap, selectedGenres);
+      addGenreIfExists('techno', genreMap, selectedGenres);
+    }
+  }
+
+  // Map mood to genres
+  if (mood) {
+    if (mood.toLowerCase().includes('energetic')) {
+      addGenreIfExists('rock', genreMap, selectedGenres);
+      addGenreIfExists('electronic', genreMap, selectedGenres);
+      addGenreIfExists('dance', genreMap, selectedGenres);
+    } else if (mood.toLowerCase().includes('calm')) {
+      addGenreIfExists('ambient', genreMap, selectedGenres);
+      addGenreIfExists('classical', genreMap, selectedGenres);
+      addGenreIfExists('jazz', genreMap, selectedGenres);
+    } else if (mood.toLowerCase().includes('neutral')) {
+      addGenreIfExists('pop', genreMap, selectedGenres);
+      addGenreIfExists('indie', genreMap, selectedGenres);
+    }
+  }
+
+  // Consider key and scale
+  if (key && scale) {
+    // Minor scales often associated with certain genres
+    if (scale.toLowerCase().includes('minor')) {
+      addGenreIfExists('rock', genreMap, selectedGenres);
+      addGenreIfExists('indie', genreMap, selectedGenres);
+      addGenreIfExists('alternative', genreMap, selectedGenres);
+    }
+    // Major scales often associated with certain genres
+    else if (scale.toLowerCase().includes('major')) {
+      addGenreIfExists('pop', genreMap, selectedGenres);
+      addGenreIfExists('country', genreMap, selectedGenres);
+      addGenreIfExists('folk', genreMap, selectedGenres);
+    }
+  }
+
+  // Default to Pop if no genres were determined
+  if (selectedGenres.length === 0) {
+    addGenreIfExists('pop', genreMap, selectedGenres);
+  }
+
+  // Return up to 3 genres, prioritizing the first ones if we found more
+  return selectedGenres.slice(0, 3);
+}
+
+// Helper to add a genre if it exists in the system
+function addGenreIfExists(genreName: string, genreMap: Map<string, string>, selectedGenres: string[]) {
+  const id = genreMap.get(genreName);
+  if (id && !selectedGenres.includes(id)) {
+    selectedGenres.push(id);
+  }
+}
+
+// Helper function to generate a cover image for a track based on metadata using DiceBear
+async function generateCoverArtwork(trackTitle: string, artistName: string, mood?: string | null): Promise<string | null> {
+  try {
+    const seed = encodeURIComponent(`${artistName}-${trackTitle}`);
+
+    const imageUrl = `https://api.dicebear.com/8.x/shapes/svg?seed=${seed}&radius=0&backgroundType=gradientLinear&backgroundRotation=0,360`; // radius=0 for square
+
+    console.log(`Generated cover artwork for "${trackTitle}" using DiceBear: ${imageUrl}`);
+    return imageUrl;
+
+  } catch (error) {
+    console.error('Error generating cover artwork with DiceBear:', error);
+    // Fallback to a simple placeholder if generation fails
+    return `https://placehold.co/500x500/EEE/31343C?text=${encodeURIComponent(trackTitle.substring(0,15))}`;
+  }
+}
+
+// --- New function for admin use to create verified artist profiles ---
+/**
+ * Get or create a verified artist profile - Admin version
+ * Unlike the regular getOrCreateArtistProfile function, this function creates a verified artist profile
+ * if it doesn't exist, allowing regular users to view the artist profile immediately.
+ * This should only be used in admin contexts like bulk upload.
+ */
+export async function getOrCreateVerifiedArtistProfile(artistNameOrId: string): Promise<ArtistProfile> {
+  const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId); 
+
+  if (isLikelyId) {
+    const existingProfile = await prisma.artistProfile.findUnique({
+      where: { id: artistNameOrId },
+    });
+    if (existingProfile) {
+      // If profile exists but isn't verified, verify it
+      if (!existingProfile.isVerified) {
+        return await prisma.artistProfile.update({
+          where: { id: existingProfile.id },
+          data: { isVerified: true }
+        });
+      }
+      return existingProfile;
+    }
+  }
+
+  // Treat as name
+  const nameToSearch = artistNameOrId;
+  let artistProfile = await prisma.artistProfile.findFirst({
+    where: {
+      artistName: {
+        equals: nameToSearch,
+        mode: 'insensitive',
+      },
+    },
+  });
+
+  if (artistProfile) {
+    // If profile exists but isn't verified, verify it
+    if (!artistProfile.isVerified) {
+      artistProfile = await prisma.artistProfile.update({
+        where: { id: artistProfile.id },
+        data: { isVerified: true }
+      });
+    }
+    return artistProfile;
+  }
+
+  // If not found, create a verified profile
+  console.log(`Creating verified artist profile for: ${nameToSearch}`);
+  artistProfile = await prisma.artistProfile.create({
+    data: {
+      artistName: nameToSearch,
+      role: Role.ARTIST,
+      isVerified: true,
+      isActive: true,
+      userId: null,
+      monthlyListeners: 0,
+    },
+  });
+
+  return artistProfile;
+}
+
+export const processBulkUpload = async (files: Express.Multer.File[]) => {
+  const results = [];
+
+  for (const file of files) {
+    try {
+      console.log(`Processing file: ${file.originalname}`);
+
+      // 1. Upload to Cloudinary
+      const audioUploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
+      const audioUrl = audioUploadResult.secure_url;
+
+      // 2. Extract Metadata (music-metadata)
+      let duration = 0;
+      let title = file.originalname.replace(/\.[^/.]+$/, ""); // Default title from filename
+      let derivedArtistName = "Unknown Artist"; // Default artist name
+
+      try {
+        const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+        duration = Math.round(metadata.format.duration || 0);
+        
+        // Try to get artist and title from metadata
+        if (metadata.common?.artist) {
+          derivedArtistName = metadata.common.artist;
+        }
+        if (metadata.common?.title) {
+          title = metadata.common.title;
+        }
+      } catch (metadataError) {
+        console.error('Error parsing basic audio metadata:', metadataError);
+      }
+
+      // 3. Analyze Audio (Essentia)
+      let tempo: number | null = null;
+      let mood: string | null = null;
+      let key: string | null = null;
+      let scale: string | null = null;
+      let danceability: number | null = null;
+      let energy: number | null = null;
+
+      try {
+        const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
+
+        if (pcmF32) {
+          const essentia = new Essentia(EssentiaWASM);
+          const audioVector = essentia.arrayToVector(pcmF32);
+          
+          // Tempo Estimation
+          try {
+            const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+            tempo = Math.round(tempoResult.bpm);
+          } catch (tempoError) {
+            console.error('Error estimating tempo:', tempoError);
+          }
+
+          // Danceability Estimation
+          try {
+            const danceabilityResult = essentia.Danceability(audioVector);
+            danceability = danceabilityResult.danceability;
+          } catch (danceabilityError) {
+            console.error('Error estimating danceability:', danceabilityError);
+          }
+          
+          // Energy Calculation (used for mood placeholder and energy field)
+          try {
+            const energyResult = essentia.Energy(audioVector);
+            energy = energyResult.energy;
+            
+            // Mood Placeholder (based on energy)
+            if (typeof energy === 'number') {
+              if (energy > 0.6) {
+                mood = 'Energetic';
+              } else if (energy < 0.4) {
+                mood = 'Calm';
+              } else {
+                mood = 'Neutral';
+              }
+            }
+          } catch (energyError) {
+            console.error('Error calculating energy/mood:', energyError);
+          }
+          
+          // Key & Scale Estimation
+          try {
+            const keyResult = essentia.KeyExtractor(audioVector);
+            key = keyResult.key;
+            scale = keyResult.scale;
+          } catch (keyError) {
+            console.error('Error estimating key/scale:', keyError);
+          }
+        } else {
+          console.warn('Audio decoding failed, skipping all audio analysis.');
+        }
+      } catch (analysisError) {
+        console.error('Error during audio analysis pipeline:', analysisError);
+      }
+
+      // 4. Get or Create VERIFIED Artist Profile (for admin bulk upload)
+      const artistProfile = await getOrCreateVerifiedArtistProfile(derivedArtistName);
+      const artistId = artistProfile.id;
+
+      // 5. Auto-Determine genres based on analysis
+      let genreIds: string[] = [];
+      try {
+        genreIds = await determineGenresFromAudioAnalysis(tempo, mood, key, scale);
+        console.log(`Auto-determined genres for "${title}": ${genreIds.length} genres`);
+      } catch (genreError) {
+        console.error('Error determining genres from audio analysis:', genreError);
+        
+        // 5b. Fallback to default genre - using "Pop" as a fallback if available
+        try {
+          const popGenre = await prisma.genre.findFirst({
+            where: { 
+              name: { equals: 'Pop', mode: 'insensitive' }
+            }
+          });
+          
+          if (popGenre) {
+            genreIds = [popGenre.id];
+          } else {
+            // If Pop genre doesn't exist, get the first genre
+            const anyGenre = await prisma.genre.findFirst({
+              orderBy: { createdAt: 'asc' }
+            });
+            if (anyGenre) {
+              genreIds = [anyGenre.id];
+            }
+          }
+        } catch (fallbackGenreError) {
+          console.error('Error finding fallback genre:', fallbackGenreError);
+        }
+      }
+
+      // 6. Generate cover artwork based on track metadata
+      let coverUrl = null;
+      try {
+        coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+        console.log(`Generated cover artwork for "${title}"`);
+      } catch (coverError) {
+        console.error('Error generating cover artwork:', coverError);
+      }
+
+      // 7. Create Track record in Prisma
+      const releaseDate = new Date(); // Default to current date
+      
+      const trackData: Prisma.TrackCreateInput = {
+        title,
+        duration,
+        releaseDate,
+        audioUrl,
+        coverUrl, // Add the generated cover URL
+        type: AlbumType.SINGLE,
+        isActive: true,
+        tempo,
+        mood,
+        key,
+        scale,
+        danceability,
+        energy,
+        artist: { connect: { id: artistId } },
+      };
+
+      // Add genres if we determined any
+      if (genreIds.length > 0) {
+        trackData.genres = {
+          create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } }))
+        };
+      }
+
+      const newTrack = await prisma.track.create({
+        data: trackData,
+        select: trackSelect
+      });
+
+      // 8. Add created track info to results
+      results.push({
+        trackId: newTrack.id,
+        title: newTrack.title,
+        artistName: derivedArtistName,
+        artistId: artistId,
+        duration: newTrack.duration,
+        audioUrl: newTrack.audioUrl,
+        coverUrl: newTrack.coverUrl, // Include coverUrl in the result
+        tempo: newTrack.tempo,
+        mood: newTrack.mood,
+        key: newTrack.key,
+        scale: newTrack.scale,
+        genreIds: genreIds,
+        genres: newTrack.genres?.map(g => g.genre.name),
+        fileName: file.originalname,
+        success: true
+      });
+
+    } catch (error) {
+      console.error(`Error processing file ${file.originalname}:`, error);
+      results.push({ 
+        fileName: file.originalname, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false
+      });
+    }
+  }
+
+  return results;
+};

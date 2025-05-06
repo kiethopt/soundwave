@@ -14,7 +14,6 @@ import { useState } from "react";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 
 const filteredPlaylistNames = new Set([
-  "Vibe Rewind",
   "Welcome Mix",
   "Favorites",
 ]);

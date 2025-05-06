@@ -412,7 +412,7 @@ export const addTrackToPlaylist = async (
     // Check if it's a SYSTEM playlist - only ADMIN can modify
     if (
       playlist.type === "SYSTEM" &&
-      (playlist.name === "Vibe Rewind" || playlist.name === "Welcome Mix")
+      (playlist.name === "Welcome Mix")
     ) {
       res.status(400).json({
         success: false,
@@ -1480,34 +1480,5 @@ export const reorderPlaylistTracks = async (
   } catch (error) {
     console.error("Error in reorderPlaylistTracks controller:", error);
     next(error); // Pass error to the global error handler
-  }
-};
-
-// Update the Vibe Rewind playlist (tracks user has listened to)
-export const updateVibeRewindPlaylist = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const user = req.user;
-    if (!user) {
-      res.status(401).json({ success: false, message: "Unauthorized" });
-      return;
-    }
-
-    // Call the service function
-    // await playlistService.updateVibeRewindPlaylist(user.id);
-
-    res.status(200).json({
-      success: true,
-      message: "Vibe Rewind playlist updated successfully",
-    });
-  } catch (error) {
-    console.error("Update Vibe Rewind playlist error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update Vibe Rewind playlist",
-    });
   }
 };

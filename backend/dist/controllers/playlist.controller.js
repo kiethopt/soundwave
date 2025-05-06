@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateVibeRewindPlaylist = exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
@@ -366,7 +366,7 @@ const addTrackToPlaylist = async (req, res, next) => {
             return;
         }
         if (playlist.type === "SYSTEM" &&
-            (playlist.name === "Vibe Rewind" || playlist.name === "Welcome Mix")) {
+            (playlist.name === "Welcome Mix")) {
             res.status(400).json({
                 success: false,
                 message: `Cannot manually add tracks to ${playlist.name} playlist.`,
@@ -1174,25 +1174,4 @@ const reorderPlaylistTracks = async (req, res, next) => {
     }
 };
 exports.reorderPlaylistTracks = reorderPlaylistTracks;
-const updateVibeRewindPlaylist = async (req, res, next) => {
-    try {
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ success: false, message: "Unauthorized" });
-            return;
-        }
-        res.status(200).json({
-            success: true,
-            message: "Vibe Rewind playlist updated successfully",
-        });
-    }
-    catch (error) {
-        console.error("Update Vibe Rewind playlist error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update Vibe Rewind playlist",
-        });
-    }
-};
-exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 //# sourceMappingURL=playlist.controller.js.map

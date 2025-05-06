@@ -209,6 +209,18 @@ export const api = {
         token
       ),
 
+    // Add a new function for bulk uploading tracks
+    bulkUploadTracks: async (formData: FormData, token: string) => {
+      return fetchWithAuth(
+        "/api/admin/bulk-upload-tracks",
+        {
+          method: "POST",
+          body: formData, // FormData containing multiple audio files
+        },
+        token
+      );
+    },
+
     getArtistRequests: async (
       token: string,
       page: number = 1,
@@ -754,6 +766,11 @@ export const api = {
 
     getUserClaims: async (token: string) =>
       fetchWithAuth("/api/user/artist-claims", { method: "GET" }, token),
+
+    // Thêm hàm mới để lấy discover genres
+    getDiscoverGenres: async (token: string) => {
+      return fetchWithAuth(`/api/user/discover-genres`, { method: 'GET' }, token);
+    },
   },
 
   artists: {
@@ -1200,7 +1217,7 @@ export const api = {
     getAll: async (
       token: string,
       page: number = 1,
-      limit: number = 10,
+      limit: number = 500,
       queryParams?: string
     ) =>
       fetchWithAuth(

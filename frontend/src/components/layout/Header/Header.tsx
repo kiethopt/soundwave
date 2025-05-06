@@ -601,7 +601,7 @@ export default function Header({
                <button
                  onClick={handleSwitchProfile}
                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light'
-                     ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                     ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                      : 'bg-white/10 text-white hover:bg-white/20'
                  }`}
                >
@@ -779,15 +779,17 @@ export default function Header({
                       <span className="text-sm font-medium">Profile</span>
                     </Link>
 
-                    <Link
-                      href="/settings"
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
-                      onClick={() => setShowDropdown(false)}
-                      role="menuitem"
-                    >
-                      <Settings className="w-4 h-4" />
-                      <span className="text-sm font-medium">Settings</span>
-                    </Link>
+                    {user?.role === 'USER' && user?.currentProfile === 'USER' && (
+                      <Link
+                        href="/settings"
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
+                        onClick={() => setShowDropdown(false)}
+                        role="menuitem"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span className="text-sm font-medium">Settings</span>
+                      </Link>
+                    )}
 
                     {user?.role === 'USER' && !user?.artistProfile && !user?.hasPendingArtistRequest && (
                       <Link

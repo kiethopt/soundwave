@@ -80,9 +80,6 @@ export default function Sidebar({
   const [favoritePlaylist, setFavoritePlaylist] = useState<Playlist | null>(
     null
   );
-  const [vibeRewindPlaylist, setVibeRewindPlaylist] = useState<Playlist | null>(
-    null
-  );
   const [welcomeMixPlaylist, setWelcomeMixPlaylist] = useState<Playlist | null>(
     null
   );
@@ -146,7 +143,6 @@ export default function Sidebar({
     setLoading(true);
     setError(null);
     setFavoritePlaylist(null);
-    setVibeRewindPlaylist(null);
     setWelcomeMixPlaylist(null);
     setPlaylistAI(null);
     setPlaylists([]);
@@ -168,12 +164,6 @@ export default function Sidebar({
 
         const fav =
           fetchedPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
-        const vibe =
-          fetchedPlaylists.find(
-            (p: Playlist) =>
-              p.name === "Vibe Rewind" ||
-              (p.type === "SYSTEM" && p.name === "Vibe Rewind")
-          ) || null;
         const welcome =
           fetchedPlaylists.find(
             (p: Playlist) =>
@@ -189,14 +179,12 @@ export default function Sidebar({
           ) || null;
 
         setFavoritePlaylist(fav);
-        setVibeRewindPlaylist(vibe);
         setWelcomeMixPlaylist(welcome);
         setPlaylistAI(ai);
 
         const normal = fetchedPlaylists.filter(
           (p: Playlist) =>
             p.type !== "FAVORITE" &&
-            p.name !== "Vibe Rewind" &&
             p.name !== "Welcome Mix" &&
             p.name !== "AI Playlist" &&
             !p.name.includes("AI Playlist") &&
@@ -907,11 +895,10 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  {/* Old Artist Requests */}
-                  {/* <Link
-                    href="/admin/artist-requests"
+                  <Link
+                    href="/admin/bulk-upload"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/artist-requests")
+                      pathname && pathname.startsWith("/admin/bulk-upload")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -926,11 +913,11 @@ export default function Sidebar({
                           <Requests className="w-5 h-5" />
                         </div>
                         <span className="ml-3 font-medium text-sm">
-                          Artist Requests
+                          Upload
                         </span>
                       </>
                     )}
-                  </Link> */}
+                  </Link>
 
                   {/* New Simple Artist Requests */}
                   <Link

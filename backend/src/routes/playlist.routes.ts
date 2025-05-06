@@ -12,7 +12,6 @@ import {
   removeTrackFromPlaylist,
   addTrackToPlaylist,
   getSystemPlaylists,
-  updateVibeRewindPlaylist,
   generateAIPlaylist,
   deletePlaylist,
   // System playlist controllers

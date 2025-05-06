@@ -47,6 +47,54 @@ const prisma_selects_1 = require("../utils/prisma-selects");
 const socket_1 = require("../config/socket");
 const artist_service_1 = require("./artist.service");
 const mm = __importStar(require("music-metadata"));
+const essentia_js_1 = require("essentia.js");
+const mpg123_decoder_1 = require("mpg123-decoder");
+async function convertMp3BufferToPcmF32(audioBuffer) {
+    try {
+        const decoder = new mpg123_decoder_1.MPEGDecoder();
+        await decoder.ready;
+        const uint8ArrayBuffer = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length);
+        const decoded = decoder.decode(uint8ArrayBuffer);
+        decoder.free();
+        if (decoded.errors.length > 0) {
+            console.error('MP3 Decoding errors:', decoded.errors);
+            return null;
+        }
+        if (decoded.channelData.length > 1) {
+            const leftChannel = decoded.channelData[0];
+            const rightChannel = decoded.channelData[1];
+            const monoChannel = new Float32Array(leftChannel.length);
+            for (let i = 0; i < leftChannel.length; i++) {
+                monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+            }
+            return monoChannel;
+        }
+        else if (decoded.channelData.length === 1) {
+            return decoded.channelData[0];
+        }
+        else {
+            console.error('MP3 Decoding produced no channel data.');
+            return null;
+        }
+    }
+    catch (error) {
+        console.error('Error during MP3 decoding or processing:', error);
+        return null;
+    }
+}
+function analyzeMood(energy, valence) {
+    if (energy > 0.6 && valence > 0.6)
+        return 'Energetic/Happy';
+    if (energy > 0.6 && valence <= 0.4)
+        return 'Energetic/Aggressive';
+    if (energy <= 0.4 && valence > 0.6)
+        return 'Calm/Happy';
+    if (energy <= 0.4 && valence <= 0.4)
+        return 'Sad/Calm';
+    if (energy > 0.5 && valence > 0.4 && valence <= 0.6)
+        return 'Neutral/Driving';
+    return 'Neutral';
+}
 const canManageTrack = (user, trackArtistId) => {
     if (!user)
         return false;
@@ -342,7 +390,14 @@ class TrackService {
             coverFile ? (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image') : Promise.resolve(null),
         ]);
         let duration = 0;
+        let tempo = null;
+        let mood = null;
+        let key = null;
+        let scale = null;
+        let danceability = null;
+        let energy = null;
         try {
+<<<<<<< HEAD
             const audioMetadata = await mm.parseBuffer(audioFile.buffer);
             duration = Math.round(audioMetadata.format.duration || 0);
             console.log(`[TrackService.createTrack] (${audioFile.originalname}): Parsed duration = ${audioMetadata.format.duration}, Saved duration = ${duration}`);
@@ -352,6 +407,78 @@ class TrackService {
         }
         catch (error) {
             console.error(`[TrackService.createTrack] (${audioFile.originalname}): Error parsing audio metadata:`, error);
+=======
+            const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
+            duration = Math.round(metadata.format.duration || 0);
+            tempo = null;
+            mood = null;
+            try {
+                const pcmF32 = await convertMp3BufferToPcmF32(audioFile.buffer);
+                if (pcmF32) {
+                    const essentia = new essentia_js_1.Essentia(essentia_js_1.EssentiaWASM);
+                    const audioVector = essentia.arrayToVector(pcmF32);
+                    try {
+                        const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                        tempo = Math.round(tempoResult.bpm);
+                    }
+                    catch (tempoError) {
+                        console.error('Error estimating tempo:', tempoError);
+                        tempo = null;
+                    }
+                    try {
+                        const danceabilityResult = essentia.Danceability(audioVector);
+                        danceability = danceabilityResult.danceability;
+                    }
+                    catch (danceabilityError) {
+                        console.error('Error estimating danceability:', danceabilityError);
+                        danceability = null;
+                    }
+                    try {
+                        const energyResult = essentia.Energy(audioVector);
+                        energy = energyResult.energy;
+                        if (typeof energy === 'number') {
+                            if (energy > 0.6) {
+                                mood = 'Energetic';
+                            }
+                            else if (energy < 0.4) {
+                                mood = 'Calm';
+                            }
+                            else {
+                                mood = 'Neutral';
+                            }
+                        }
+                    }
+                    catch (energyError) {
+                        console.error('Error calculating energy/mood:', energyError);
+                        mood = null;
+                        energy = null;
+                    }
+                    try {
+                        const keyResult = essentia.KeyExtractor(audioVector);
+                        key = keyResult.key;
+                        scale = keyResult.scale;
+                    }
+                    catch (keyError) {
+                        console.error('Error estimating key/scale:', keyError);
+                        key = null;
+                        scale = null;
+                    }
+                }
+                else {
+                    console.warn('Audio decoding failed, skipping all audio analysis.');
+                }
+            }
+            catch (analysisError) {
+                console.error('Error during audio analysis pipeline:', analysisError);
+                tempo = null;
+                mood = null;
+            }
+        }
+        catch (error) {
+            console.error('Error parsing basic audio metadata:', error);
+            tempo = null;
+            mood = null;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         }
         const allFeaturedArtistIds = new Set();
         if (featuredArtistIds.length > 0) {
@@ -384,6 +511,12 @@ class TrackService {
             artist: { connect: { id: artistProfileId } },
             label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
             isActive: true,
+            tempo: tempo,
+            mood: mood,
+            key: key,
+            scale: scale,
+            danceability: danceability,
+            energy: energy,
         };
         if (genreIds && genreIds.length > 0) {
             trackData.genres = {

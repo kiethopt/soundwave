@@ -36,7 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
 exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+=======
+exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -49,8 +54,15 @@ const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
+<<<<<<< HEAD
 const socket_1 = require("../config/socket");
 const socket_2 = require("../config/socket");
+=======
+const upload_service_1 = require("./upload.service");
+const mm = __importStar(require("music-metadata"));
+const essentia_js_1 = require("essentia.js");
+const mpg123_decoder_1 = require("mpg123-decoder");
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const VALID_GEMINI_MODELS = [
     'gemini-2.5-flash-preview-04-17',
     'gemini-2.5-pro-preview-03-25',
@@ -1143,7 +1155,11 @@ const approveArtistClaim = async (claimId, adminUserId) => {
             status: true,
             claimingUserId: true,
             artistProfileId: true,
+<<<<<<< HEAD
             artistProfile: { select: { userId: true, isVerified: true, artistName: true } }
+=======
+            artistProfile: { select: { userId: true, isVerified: true } }
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         }
     });
     if (!claimRequest) {
@@ -1213,6 +1229,7 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                 reviewedByAdminId: adminUserId,
             }
         });
+<<<<<<< HEAD
         try {
             const notificationData = {
                 data: {
@@ -1249,6 +1266,8 @@ const approveArtistClaim = async (claimId, adminUserId) => {
         catch (notificationError) {
             console.error("[Notify/Socket Error] Failed processing claim approval notification/socket:", notificationError);
         }
+=======
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
         return {
             message: `Claim approved. Profile '${updatedProfile.artistName}' is now linked to user ${updatedClaim.claimingUserId}.`,
             claimId: updatedClaim.id,
@@ -1261,12 +1280,16 @@ exports.approveArtistClaim = approveArtistClaim;
 const rejectArtistClaim = async (claimId, adminUserId, reason) => {
     const claimRequest = await db_1.default.artistClaimRequest.findUnique({
         where: { id: claimId },
+<<<<<<< HEAD
         select: {
             id: true,
             status: true,
             claimingUserId: true,
             artistProfile: { select: { id: true, artistName: true } }
         }
+=======
+        select: { id: true, status: true, claimingUserId: true }
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
     });
     if (!claimRequest) {
         throw new Error('Artist claim request not found.');
@@ -1285,6 +1308,7 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
             reviewedAt: new Date(),
             reviewedByAdminId: adminUserId,
         },
+<<<<<<< HEAD
         select: { id: true, claimingUserId: true, artistProfileId: true }
     });
     if (rejectedClaim && claimRequest) {
@@ -1325,6 +1349,10 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
             console.error("[Notify/Socket Error] Failed processing claim rejection notification/socket:", notificationError);
         }
     }
+=======
+        select: { id: true, claimingUserId: true }
+    });
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
     return {
         message: 'Artist claim request rejected successfully.',
         claimId: rejectedClaim.id,
@@ -1332,4 +1360,347 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
     };
 };
 exports.rejectArtistClaim = rejectArtistClaim;
+<<<<<<< HEAD
+=======
+async function convertMp3BufferToPcmF32(audioBuffer) {
+    try {
+        const decoder = new mpg123_decoder_1.MPEGDecoder();
+        await decoder.ready;
+        const uint8ArrayBuffer = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length);
+        const decoded = decoder.decode(uint8ArrayBuffer);
+        decoder.free();
+        if (decoded.errors.length > 0) {
+            console.error('MP3 Decoding errors:', decoded.errors);
+            return null;
+        }
+        if (decoded.channelData.length > 1) {
+            const leftChannel = decoded.channelData[0];
+            const rightChannel = decoded.channelData[1];
+            const monoChannel = new Float32Array(leftChannel.length);
+            for (let i = 0; i < leftChannel.length; i++) {
+                monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+            }
+            return monoChannel;
+        }
+        else if (decoded.channelData.length === 1) {
+            return decoded.channelData[0];
+        }
+        else {
+            console.error('MP3 Decoding produced no channel data.');
+            return null;
+        }
+    }
+    catch (error) {
+        console.error('Error during MP3 decoding or processing:', error);
+        return null;
+    }
+}
+async function determineGenresFromAudioAnalysis(tempo, mood, key, scale) {
+    const genres = await db_1.default.genre.findMany();
+    const genreMap = new Map(genres.map(g => [g.name.toLowerCase(), g.id]));
+    const selectedGenres = [];
+    if (tempo !== null) {
+        if (tempo >= 70 && tempo < 85) {
+            addGenreIfExists('hip hop', genreMap, selectedGenres);
+            addGenreIfExists('r&b', genreMap, selectedGenres);
+            addGenreIfExists('soul', genreMap, selectedGenres);
+        }
+        else if (tempo >= 85 && tempo < 100) {
+            addGenreIfExists('pop', genreMap, selectedGenres);
+            addGenreIfExists('soul', genreMap, selectedGenres);
+            addGenreIfExists('r&b', genreMap, selectedGenres);
+        }
+        else if (tempo >= 100 && tempo < 120) {
+            addGenreIfExists('pop', genreMap, selectedGenres);
+            addGenreIfExists('rock', genreMap, selectedGenres);
+        }
+        else if (tempo >= 120 && tempo < 140) {
+            addGenreIfExists('dance', genreMap, selectedGenres);
+            addGenreIfExists('pop', genreMap, selectedGenres);
+            addGenreIfExists('house', genreMap, selectedGenres);
+            addGenreIfExists('electronic', genreMap, selectedGenres);
+        }
+        else if (tempo >= 140) {
+            addGenreIfExists('electronic', genreMap, selectedGenres);
+            addGenreIfExists('drum and bass', genreMap, selectedGenres);
+            addGenreIfExists('edm', genreMap, selectedGenres);
+            addGenreIfExists('techno', genreMap, selectedGenres);
+        }
+    }
+    if (mood) {
+        if (mood.toLowerCase().includes('energetic')) {
+            addGenreIfExists('rock', genreMap, selectedGenres);
+            addGenreIfExists('electronic', genreMap, selectedGenres);
+            addGenreIfExists('dance', genreMap, selectedGenres);
+        }
+        else if (mood.toLowerCase().includes('calm')) {
+            addGenreIfExists('ambient', genreMap, selectedGenres);
+            addGenreIfExists('classical', genreMap, selectedGenres);
+            addGenreIfExists('jazz', genreMap, selectedGenres);
+        }
+        else if (mood.toLowerCase().includes('neutral')) {
+            addGenreIfExists('pop', genreMap, selectedGenres);
+            addGenreIfExists('indie', genreMap, selectedGenres);
+        }
+    }
+    if (key && scale) {
+        if (scale.toLowerCase().includes('minor')) {
+            addGenreIfExists('rock', genreMap, selectedGenres);
+            addGenreIfExists('indie', genreMap, selectedGenres);
+            addGenreIfExists('alternative', genreMap, selectedGenres);
+        }
+        else if (scale.toLowerCase().includes('major')) {
+            addGenreIfExists('pop', genreMap, selectedGenres);
+            addGenreIfExists('country', genreMap, selectedGenres);
+            addGenreIfExists('folk', genreMap, selectedGenres);
+        }
+    }
+    if (selectedGenres.length === 0) {
+        addGenreIfExists('pop', genreMap, selectedGenres);
+    }
+    return selectedGenres.slice(0, 3);
+}
+function addGenreIfExists(genreName, genreMap, selectedGenres) {
+    const id = genreMap.get(genreName);
+    if (id && !selectedGenres.includes(id)) {
+        selectedGenres.push(id);
+    }
+}
+async function generateCoverArtwork(trackTitle, artistName, mood) {
+    try {
+        const seed = encodeURIComponent(`${artistName}-${trackTitle}`);
+        const imageUrl = `https://api.dicebear.com/8.x/shapes/svg?seed=${seed}&radius=0&backgroundType=gradientLinear&backgroundRotation=0,360`;
+        console.log(`Generated cover artwork for "${trackTitle}" using DiceBear: ${imageUrl}`);
+        return imageUrl;
+    }
+    catch (error) {
+        console.error('Error generating cover artwork with DiceBear:', error);
+        return `https://placehold.co/500x500/EEE/31343C?text=${encodeURIComponent(trackTitle.substring(0, 15))}`;
+    }
+}
+async function getOrCreateVerifiedArtistProfile(artistNameOrId) {
+    const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId);
+    if (isLikelyId) {
+        const existingProfile = await db_1.default.artistProfile.findUnique({
+            where: { id: artistNameOrId },
+        });
+        if (existingProfile) {
+            if (!existingProfile.isVerified) {
+                return await db_1.default.artistProfile.update({
+                    where: { id: existingProfile.id },
+                    data: { isVerified: true }
+                });
+            }
+            return existingProfile;
+        }
+    }
+    const nameToSearch = artistNameOrId;
+    let artistProfile = await db_1.default.artistProfile.findFirst({
+        where: {
+            artistName: {
+                equals: nameToSearch,
+                mode: 'insensitive',
+            },
+        },
+    });
+    if (artistProfile) {
+        if (!artistProfile.isVerified) {
+            artistProfile = await db_1.default.artistProfile.update({
+                where: { id: artistProfile.id },
+                data: { isVerified: true }
+            });
+        }
+        return artistProfile;
+    }
+    console.log(`Creating verified artist profile for: ${nameToSearch}`);
+    artistProfile = await db_1.default.artistProfile.create({
+        data: {
+            artistName: nameToSearch,
+            role: client_1.Role.ARTIST,
+            isVerified: true,
+            isActive: true,
+            userId: null,
+            monthlyListeners: 0,
+        },
+    });
+    return artistProfile;
+}
+const processBulkUpload = async (files) => {
+    const results = [];
+    for (const file of files) {
+        try {
+            console.log(`Processing file: ${file.originalname}`);
+            const audioUploadResult = await (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+            const audioUrl = audioUploadResult.secure_url;
+            let duration = 0;
+            let title = file.originalname.replace(/\.[^/.]+$/, "");
+            let derivedArtistName = "Unknown Artist";
+            try {
+                const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+                duration = Math.round(metadata.format.duration || 0);
+                if (metadata.common?.artist) {
+                    derivedArtistName = metadata.common.artist;
+                }
+                if (metadata.common?.title) {
+                    title = metadata.common.title;
+                }
+            }
+            catch (metadataError) {
+                console.error('Error parsing basic audio metadata:', metadataError);
+            }
+            let tempo = null;
+            let mood = null;
+            let key = null;
+            let scale = null;
+            let danceability = null;
+            let energy = null;
+            try {
+                const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
+                if (pcmF32) {
+                    const essentia = new essentia_js_1.Essentia(essentia_js_1.EssentiaWASM);
+                    const audioVector = essentia.arrayToVector(pcmF32);
+                    try {
+                        const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                        tempo = Math.round(tempoResult.bpm);
+                    }
+                    catch (tempoError) {
+                        console.error('Error estimating tempo:', tempoError);
+                    }
+                    try {
+                        const danceabilityResult = essentia.Danceability(audioVector);
+                        danceability = danceabilityResult.danceability;
+                    }
+                    catch (danceabilityError) {
+                        console.error('Error estimating danceability:', danceabilityError);
+                    }
+                    try {
+                        const energyResult = essentia.Energy(audioVector);
+                        energy = energyResult.energy;
+                        if (typeof energy === 'number') {
+                            if (energy > 0.6) {
+                                mood = 'Energetic';
+                            }
+                            else if (energy < 0.4) {
+                                mood = 'Calm';
+                            }
+                            else {
+                                mood = 'Neutral';
+                            }
+                        }
+                    }
+                    catch (energyError) {
+                        console.error('Error calculating energy/mood:', energyError);
+                    }
+                    try {
+                        const keyResult = essentia.KeyExtractor(audioVector);
+                        key = keyResult.key;
+                        scale = keyResult.scale;
+                    }
+                    catch (keyError) {
+                        console.error('Error estimating key/scale:', keyError);
+                    }
+                }
+                else {
+                    console.warn('Audio decoding failed, skipping all audio analysis.');
+                }
+            }
+            catch (analysisError) {
+                console.error('Error during audio analysis pipeline:', analysisError);
+            }
+            const artistProfile = await getOrCreateVerifiedArtistProfile(derivedArtistName);
+            const artistId = artistProfile.id;
+            let genreIds = [];
+            try {
+                genreIds = await determineGenresFromAudioAnalysis(tempo, mood, key, scale);
+                console.log(`Auto-determined genres for "${title}": ${genreIds.length} genres`);
+            }
+            catch (genreError) {
+                console.error('Error determining genres from audio analysis:', genreError);
+                try {
+                    const popGenre = await db_1.default.genre.findFirst({
+                        where: {
+                            name: { equals: 'Pop', mode: 'insensitive' }
+                        }
+                    });
+                    if (popGenre) {
+                        genreIds = [popGenre.id];
+                    }
+                    else {
+                        const anyGenre = await db_1.default.genre.findFirst({
+                            orderBy: { createdAt: 'asc' }
+                        });
+                        if (anyGenre) {
+                            genreIds = [anyGenre.id];
+                        }
+                    }
+                }
+                catch (fallbackGenreError) {
+                    console.error('Error finding fallback genre:', fallbackGenreError);
+                }
+            }
+            let coverUrl = null;
+            try {
+                coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+                console.log(`Generated cover artwork for "${title}"`);
+            }
+            catch (coverError) {
+                console.error('Error generating cover artwork:', coverError);
+            }
+            const releaseDate = new Date();
+            const trackData = {
+                title,
+                duration,
+                releaseDate,
+                audioUrl,
+                coverUrl,
+                type: client_1.AlbumType.SINGLE,
+                isActive: true,
+                tempo,
+                mood,
+                key,
+                scale,
+                danceability,
+                energy,
+                artist: { connect: { id: artistId } },
+            };
+            if (genreIds.length > 0) {
+                trackData.genres = {
+                    create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } }))
+                };
+            }
+            const newTrack = await db_1.default.track.create({
+                data: trackData,
+                select: prisma_selects_1.trackSelect
+            });
+            results.push({
+                trackId: newTrack.id,
+                title: newTrack.title,
+                artistName: derivedArtistName,
+                artistId: artistId,
+                duration: newTrack.duration,
+                audioUrl: newTrack.audioUrl,
+                coverUrl: newTrack.coverUrl,
+                tempo: newTrack.tempo,
+                mood: newTrack.mood,
+                key: newTrack.key,
+                scale: newTrack.scale,
+                genreIds: genreIds,
+                genres: newTrack.genres?.map(g => g.genre.name),
+                fileName: file.originalname,
+                success: true
+            });
+        }
+        catch (error) {
+            console.error(`Error processing file ${file.originalname}:`, error);
+            results.push({
+                fileName: file.originalname,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                success: false
+            });
+        }
+    }
+    return results;
+};
+exports.processBulkUpload = processBulkUpload;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 //# sourceMappingURL=admin.service.js.map

@@ -1,35 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { clearCacheForEntity } from '../../middleware/cache.middleware';
 import { client as redisClient } from '../../middleware/cache.middleware';
-import * as playlistService from '../../services/playlist.service';
-
-// Flag to prevent too frequent updates (we don't need to update on every play)
-const userLastUpdateTime = new Map<string, number>();
-const UPDATE_INTERVAL = 30 * 60 * 1000; // 30 minutes in milliseconds
-
-/**
- * Throttled function to update Vibe Rewind playlist
- * Only updates if enough time has passed since last update
- */
-const throttledPlaylistUpdate = async (userId: string) => {
-  const now = Date.now();
-  const lastUpdate = userLastUpdateTime.get(userId) || 0;
-
-  // Check if enough time has passed since last update
-  if (now - lastUpdate > UPDATE_INTERVAL) {
-    try {
-      await playlistService.updateVibeRewindPlaylist(userId);
-      userLastUpdateTime.set(userId, now);
-      console.log(
-        `[HistoryExtension] Updated Vibe Rewind playlist for user ${userId}`
-      );
-    } catch (error) {
-      console.error(
-        `[HistoryExtension] Error updating Vibe Rewind playlist: ${error}`
-      );
-    }
-  }
-};
 
 export const historyExtension = Prisma.defineExtension((client) => {
   return client.$extends({
@@ -55,9 +26,6 @@ export const historyExtension = Prisma.defineExtension((client) => {
                 userId: args.data.userId,
               }),
             ]);
-
-            // Update Vibe Rewind playlist (throttled)
-            throttledPlaylistUpdate(args.data.userId);
           }
 
           return result;
@@ -84,17 +52,6 @@ export const historyExtension = Prisma.defineExtension((client) => {
                 userId: history.userId,
               }),
             ]);
-
-            // If this is a completed play, update the playlist
-            const isCompleted =
-              typeof args.data === 'object' &&
-              'completed' in args.data &&
-              args.data.completed === true;
-
-            if (isCompleted) {
-              // Update Vibe Rewind playlist (throttled)
-              throttledPlaylistUpdate(history.userId);
-            }
           }
 
           return result;

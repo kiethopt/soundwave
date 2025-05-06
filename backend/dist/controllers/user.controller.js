@@ -33,7 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
 exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+=======
+exports.getDiscoverGenres = exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const socket_1 = require("../config/socket");
@@ -525,4 +529,17 @@ const getAllArtistsProfile = async (req, res) => {
     }
 };
 exports.getAllArtistsProfile = getAllArtistsProfile;
+<<<<<<< HEAD
+=======
+const getDiscoverGenres = async (req, res) => {
+    try {
+        const genres = await userService.getDiscoverGenres();
+        res.json(genres);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get discover genres');
+    }
+};
+exports.getDiscoverGenres = getDiscoverGenres;
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 //# sourceMappingURL=user.controller.js.map

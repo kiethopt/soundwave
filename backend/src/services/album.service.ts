@@ -743,6 +743,7 @@ export const getAlbumById = async (req: Request) => {
   } else {
     throw new Error('Album not found or access denied');
   }
+<<<<<<< HEAD
 };
 
 // export const playAlbum = async (req: Request) => {
@@ -808,3 +809,6 @@ export const getAlbumById = async (req: Request) => {
 
 //   return { message: 'Album playback started', track: firstTrack };
 // };
+=======
+};
+>>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
