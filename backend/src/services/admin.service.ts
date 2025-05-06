@@ -1377,16 +1377,35 @@ export const approveArtistClaim = async (claimId: string, adminUserId: string) =
        select: { id: true, artistName: true } // Select some profile info for return/logging
     });
 
-    // 3. Update the User's role and current profile (Optional but recommended)
-    // Set currentProfile to ARTIST so they see the artist dashboard upon next login/refresh
-    await tx.user.update({
-        where: { id: updatedClaim.claimingUserId },
-        data: {
-            role: Role.ARTIST, // Change user role to ARTIST
-            currentProfile: 'ARTIST',
-        }
+    // 3. Reject all other pending claims for the SAME artist profile from OTHER users
+    await tx.artistClaimRequest.updateMany({
+      where: {
+        artistProfileId: updatedClaim.artistProfileId,
+        id: { not: claimId },
+        status: ClaimStatus.PENDING,
+      },
+      data: {
+        status: ClaimStatus.REJECTED,
+        rejectionReason: 'Another claim for this artist was approved.',
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+      }
     });
 
+    // 4. Reject any other claim requests by the approved user for other artist profiles
+    await tx.artistClaimRequest.updateMany({
+      where: {
+        claimingUserId: updatedClaim.claimingUserId,
+        artistProfileId: { not: updatedClaim.artistProfileId },
+        status: { in: [ClaimStatus.PENDING, ClaimStatus.REJECTED] },
+      },
+      data: {
+        status: ClaimStatus.REJECTED,
+        rejectionReason: 'You have been approved for another artist claim.',
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+      }
+    });
 
     // TODO: Add notification/email logic here later
 

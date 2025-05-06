@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { ArtistRequest } from '@/types';
+import { ArtistRequest, ArtistClaimRequest } from '@/types';
 import { RejectModal, ApproveModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export default function ArtistRequestManagement() {
   const { theme } = useTheme();
@@ -40,6 +41,34 @@ export default function ArtistRequestManagement() {
   const [endDate, setEndDate] = useState('');
   
   const limit = 10;
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'artist' | 'claim'>('artist');
+
+  // Claim request state
+  const [claimRequests, setClaimRequests] = useState<ArtistClaimRequest[]>([]);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimCurrentPage, setClaimCurrentPage] = useState(1);
+  const [claimTotalPages, setClaimTotalPages] = useState(1);
+  const [claimSelectedIds, setClaimSelectedIds] = useState<Set<string>>(new Set());
+  const [claimActionLoading, setClaimActionLoading] = useState<string | null>(null);
+  const [isClaimApproveModalOpen, setIsClaimApproveModalOpen] = useState(false);
+  const [isClaimRejectModalOpen, setIsClaimRejectModalOpen] = useState(false);
+  const [claimRequestToApprove, setClaimRequestToApprove] = useState<ArtistClaimRequest | null>(null);
+  const [claimRequestIdToReject, setClaimRequestIdToReject] = useState<string | null>(null);
+  const [isClaimBulkReject, setIsClaimBulkReject] = useState(false);
+
+  // Claim select all logic
+  const isAllClaimSelected = claimRequests.length > 0 && claimSelectedIds.size === claimRequests.length;
+  const isClaimIndeterminate = claimSelectedIds.size > 0 && claimSelectedIds.size < claimRequests.length;
+  const handleSelectAllClaimRows = (checked: boolean | 'indeterminate') => {
+    if (checked) {
+      const allIds = new Set(claimRequests.map(request => request.id));
+      setClaimSelectedIds(allIds);
+    } else {
+      setClaimSelectedIds(new Set());
+    }
+  };
 
   // Fetch data from API
   const fetchRequests = useCallback(async (page: number, searchTerm = '', dateFrom?: string, dateTo?: string) => {
@@ -76,10 +105,36 @@ export default function ArtistRequestManagement() {
     }
   }, [limit]);
 
+  // Fetch claim requests
+  const fetchClaimRequests = useCallback(async (page: number, searchTerm = '', dateFrom?: string, dateTo?: string) => {
+    setClaimLoading(true);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('Authentication required');
+      const filters: any = { search: searchTerm };
+      if (dateFrom) filters.startDate = dateFrom;
+      if (dateTo) filters.endDate = dateTo;
+      const response = await api.admin.getArtistClaimRequests(token, page, limit, filters);
+      setClaimRequests(response.claimRequests);
+      setClaimTotalPages(response.pagination.totalPages);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to fetch claim requests');
+      setClaimRequests([]);
+      setClaimTotalPages(1);
+    } finally {
+      setClaimLoading(false);
+    }
+  }, [limit]);
+
   // Khởi tạo và fetch dữ liệu dựa trên sự thay đổi của state
   useEffect(() => {
-    fetchRequests(currentPage, activeSearchTerm, startDate, endDate);
-  }, [currentPage, activeSearchTerm, startDate, endDate, fetchRequests]);
+    if (activeTab === 'artist') {
+      fetchRequests(currentPage, activeSearchTerm, startDate, endDate);
+    } else {
+      fetchClaimRequests(claimCurrentPage, activeSearchTerm, startDate, endDate);
+    }
+    // eslint-disable-next-line
+  }, [activeTab, currentPage, claimCurrentPage, activeSearchTerm, startDate, endDate]);
 
   // Handle page navigation
   const handlePageChange = (newPage: number) => {
@@ -298,182 +353,413 @@ export default function ArtistRequestManagement() {
   const isAllSelected = requests.length > 0 && selectedRequestIds.size === requests.length;
   const isIndeterminate = selectedRequestIds.size > 0 && selectedRequestIds.size < requests.length;
 
+  // Add claim page change handler
+  const handleClaimPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= claimTotalPages) {
+      setClaimCurrentPage(newPage);
+    }
+  };
+
+  // Claim approve/reject handlers
+  const handleClaimApproveConfirm = async () => {
+    if (!claimRequestToApprove) return;
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      setIsClaimApproveModalOpen(false);
+      return;
+    }
+    setClaimActionLoading(claimRequestToApprove.id);
+    try {
+      await api.admin.approveArtistClaim(claimRequestToApprove.id, token);
+      toast.success('Claim request approved successfully!');
+      // Remove all claim requests for this artist profile from UI
+      setClaimRequests(prev => prev.filter(c => c.artistProfile.id !== claimRequestToApprove.artistProfile.id));
+      fetchClaimRequests(claimCurrentPage, activeSearchTerm, startDate, endDate);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve claim request.');
+    } finally {
+      setClaimActionLoading(null);
+      setIsClaimApproveModalOpen(false);
+      setClaimRequestToApprove(null);
+    }
+  };
+  const handleClaimRejectConfirm = async (reason: string) => {
+    if (!claimRequestIdToReject) return;
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      setIsClaimRejectModalOpen(false);
+      return;
+    }
+    setClaimActionLoading(claimRequestIdToReject);
+    try {
+      await api.admin.rejectArtistClaim(claimRequestIdToReject, reason, token);
+      toast.success('Claim request rejected successfully!');
+      fetchClaimRequests(claimCurrentPage, activeSearchTerm, startDate, endDate);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject claim request.');
+    } finally {
+      setClaimActionLoading(null);
+      setIsClaimRejectModalOpen(false);
+      setClaimRequestIdToReject(null);
+      setIsClaimBulkReject(false);
+    }
+  };
+
   return (
     <div className={`container mx-auto space-y-6 p-4 pb-20 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
       <div className="mb-6">
-        <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-          Artist Requests
-        </h1>
-        <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>
-          Manage and process artist verification requests
-        </p>
+        <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Artist & Claim Requests</h1>
+        <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>Manage and process artist verification and claim requests</p>
       </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <form onSubmit={handleSearchSubmit} className="relative flex-grow">
-           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
-           <Input
-             type="text"
-             placeholder="Search and press Enter..."
-             value={searchInput}
-             onChange={(e) => setSearchInput(e.target.value)}
-             className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}
-           />
-           <button type="submit" className="hidden">Search</button>
-        </form>
-        
-        <DateRangePicker 
-          onChange={handleDateRangeChange} 
-          startDate={startDate}
-          endDate={endDate}
-          className="w-full sm:w-[350px]"
-        />
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
-        <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-          <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
-            <tr>
-              <th scope="col" className="p-4 rounded-tl-md">
-                <Checkbox
-                  id="select-all-checkbox"
-                  checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
-                  onCheckedChange={handleSelectAllRows}
-                  aria-label="Select all rows on this page"
-                  className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
-                  disabled={loading || requests.length === 0 || actionLoading !== null}
-                />
-              </th>
-              <th className="py-3 px-6 text-left font-medium">Artist Name</th>
-              <th className="py-3 px-6 text-left font-medium">Email</th>
-              <th className="py-3 px-6 text-left font-medium rounded-tr-md">Requested At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
-                  Loading artist requests...
-                </td>
-              </tr>
-            ) : requests.length === 0 ? (
-              <tr>
-                <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
-                  No artist requests found
-                </td>
-              </tr>
-            ) : (
-              requests.map((request) => (
-                <tr
-                  key={request.id}
-                  onClick={(e) => handleRowClick(request, e)}
-                  className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedRequestIds.has(request.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === request.id ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  <td className="w-4 p-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'artist' | 'claim')} className="w-full">
+        <TabsList className={`grid w-full grid-cols-2 mb-6 ${theme === 'dark' ? 'bg-gray-800' : ''}`}>
+          <TabsTrigger value="artist" className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}>Artist Requests</TabsTrigger>
+          <TabsTrigger value="claim" className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}>Claim Requests</TabsTrigger>
+        </TabsList>
+        <TabsContent value="artist" className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <form onSubmit={handleSearchSubmit} className="relative flex-grow">
+              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+              <Input
+                type="text"
+                placeholder="Search and press Enter..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}
+              />
+              <button type="submit" className="hidden">Search</button>
+            </form>
+            <DateRangePicker 
+              onChange={handleDateRangeChange} 
+              startDate={startDate}
+              endDate={endDate}
+              className="w-full sm:w-[350px]"
+            />
+          </div>
+          <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+            <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+                <tr>
+                  <th scope="col" className="p-4 rounded-tl-md">
                     <Checkbox
-                      id={`select-row-${request.id}`}
-                      checked={selectedRequestIds.has(request.id)}
-                      onCheckedChange={(checked) => handleSelectRow(request.id, checked)}
-                      aria-label={`Select row for request ${request.artistName}`}
+                      id="select-all-checkbox"
+                      checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
+                      onCheckedChange={handleSelectAllRows}
+                      aria-label="Select all rows on this page"
                       className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
-                      disabled={loading || actionLoading !== null}
+                      disabled={loading || requests.length === 0 || actionLoading !== null}
                     />
-                  </td>
-                  <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {request.artistName}
-                  </td>
-                  <td className="py-4 px-6">{request.user?.email || 'N/A'}</td>
-                  <td className="py-4 px-6">{formatDate(request.verificationRequestedAt)}</td>
+                  </th>
+                  <th className="py-3 px-6 text-left font-medium">Artist Name</th>
+                  <th className="py-3 px-6 text-left font-medium">Email</th>
+                  <th className="py-3 px-6 text-left font-medium rounded-tr-md">Requested At</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex justify-between items-center mt-4">
-        <div className="min-w-[200px]">
-          {selectedRequestIds.size > 0 && (
-            <Button
-              onClick={handleBulkDeleteClick}
-              variant="destructive"
-              size="default"
-              disabled={loading || actionLoading === 'bulk'}
-              className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Selected ({selectedRequestIds.size})
-            </Button>
-          )}
-        </div>
-        <div className="flex justify-end">
-          {totalPages > 1 && (
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1 || loading || actionLoading !== null}
-                variant="outline"
-                size="sm">
-                Previous
-              </Button>
-              <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages || loading || actionLoading !== null}
-                variant="outline"
-                size="sm">
-                Next
-              </Button>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                      Loading artist requests...
+                    </td>
+                  </tr>
+                ) : requests.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                      No artist requests found
+                    </td>
+                  </tr>
+                ) : (
+                  requests.map((request) => (
+                    <tr
+                      key={request.id}
+                      onClick={(e) => handleRowClick(request, e)}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedRequestIds.has(request.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === request.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <td className="w-4 p-4">
+                        <Checkbox
+                          id={`select-row-${request.id}`}
+                          checked={selectedRequestIds.has(request.id)}
+                          onCheckedChange={(checked) => handleSelectRow(request.id, checked)}
+                          aria-label={`Select row for request ${request.artistName}`}
+                          className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
+                          disabled={loading || actionLoading !== null}
+                        />
+                      </td>
+                      <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {request.artistName}
+                      </td>
+                      <td className="py-4 px-6">{request.user?.email || 'N/A'}</td>
+                      <td className="py-4 px-6">{formatDate(request.verificationRequestedAt)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-between items-center mt-4">
+            <div className="min-w-[200px]">
+              {selectedRequestIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDeleteClick}
+                  variant="destructive"
+                  size="default"
+                  disabled={loading || actionLoading === 'bulk'}
+                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedRequestIds.size})
+                </Button>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Rejection Reason Modal */}
-      <RejectModal
-        isOpen={isRejectModalOpen}
-        onClose={() => {
-          setIsRejectModalOpen(false);
-          setRequestIdToReject(null);
-          setIsBulkReject(false);
-        }}
-        onConfirm={handleRejectConfirm}
-        theme={theme}
-      />
-
-      {/* Approve Modal */}
-      <ApproveModal
-        isOpen={isApproveModalOpen}
-        onClose={() => {
-          setIsApproveModalOpen(false);
-          setRequestToApprove(null);
-        }}
-        onConfirm={handleApproveConfirm}
-        theme={theme}
-        artistName={requestToApprove?.artistName}
-      />
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmDeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setRequestToDelete(null);
-          setIsBulkDelete(false);
-        }}
-        onConfirm={handleDeleteConfirm}
-        theme={theme}
-        entityType="artist request"
-        item={requestToDelete ? { 
-          id: requestToDelete.id, 
-          name: requestToDelete.artistName, 
-          email: requestToDelete.user?.email || ''
-        } : null}
-        count={isBulkDelete ? selectedRequestIds.size : undefined}
-      />
+            <div className="flex justify-end">
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Previous
+                  </Button>
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          <RejectModal
+            isOpen={isRejectModalOpen}
+            onClose={() => {
+              setIsRejectModalOpen(false);
+              setRequestIdToReject(null);
+              setIsBulkReject(false);
+            }}
+            onConfirm={handleRejectConfirm}
+            theme={theme}
+          />
+          <ApproveModal
+            isOpen={isApproveModalOpen}
+            onClose={() => {
+              setIsApproveModalOpen(false);
+              setRequestToApprove(null);
+            }}
+            onConfirm={handleApproveConfirm}
+            theme={theme}
+            artistName={requestToApprove?.artistName}
+          />
+          <ConfirmDeleteModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => {
+              setIsDeleteModalOpen(false);
+              setRequestToDelete(null);
+              setIsBulkDelete(false);
+            }}
+            onConfirm={handleDeleteConfirm}
+            theme={theme}
+            entityType="artist request"
+            item={requestToDelete ? { 
+              id: requestToDelete.id, 
+              name: requestToDelete.artistName, 
+              email: requestToDelete.user?.email || ''
+            } : null}
+            count={isBulkDelete ? selectedRequestIds.size : undefined}
+          />
+        </TabsContent>
+        <TabsContent value="claim" className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <form onSubmit={handleSearchSubmit} className="relative flex-grow">
+              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+              <Input
+                type="text"
+                placeholder="Search and press Enter..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}
+              />
+              <button type="submit" className="hidden">Search</button>
+            </form>
+            <DateRangePicker 
+              onChange={handleDateRangeChange} 
+              startDate={startDate}
+              endDate={endDate}
+              className="w-full sm:w-[350px]"
+            />
+          </div>
+          <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+            <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+                <tr>
+                  <th className="p-4 rounded-tl-md">
+                    <Checkbox
+                      id="select-all-claim-checkbox"
+                      checked={isAllClaimSelected ? true : isClaimIndeterminate ? 'indeterminate' : false}
+                      onCheckedChange={handleSelectAllClaimRows}
+                      aria-label="Select all claim requests on this page"
+                      className={theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}
+                      disabled={claimLoading || claimRequests.length === 0 || claimActionLoading !== null}
+                    />
+                  </th>
+                  <th className="py-3 px-6 text-left font-medium">Claimed Artist</th>
+                  <th className="py-3 px-6 text-left font-medium">Claiming User</th>
+                  <th className="py-3 px-6 text-left font-medium">Email</th>
+                  <th className="py-3 px-6 text-left font-medium">Submitted At</th>
+                  <th className="py-3 px-6 text-left font-medium">Status</th>
+                  <th className="py-3 px-6 text-left font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claimLoading ? (
+                  <tr><td colSpan={7} className="py-8 text-center">Loading claim requests...</td></tr>
+                ) : claimRequests.length === 0 ? (
+                  <tr><td colSpan={7} className="py-8 text-center">No claim requests found</td></tr>
+                ) : (
+                  claimRequests.map((claim) => (
+                    <tr key={claim.id} className="border-b cursor-pointer" onClick={(e) => {
+                      // Only trigger row click if not clicking a button or checkbox
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button') || target.closest('[role="checkbox"]')) return;
+                      router.push(`/admin/artist-requests/claim/${claim.id}`);
+                    }}>
+                      <td className="w-4 p-4">
+                        <Checkbox
+                          id={`select-claim-row-${claim.id}`}
+                          checked={claimSelectedIds.has(claim.id)}
+                          onCheckedChange={(checked) => {
+                            const newSet = new Set(claimSelectedIds);
+                            if (checked) newSet.add(claim.id); else newSet.delete(claim.id);
+                            setClaimSelectedIds(newSet);
+                          }}
+                          aria-label={`Select row for claim ${claim.artistProfile.artistName}`}
+                          className={theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}
+                          disabled={claimLoading || claimActionLoading !== null}
+                        />
+                      </td>
+                      <td className="py-4 px-6 font-medium whitespace-nowrap">{claim.artistProfile.artistName}</td>
+                      <td className="py-4 px-6">{claim.claimingUser.name || claim.claimingUser.username || claim.claimingUser.email}</td>
+                      <td className="py-4 px-6">{claim.claimingUser.email}</td>
+                      <td className="py-4 px-6">{formatDate(claim.submittedAt)}</td>
+                      <td className="py-4 px-6 capitalize">{claim.status.toLowerCase()}</td>
+                      <td className="py-4 px-6">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setClaimRequestToApprove(claim);
+                            setIsClaimApproveModalOpen(true);
+                          }}
+                          disabled={claimActionLoading !== null}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="ml-2"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setClaimRequestIdToReject(claim.id);
+                            setIsClaimRejectModalOpen(true);
+                          }}
+                          disabled={claimActionLoading !== null}
+                        >
+                          Reject
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-between items-center mt-4">
+            <div className="min-w-[200px]">
+              {selectedRequestIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDeleteClick}
+                  variant="destructive"
+                  size="default"
+                  disabled={loading || actionLoading === 'bulk'}
+                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedRequestIds.size})
+                </Button>
+              )}
+            </div>
+            <div className="flex justify-end">
+              {claimTotalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={() => handleClaimPageChange(claimCurrentPage - 1)}
+                    disabled={claimCurrentPage === 1 || claimLoading || claimActionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Previous
+                  </Button>
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Page {claimCurrentPage} of {claimTotalPages}
+                  </span>
+                  <Button
+                    onClick={() => handleClaimPageChange(claimCurrentPage + 1)}
+                    disabled={claimCurrentPage === claimTotalPages || claimLoading || claimActionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          <RejectModal
+            isOpen={isClaimRejectModalOpen}
+            onClose={() => {
+              setIsClaimRejectModalOpen(false);
+              setClaimRequestIdToReject(null);
+              setIsClaimBulkReject(false);
+            }}
+            onConfirm={handleClaimRejectConfirm}
+            theme={theme}
+          />
+          <ApproveModal
+            isOpen={isClaimApproveModalOpen}
+            onClose={() => {
+              setIsClaimApproveModalOpen(false);
+              setClaimRequestToApprove(null);
+            }}
+            onConfirm={handleClaimApproveConfirm}
+            theme={theme}
+            artistName={claimRequestToApprove?.artistProfile.artistName}
+          />
+          <ConfirmDeleteModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => {
+              setIsDeleteModalOpen(false);
+              setRequestToDelete(null);
+              setIsBulkDelete(false);
+            }}
+            onConfirm={handleDeleteConfirm}
+            theme={theme}
+            entityType="artist request"
+            item={requestToDelete ? { 
+              id: requestToDelete.id, 
+              name: requestToDelete.artistName, 
+              email: requestToDelete.user?.email || ''
+            } : null}
+            count={isBulkDelete ? selectedRequestIds.size : undefined}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 
