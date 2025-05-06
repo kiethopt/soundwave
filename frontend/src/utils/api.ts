@@ -1632,4 +1632,82 @@ export const api = {
         token
       ),
   },
+
+  reports: {
+    create: async (data: {
+      type: string;
+      description: string;
+      trackId?: string;
+      playlistId?: string;
+      albumId?: string;
+    }, token: string) => {
+      return fetchWithAuth(
+        "/api/reports",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+        token
+      );
+    },
+
+    getUserReports: async (token: string, page: number = 1, limit: number = 10) => {
+      return fetchWithAuth(
+        `/api/reports/my-reports?page=${page}&limit=${limit}`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    getReport: async (id: string, token: string) => {
+      return fetchWithAuth(
+        `/api/reports/${id}`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    // Admin only
+    getAllReports: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      filters: { type?: string; status?: string } = {}
+    ) => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filters.type) {
+        params.append("type", filters.type);
+      }
+
+      if (filters.status) {
+        params.append("status", filters.status);
+      }
+
+      return fetchWithAuth(
+        `/api/reports?${params.toString()}`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    // Admin only
+    resolveReport: async (
+      id: string,
+      data: { status: string; resolution: string },
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/reports/${id}/resolve`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        },
+        token
+      );
+    },
+  },
 };

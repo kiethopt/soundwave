@@ -569,3 +569,85 @@ export interface ArtistClaimRequest {
   } | null;
 }
 // --- End New Type ---
+
+// Add Report-related types
+export type ReportType = 'COPYRIGHT_VIOLATION' | 'INAPPROPRIATE_CONTENT' | 'AI_GENERATION_ISSUE' | 'OTHER';
+export type ReportStatus = 'PENDING' | 'RESOLVED' | 'REJECTED';
+
+export interface Report {
+  id: string;
+  type: ReportType;
+  description: string;
+  status: ReportStatus;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  resolution?: string;
+  
+  reporter: {
+    id: string;
+    name?: string;
+    email: string;
+    username?: string;
+    avatar?: string;
+  };
+  
+  resolver?: {
+    id: string;
+    name?: string;
+    username?: string;
+    avatar?: string;
+  };
+  
+  track?: {
+    id: string;
+    title: string;
+    artist: {
+      id: string;
+      artistName: string;
+      avatar?: string;
+      isVerified: boolean;
+    };
+    album?: {
+      id: string;
+      title: string;
+      coverUrl?: string;
+    };
+    coverUrl?: string;
+    isActive: boolean;
+  };
+  
+  playlist?: {
+    id: string;
+    name: string;
+    coverUrl?: string;
+    privacy: PlaylistPrivacy;
+    isAIGenerated: boolean;
+    user: {
+      id: string;
+      name?: string;
+      username?: string;
+      avatar?: string;
+    };
+  };
+  
+  album?: {
+    id: string;
+    title: string;
+    coverUrl?: string;
+    artist: {
+      id: string;
+      artistName: string;
+      avatar?: string;
+      isVerified: boolean;
+    };
+  };
+}
+
+export interface ReportFormData {
+  type: ReportType;
+  description: string;
+  trackId?: string;
+  playlistId?: string;
+  albumId?: string;
+}

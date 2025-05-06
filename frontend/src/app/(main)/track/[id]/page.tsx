@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { Track, Playlist } from "@/types";
-import { ArrowLeft, Calendar, Music } from "lucide-react";
+import { ArrowLeft, Calendar, Music, Flag } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,8 @@ import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { useTrack } from "@/contexts/TrackContext";
 import { AlbumTracks } from "@/components/user/album/AlbumTracks";
 import io, { Socket } from "socket.io-client";
+import { ReportDialog } from "@/components/shared/ReportDialog";
+import { Button } from "@/components/ui/button";
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -40,6 +42,7 @@ export default function TrackDetailPage() {
     trackQueue,
     addToQueue,
   } = useTrack();
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   const fetchTrackDetails = useCallback(async () => {
     if (!trackId) return;
@@ -428,10 +431,35 @@ export default function TrackDetailPage() {
               </span>
             </div>
           )}
+          
+          {/* Report Button */}
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setIsReportDialogOpen(true)}
+              title="Report this track"
+            >
+              <Flag className="h-4 w-4" />
+              Report
+            </Button>
+          </div>
         </div>
 
         {/* Auth Dialog */}
         <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+        
+        {/* Report Dialog */}
+        {track && (
+          <ReportDialog
+            open={isReportDialogOpen}
+            onOpenChange={setIsReportDialogOpen}
+            entityType="track"
+            entityId={track.id}
+            entityName={track.title}
+          />
+        )}
       </div>
     </div>
   );

@@ -758,12 +758,12 @@ export function EditTrackModal({
 
 // --- NEW MODAL: Edit Artist Profile (Combined) ---
 interface EditArtistProfileModalProps {
-    artistProfile: ArtistProfile | null;
-    isOpen: boolean;
-    onClose: () => void;
-    onSubmit: (artistId: string, formData: FormData) => Promise<void>;
-    theme?: "light" | "dark";
-    availableGenres?: Genre[] | Array<{ id: string; name: string }>;
+  artistProfile: ArtistProfile | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (artistId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+  availableGenres?: Genre[] | Array<{ id: string; name: string }>;
 }
 
 export function EditArtistProfileModal({
@@ -781,20 +781,20 @@ export function EditArtistProfileModal({
     const [bannerFile, setBannerFile] = useState<File | null>(null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
     const [socialLinks, setSocialLinks] = useState<{ facebook?: string; instagram?: string; twitter?: string }>({});
-    const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const bannerInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        if (artistProfile && isOpen) {
+  useEffect(() => {
+    if (artistProfile && isOpen) {
             setArtistName(artistProfile.artistName || '');
             setBio(artistProfile.bio || '');
             setAvatarPreview(artistProfile.avatar || null);
             setBannerPreview(artistProfile.artistBanner || null);
             setSocialLinks(artistProfile.socialMediaLinks || {});
-            setSelectedGenres(artistProfile.genres?.map(g => g.genre.id) || []);
+      setSelectedGenres(artistProfile.genres?.map(g => g.genre.id) || []);
             setAvatarFile(null);
             setBannerFile(null);
             setIsSubmitting(false);
@@ -809,8 +809,8 @@ export function EditArtistProfileModal({
             setAvatarFile(null);
             setBannerFile(null);
             setIsSubmitting(false);
-        }
-    }, [artistProfile, isOpen]);
+    }
+  }, [artistProfile, isOpen]);
 
     const handleFileChange = (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -837,11 +837,11 @@ export function EditArtistProfileModal({
         setSocialLinks(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!artistProfile) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!artistProfile) return;
 
-        setIsSubmitting(true);
+      setIsSubmitting(true);
         const formData = new FormData();
 
         // Append changed data
@@ -863,7 +863,7 @@ export function EditArtistProfileModal({
 
             if (Object.keys(filteredLinks).length > 0) {
                  formData.append('socialMediaLinks', JSON.stringify(filteredLinks));
-            } else {
+      } else {
                  // Send an empty object if all links are cleared
                  formData.append('socialMediaLinks', '{}');
             }
@@ -881,57 +881,57 @@ export function EditArtistProfileModal({
 
         try {
             await onSubmit(artistProfile.id, formData);
-            onClose();
-        } catch (error) {
+      onClose();
+    } catch (error) {
             console.error('Error updating artist profile:', error);
             // Error handled by parent component's onSubmit
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    if (!isOpen || !artistProfile) return null;
+  if (!isOpen || !artistProfile) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className={cn(
+      <DialogContent className={cn(
             "sm:max-w-3xl p-0 overflow-hidden flex flex-col", // Increased width
-            theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-        )}>
-            {/* Header */}
-            <div className="px-6 pt-6">
-               <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "w-12 h-12 flex items-center justify-center rounded-full",
-                            theme === 'dark' ? 'bg-purple-900/30' : 'bg-purple-100'
-                        )}>
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-purple-900/30' : 'bg-purple-100'
+              )}>
                             <Edit className={cn( // Changed icon to Edit
-                                "w-7 h-7",
-                                theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
-                            )} strokeWidth={1.5} />
-                        </div>
-                        <div>
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
                             <DialogTitle className={cn("text-lg font-bold", theme === 'dark' ? 'text-white' : 'text-gray-900')}>
                                 Edit Artist Profile
-                            </DialogTitle>
+                </DialogTitle>
                             <DialogDescription className={cn("text-sm mt-1", theme === 'dark' ? 'text-gray-300' : 'text-gray-600')}>
                                 Update your artist details and associated genres.
-                            </DialogDescription>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Close"
-                        className={cn(
-                            "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                            theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
-                        )}>
-                        <XIcon className="w-5 h-5" />
-                    </button>
-                </div>
+                </DialogDescription>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                        )}>
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} id="edit-artist-profile-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-6">
@@ -940,7 +940,7 @@ export function EditArtistProfileModal({
                  <div className="space-y-2">
                      <UILabel htmlFor="banner-upload" className="text-sm font-medium">Artist Banner</UILabel>
                      <div
-                         className={cn(
+                className={cn(
                              "w-full h-40 rounded-md border border-dashed flex items-center justify-center cursor-pointer relative overflow-hidden",
                              theme === "dark" ? "border-gray-600 hover:border-gray-500 bg-gray-800/50" : "border-gray-300 hover:border-gray-400 bg-gray-50"
                          )}
@@ -1052,25 +1052,25 @@ export function EditArtistProfileModal({
                 {/* Genres */}
                 <div className="space-y-2">
                     <UILabel className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-                        Genres
-                    </UILabel>
-                    <SearchableSelect
-                        options={availableGenres.map(genre => ({
+                Genres
+              </UILabel>
+                <SearchableSelect
+                  options={availableGenres.map(genre => ({
                             id: genre.id,
                             name: genre.name
-                        }))}
-                        value={selectedGenres}
-                        onChange={setSelectedGenres}
+                  }))}
+                  value={selectedGenres}
+                  onChange={setSelectedGenres}
                         placeholder="Select your primary genres"
-                        multiple={true}
-                    />
-                     <p className={cn(
+                  multiple={true}
+                />
+              <p className={cn(
                         "mt-1 text-sm",
-                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    )}>
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+              )}>
                         Select the genres that best represent your music style.
-                    </p>
-                </div>
+              </p>
+            </div>
             </form>
 
             {/* Footer */}
@@ -1078,33 +1078,33 @@ export function EditArtistProfileModal({
                 "px-6 py-4 flex gap-3 border-t flex-shrink-0",
                 theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'
             )}>
-               <Button
-                 type="button"
+            <Button
+              type="button"
                  variant="outline"
-                 onClick={onClose}
-                 className={cn(
+              onClick={onClose}
+              className={cn(
                     "flex-1 text-center justify-center",
                     theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'
-                 )}
+              )}
                  disabled={isSubmitting}
-                >
-                 Cancel
-               </Button>
-               <Button
-                 type="submit"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
                  form="edit-artist-profile-form"
-                 className={cn(
+              className={cn(
                     "flex-1 text-center justify-center",
-                    theme === 'dark' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700 text-white'
-                 )}
-                 disabled={isSubmitting}
-               >
+                theme === 'dark' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700 text-white'
+              )}
+              disabled={isSubmitting}
+            >
                  {isSubmitting ? 'Saving...' : 'Save Changes'}
-               </Button>
-            </div>
-        </DialogContent>
+            </Button>
+          </div>
+      </DialogContent>
     </Dialog>
-    );
+  );
 }
 
 // --- End NEW MODAL ---

@@ -47,6 +47,9 @@ import { Album, Track } from "@/types";
 import { Calendar } from "lucide-react";
 import { ArtistProfile } from "@/types";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { X, Check } from "lucide-react";
+import { Report, ReportStatus, ReportType } from "@/types";
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -4880,6 +4883,365 @@ export function SystemPlaylistDetailModal({
             )}
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ReportDetailModalProps {
+  report: Report | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onResolve?: (report: Report) => void;
+  theme?: "light" | "dark";
+}
+
+export function ReportDetailModal({
+  report,
+  isOpen,
+  onClose,
+  onResolve,
+  theme = "light",
+}: ReportDetailModalProps) {
+  if (!report) return null;
+
+  const getStatusBadge = (status: ReportStatus) => {
+    switch (status) {
+      case 'PENDING':
+        return (
+          <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+            Pending
+          </Badge>
+        );
+      case 'RESOLVED':
+        return (
+          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+            Resolved
+          </Badge>
+        );
+      case 'REJECTED':
+        return (
+          <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+            Rejected
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getReportTypeBadge = (type: ReportType) => {
+    switch (type) {
+      case 'COPYRIGHT_VIOLATION':
+        return (
+          <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+            Copyright
+          </Badge>
+        );
+      case 'INAPPROPRIATE_CONTENT':
+        return (
+          <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">
+            Inappropriate
+          </Badge>
+        );
+      case 'AI_GENERATION_ISSUE':
+        return (
+          <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20">
+            AI Issue
+          </Badge>
+        );
+      case 'OTHER':
+        return (
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+            Other
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{type}</Badge>;
+    }
+  };
+
+  const getEntityName = () => {
+    if (report.track) {
+      return (
+        <div className="flex flex-col">
+          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.track.title}</span>
+          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Track by {report.track.artist.artistName}</span>
+        </div>
+      );
+    } else if (report.album) {
+      return (
+        <div className="flex flex-col">
+          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.album.title}</span>
+          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Album by {report.album.artist.artistName}</span>
+        </div>
+      );
+    } else if (report.playlist) {
+      return (
+        <div className="flex flex-col">
+          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.playlist.name}</span>
+          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
+        </div>
+      );
+    }
+    return <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>Unknown Entity</span>;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={`sm:max-w-[600px] ${
+        theme === "dark"
+          ? "bg-gray-800 border-gray-700 text-white"
+          : "bg-white"
+      }`}>
+        <DialogHeader>
+          <DialogTitle className={theme === "dark" ? "text-white" : ""}>
+            Report Details
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Type</h3>
+              <div>{getReportTypeBadge(report.type)}</div>
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Status</h3>
+              <div>{getStatusBadge(report.status)}</div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Description</h3>
+            <p className={`rounded-md p-3 text-sm ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+              {report.description}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Reported By</h3>
+              <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
+                {report.reporter.name || report.reporter.username || report.reporter.email}
+              </p>
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Date Submitted</h3>
+              <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
+                {new Date(report.createdAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {report.status !== 'PENDING' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Resolved By</h3>
+                  <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
+                    {report.resolver?.name || report.resolver?.username || 'System'}
+                  </p>
+                </div>
+                <div>
+                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Date Resolved</h3>
+                  <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
+                    {report.resolvedAt ? new Date(report.resolvedAt).toLocaleString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {report.resolution && (
+                <div>
+                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Resolution</h3>
+                  <p className={`rounded-md p-3 text-sm ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+                    {report.resolution}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="flex justify-end gap-2">
+          {report.status === 'PENDING' && onResolve && (
+            <Button 
+              onClick={() => onResolve(report)}
+              className={`${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+            >
+              Resolve Now
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className={theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : ''}
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ResolveReportModalProps {
+  report: Report | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (reportId: string, data: { status: ReportStatus; resolution: string }) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function ResolveReportModal({
+  report,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: ResolveReportModalProps) {
+  const [resolution, setResolution] = useState('');
+  const [resolutionStatus, setResolutionStatus] = useState<ReportStatus>('RESOLVED');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset form when modal opens
+      setResolution('');
+      setResolutionStatus('RESOLVED');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!report) return;
+    
+    try {
+      setIsSubmitting(true);
+      await onSubmit(report.id, {
+        status: resolutionStatus,
+        resolution,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Error resolving report:', error);
+      // Error handling is done in the parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!report) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={`sm:max-w-[500px] ${
+        theme === "dark"
+          ? "bg-gray-800 border-gray-700 text-white"
+          : "bg-white"
+      }`}>
+        <DialogHeader>
+          <DialogTitle className={theme === "dark" ? "text-white" : ""}>
+            Resolve Report
+          </DialogTitle>
+          <DialogDescription className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+            Mark this report as resolved or rejected and provide a resolution.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <label 
+              htmlFor="resolution-status" 
+              className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+            >
+              Resolution Status
+            </label>
+            <Select
+              value={resolutionStatus}
+              onValueChange={(value) => setResolutionStatus(value as ReportStatus)}
+            >
+              <SelectTrigger 
+                id="resolution-status" 
+                className={theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-200' : ''}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}>
+                <SelectItem value="RESOLVED">Resolved (Approve)</SelectItem>
+                <SelectItem value="REJECTED">Rejected (Deny)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <label 
+              htmlFor="resolution-note" 
+              className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+            >
+              Resolution Note
+            </label>
+            <Textarea
+              id="resolution-note"
+              value={resolution}
+              onChange={(e) => setResolution(e.target.value)}
+              placeholder="Explain how this report was addressed..."
+              rows={4}
+              className={theme === 'dark' 
+                ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder:text-gray-500' 
+                : 'placeholder:text-gray-400'
+              }
+            />
+          </div>
+
+          {report.type === 'COPYRIGHT_VIOLATION' && resolutionStatus === 'RESOLVED' && (
+            <div className={`rounded-md p-3 text-sm border ${
+              theme === 'dark' 
+                ? 'bg-amber-950 border-amber-800 text-amber-300' 
+                : 'bg-amber-50 border-amber-200 text-amber-800'
+            }`}>
+              <p className="font-medium mb-1">Warning</p>
+              <p>
+                Approving a copyright violation report will automatically deactivate the
+                reported content, making it inaccessible to users.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : ''}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !resolution.trim()}
+            className={
+              resolutionStatus === 'RESOLVED'
+                ? theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
+                : theme === 'dark' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+            }
+          >
+            {isSubmitting ? (
+              'Processing...'
+            ) : resolutionStatus === 'RESOLVED' ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Approve
+              </>
+            ) : (
+              <>
+                <X className="mr-2 h-4 w-4" />
+                Reject
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -819,3 +819,87 @@ export const artistClaimRequestDetailsSelect = {
   },
   reviewedByAdmin: { select: { id: true, name: true, username: true } }, // Admin who reviewed
 };
+
+// Add report select
+export const reportSelect = {
+  id: true,
+  type: true,
+  description: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  resolvedAt: true,
+  resolution: true,
+  reporter: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+      avatar: true,
+    }
+  },
+  resolver: {
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      avatar: true,
+    }
+  },
+  track: {
+    select: {
+      id: true,
+      title: true,
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+          isVerified: true,
+        }
+      },
+      album: {
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+        }
+      },
+      coverUrl: true,
+      isActive: true,
+    }
+  },
+  playlist: {
+    select: {
+      id: true,
+      name: true,
+      coverUrl: true,
+      privacy: true,
+      isAIGenerated: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          avatar: true,
+        }
+      }
+    }
+  },
+  album: {
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+          isVerified: true,
+        }
+      }
+    }
+  }
+};
