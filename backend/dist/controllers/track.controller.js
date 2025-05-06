@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkTrackLiked = exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
+exports.checkTrackCopyright = exports.checkTrackLiked = exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const trackService = __importStar(require("../services/track.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const track_service_1 = require("../services/track.service");
@@ -81,7 +81,12 @@ const createTrack = async (req, res) => {
         res.status(201).json({ message: 'Track created successfully', track: newTrack });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Create track');
+        if (error.code === 'P2002') {
+            res.status(409).json({ message: `A track with this title likely already exists for this artist.`, code: error.code });
+        }
+        else {
+            (0, handle_utils_1.handleError)(res, error, 'Create track');
+        }
     }
 };
 exports.createTrack = createTrack;
@@ -254,4 +259,48 @@ const checkTrackLiked = async (req, res) => {
     }
 };
 exports.checkTrackLiked = checkTrackLiked;
+const checkTrackCopyright = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.artistProfile) {
+            res.status(403).json({ message: 'Forbidden: Only verified artists can check copyright.' });
+            return;
+        }
+        const files = req.files;
+        if (!files || !files.audioFile || files.audioFile.length === 0) {
+            res.status(400).json({ message: 'Audio file is required.' });
+            return;
+        }
+        const audioFile = files.audioFile[0];
+        const { title, releaseDate } = req.body;
+        if (!title || !releaseDate) {
+            res.status(400).json({ message: 'Title and release date are required for context during copyright check.' });
+            return;
+        }
+        const featuredArtistIds = (req.body.featuredArtistIds || []);
+        const featuredArtistNames = (req.body.featuredArtistNames || []);
+        const checkData = {
+            title,
+            releaseDate,
+            declaredFeaturedArtistIds: Array.isArray(featuredArtistIds) ? featuredArtistIds : [],
+            declaredFeaturedArtistNames: Array.isArray(featuredArtistNames) ? featuredArtistNames : [],
+        };
+        const result = await track_service_1.TrackService.checkTrackCopyrightOnly(user.artistProfile.id, checkData, audioFile, user);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        if (error.isCopyrightConflict && error.copyrightDetails) {
+            res.status(409).json({
+                message: error.message,
+                isCopyrightConflict: true,
+                copyrightDetails: error.copyrightDetails,
+                isSafeToUpload: false,
+            });
+        }
+        else {
+            (0, handle_utils_1.handleError)(res, error, 'Check track copyright');
+        }
+    }
+};
+exports.checkTrackCopyright = checkTrackCopyright;
 //# sourceMappingURL=track.controller.js.map

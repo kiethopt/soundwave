@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { ArrowLeft, Upload, Music, FileAudio, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Music, FileAudio, CheckCircle, AlertTriangle, Info, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArtistCreatableSelect } from '@/components/ui/ArtistCreatableSelect';
@@ -12,7 +12,6 @@ import { ArtistProfile } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label as UILabel } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 // Define the type for selected artists (can have ID or just name)
@@ -27,10 +26,163 @@ interface Label {
   name: string;
 }
 
+// Define the type for copyright detection results
+interface CopyrightInfo {
+  title: string;
+  artist: string;
+  album?: string;
+  releaseDate?: string;
+  label?: string;
+  similarity?: number;
+  songLink?: string;
+  isBlocking: boolean;
+}
+
+// Component to display copyright information
+const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo, theme: 'light' | 'dark' }) => {
+  const alertType = copyright.isBlocking ? 'error' : 'info';
+  const alertStyles = {
+    error: {
+      light: 'border-orange-400 bg-orange-50 text-orange-800',
+      dark: 'border-orange-600 bg-orange-900/20 text-orange-200'
+    },
+    info: {
+      light: 'border-blue-400 bg-blue-50 text-blue-800',
+      dark: 'border-blue-600 bg-blue-900/20 text-blue-200'
+    }
+  };
+  const iconStyles = {
+    error: {
+      light: 'text-orange-500',
+      dark: 'text-orange-400'
+    },
+    info: {
+      light: 'text-blue-500',
+      dark: 'text-blue-400'
+    }
+  };
+  const musicIconBgStyles = {
+    error: {
+      light: 'bg-orange-100',
+      dark: 'bg-orange-900/30'
+    },
+    info: {
+      light: 'bg-blue-100',
+      dark: 'bg-blue-900/30'
+    }
+  }
+  const linkStyles = {
+    error: {
+      light: 'bg-orange-100 text-orange-700 hover:bg-orange-200',
+      dark: 'bg-orange-800/30 text-orange-300 hover:bg-orange-800/50'
+    },
+    info: {
+      light: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
+      dark: 'bg-blue-800/30 text-blue-300 hover:bg-blue-800/50'
+    }
+  }
+  const messageStyles = {
+    error: {
+      light: 'text-orange-700',
+      dark: 'text-orange-300'
+    },
+    info: {
+      light: 'text-blue-700',
+      dark: 'text-blue-300'
+    }
+  }
+
+  return (
+    <div 
+      className={cn(
+        "mt-4 p-4 rounded-lg border-l-4 flex flex-col gap-3",
+        alertStyles[alertType][theme]
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-0.5">
+          {alertType === 'error' ? (
+            <AlertTriangle className={cn("h-5 w-5", iconStyles[alertType][theme])} />
+          ) : (
+            <Info className={cn("h-5 w-5", iconStyles[alertType][theme])} />
+          )}
+        </div>
+        <div>
+          <h3 className="text-sm font-medium">{copyright.isBlocking ? 'Copyright Match Detected' : 'Potential Match Information'}</h3>
+          <p className="text-xs mt-1 opacity-80">
+            {copyright.isBlocking
+              ? 'The uploaded audio appears to match an existing copyrighted track.'
+              : 'The uploaded audio matches the following track, which seems to be your own content. You may proceed.'
+            }
+          </p>
+        </div>
+      </div>
+
+      <div className={cn(
+        "rounded-md p-3 flex flex-col md:flex-row gap-4",
+        theme === 'light' ? 'bg-white shadow-sm' : 'bg-black/20 shadow-inner'
+      )}>
+        <div className={cn(
+          "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0",
+          musicIconBgStyles[alertType][theme]
+        )}>
+          <Music className={cn("h-6 w-6", iconStyles[alertType][theme])} />
+        </div>
+        
+        <div className="flex-1">
+          <h4 className="font-medium">{copyright.title}</h4>
+          <p className={cn("text-sm", theme === 'light' ? 'text-gray-600' : 'text-gray-400')}>
+            by <span className="font-medium">{copyright.artist}</span>
+            {copyright.album && <> · {copyright.album}</>}
+          </p>
+          
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
+            {copyright.releaseDate && (
+              <div className="flex items-center gap-1">
+                <Info className="h-3.5 w-3.5" />
+                <span>Released: {copyright.releaseDate}</span>
+              </div>
+            )}
+            {copyright.label && (
+              <div className="flex items-center gap-1">
+                <Info className="h-3.5 w-3.5" />
+                <span>Label: {copyright.label}</span>
+              </div>
+            )}
+          </div>
+          
+          {copyright.songLink && (
+            <a 
+              href={copyright.songLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={cn(
+                "mt-3 inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                linkStyles[alertType][theme]
+              )}
+            >
+              View Original <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      </div>
+      
+      <div className={cn("text-xs px-1", messageStyles[alertType][theme])}>
+        {copyright.isBlocking
+          ? 'To upload this track, you need permission to use this content. If this is your content but blocked, ensure your artist name matches or request verification.'
+          : 'If this is not your content, please do not proceed with the upload.'
+        }
+      </div>
+    </div>
+  );
+};
+
 export default function NewTrack() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
+  const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0); // Track last copyright check time
+  const COOLDOWN_PERIOD = 15000; // 15 seconds cooldown between checks
 
   // Helper function to get current date and time in YYYY-MM-DDTHH:MM format
   const getCurrentDateTime = () => {
@@ -55,6 +207,7 @@ export default function NewTrack() {
   const [featuredArtists, setFeaturedArtists] = useState<SelectedArtist[]>([]);
   const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [copyrightInfo, setCopyrightInfo] = useState<CopyrightInfo | null>(null);
 
   // State to store the artist's default label name
   const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
@@ -119,6 +272,8 @@ export default function NewTrack() {
     if (e.target.files) {
       if (e.target.name === 'audio') {
         setAudioFile(e.target.files[0]);
+        // Clear any previous copyright detection
+        setCopyrightInfo(null);
       } else if (e.target.name === 'cover' && e.target.files.length > 0) {
         const file = e.target.files[0];
         setCoverFile(file);
@@ -143,59 +298,192 @@ export default function NewTrack() {
     audioFileInputRef.current?.click();
   };
 
+  // Function to check copyright
+  const checkCopyright = async () => {
+    console.log('[Frontend CheckCopyright] Attempting to check copyright...');
+    if (!audioFile) {
+      toast.error('Please select an audio file first');
+      console.log('[Frontend CheckCopyright] Aborted: No audio file.');
+      return;
+    }
+    if (!trackData.title) {
+        toast.error('Please enter a title first');
+        console.log('[Frontend CheckCopyright] Aborted: No title.');
+        return;
+    }
+    
+    // Check if we're within the cooldown period
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastCheckTimestamp;
+    if (timeSinceLastCheck < COOLDOWN_PERIOD && lastCheckTimestamp !== 0) {
+      const remainingTime = Math.ceil((COOLDOWN_PERIOD - timeSinceLastCheck) / 1000);
+      toast.error(`Please wait ${remainingTime} seconds before checking again`);
+      return;
+    }
+    
+    setCopyrightInfo(null);
+    setIsLoading(true);
+    setLastCheckTimestamp(now);
+    
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+      
+      const formData = new FormData();
+      formData.append('audioFile', audioFile);
+      formData.append('title', trackData.title);
+      formData.append('releaseDate', trackData.releaseDate || getCurrentDateTime());
+
+      // Add featured artists to FormData
+      featuredArtists.forEach((artist, index) => {
+        if (artist.id) {
+          formData.append(`featuredArtistIds[${index}]`, artist.id);
+        }
+        formData.append(`featuredArtistNames[${index}]`, artist.name);
+      });
+      
+      console.log('[Frontend CheckCopyright] Calling api.tracks.checkCopyright with formData:', {
+        audioFileName: audioFile.name,
+        title: trackData.title,
+        releaseDate: trackData.releaseDate || getCurrentDateTime(),
+        featuredArtists: featuredArtists, // Log the featured artists being sent
+      });
+
+      // Call the NEW check-copyright endpoint
+      const result = await api.tracks.checkCopyright(formData, token);
+      setIsLoading(false);
+
+      if (result.copyrightDetails) {
+          const details = result.copyrightDetails;
+          const newCopyrightInfo: CopyrightInfo = {
+            title: details.title || 'Unknown Title',
+            artist: details.artist || 'Unknown Artist',
+            album: details.album,
+            releaseDate: details.release_date,
+            label: details.label,
+            songLink: details.song_link,
+            isBlocking: false,
+          };
+          setCopyrightInfo(newCopyrightInfo);
+          toast.success(result.message || 'Potential match found (non-blocking)'); 
+      } else {
+          // No match found
+          toast.success(result.message || 'No copyright issues detected.');
+      }
+
+    } catch (error: any) {
+      setIsLoading(false);
+      const backendError = error.responseBody;
+
+      if (error.message && (
+        error.message.includes('ECONNRESET') || 
+        error.message.includes('network error') || 
+        error.message.includes('failed to fetch') ||
+        error.message.includes('timeout')
+      )) {
+        toast.error('Connection timeout. The server may be busy, please try again in a few moments.');
+        return;
+      }
+
+      if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
+          // Blocking copyright conflict
+          const details = backendError.copyrightDetails;
+          const newCopyrightInfo: CopyrightInfo = {
+            title: details.title || 'Unknown Title',
+            artist: details.artist || 'Unknown Artist',
+            album: details.album,
+            releaseDate: details.release_date,
+            label: details.label,
+            songLink: details.song_link,
+            isBlocking: true,
+          };
+          setCopyrightInfo(newCopyrightInfo);
+          if (backendError.message && backendError.message.includes('similarity score')) {
+            toast.error('Copyright Match: Artist name similarity too low. See details below.');
+          } else {
+            toast.error('Copyright Match: Track matches existing content. See details below.');
+          }
+      } else {
+          console.error('Full error checking copyright:', error);
+          toast.error('Error checking copyright. Please try again.');
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Frontend handleSubmit] Attempting to submit track...');
 
     if (!audioFile) {
       toast.error('Please select an audio file');
+      console.log('[Frontend handleSubmit] Aborted: No audio file.');
       return;
     }
 
     if (selectedGenres.length === 0) {
       toast.error('Please select at least one genre');
+      console.log('[Frontend handleSubmit] Aborted: No genres selected.');
       return;
     }
 
+    if (!copyrightInfo) {
+      toast.error('Please perform the copyright check before submitting.');
+      console.log('[Frontend handleSubmit] Aborted: Copyright check not performed (copyrightInfo is null).');
+      return;
+    }
+    if (copyrightInfo.isBlocking) {
+        toast.error('Cannot submit due to a blocking copyright conflict. Please use a different audio file.');
+        console.log('[Frontend handleSubmit] Aborted: Copyright conflict is blocking.');
+        return;
+    }
+
     setIsLoading(true);
+    console.log('[Frontend handleSubmit] Proceeding with track creation...');
 
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
+      // Create FormData for the actual submission
       const formData = new FormData();
       formData.append('title', trackData.title);
-      formData.append('type', 'SINGLE'); // Type vẫn đang là SINGLE
+      formData.append('type', 'SINGLE');
       formData.append('releaseDate', trackData.releaseDate);
-      formData.append('audioFile', audioFile); // Đã kiểm tra nên audioFile không null
-
-      if (coverFile) {
-        formData.append('coverFile', coverFile);
-      } else {
-        toast('No cover image selected. You can update it later.');
-      }
-
+      formData.append('audioFile', audioFile);
+      if (coverFile) formData.append('coverFile', coverFile);
       featuredArtists.forEach((artist) => {
-        if (artist.id) {
-          formData.append('featuredArtistIds[]', artist.id);
-        } else {
-          formData.append('featuredArtistNames[]', artist.name);
-        }
+        if (artist.id) formData.append('featuredArtistIds[]', artist.id);
+        else formData.append('featuredArtistNames[]', artist.name);
       });
+      selectedGenres.forEach((genreId) => formData.append('genreIds[]', genreId));
 
-      selectedGenres.forEach((genreId) => {
-        formData.append('genreIds[]', genreId);
-      });
-
-      await api.tracks.create(formData, token); // Gọi API tạo track
+      await api.tracks.create(formData, token);
       toast.success('Track created successfully');
-      router.push('/artist/tracks'); // Điều hướng sau khi tạo thành công
-    } catch (error) {
-      console.error('Error creating track:', error);
-      // Cung cấp thông báo lỗi cụ thể hơn nếu có thể
-      const errorMessage = (error as any)?.response?.data?.message || 'Failed to create track';
-      toast.error(errorMessage);
-    } finally {
+      router.push('/artist/tracks');
+
+    } catch (error: any) {
       setIsLoading(false);
+      const backendError = error.responseBody;
+      let displayMessage = error.message || 'Failed to create track';
+
+      if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
+        const details = backendError.copyrightDetails;
+        const newCopyrightInfo: CopyrightInfo = {
+          title: details.title || 'Unknown Title',
+          artist: details.artist || 'Unknown Artist',
+          album: details.album,
+          releaseDate: details.release_date,
+          label: details.label,
+          songLink: details.song_link,
+          isBlocking: true,
+        };
+        setCopyrightInfo(newCopyrightInfo);
+        displayMessage = backendError.message || 'Copyright match detected, upload failed.';
+      } else if (error.statusCode === 409 && error.message?.includes('already exists')) {
+         displayMessage = 'A track with this title already exists for you.';
+      }
+      
+      toast.error(displayMessage);
     }
   };
 
@@ -324,6 +612,31 @@ export default function NewTrack() {
                     </div>
                   )}
                 </div>
+                
+                {/* Check Copyright Button */}
+                {audioFile && (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      onClick={checkCopyright}
+                      disabled={isLoading || !audioFile || !trackData.title}
+                      className={cn(
+                        'w-full',
+                        theme === 'light'
+                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                          : 'bg-blue-900/20 text-blue-400 hover:bg-blue-900/30 border border-blue-800'
+                      )}
+                      variant="outline"
+                    >
+                      {isLoading ? 'Checking...' : 'Check for Copyright'}
+                    </Button>
+                    {!trackData.title && (
+                      <p className={cn("text-xs mt-1", theme === 'light' ? 'text-gray-500' : 'text-gray-400')}>
+                        Please enter a title before checking for copyright
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -407,11 +720,18 @@ export default function NewTrack() {
                 </div>
               )}
 
+              {/* ADD Copyright Alert here */}
+              {copyrightInfo && (
+                <div className="mt-4 md:mt-0"> {/* Add some top margin on mobile */}
+                  <CopyrightAlert copyright={copyrightInfo} theme={theme} />
+                </div>
+              )}
+
               {/* Submit Button */}
               <div className="flex justify-end pt-4">
                 <Button
                   type="submit"
-                  disabled={isLoading || !audioFile || selectedGenres.length === 0 || !trackData.title || !trackData.releaseDate}
+                  disabled={isLoading || !audioFile || selectedGenres.length === 0 || !trackData.title || !trackData.releaseDate || (copyrightInfo !== null && copyrightInfo.isBlocking)}
                   className={cn(
                     'px-6 py-2.5',
                     theme === 'light'

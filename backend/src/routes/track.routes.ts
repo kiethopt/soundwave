@@ -14,6 +14,7 @@ import {
   likeTrack,
   unlikeTrack,
   checkTrackLiked,
+  checkTrackCopyright
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -44,6 +45,19 @@ router.post(
   ]),
   handleUploadError,
   createTrack
+);
+
+// NEW Route to check copyright (ADMIN & ARTIST only)
+router.post(
+  '/check-copyright',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  upload.fields([
+    { name: 'audioFile', maxCount: 1 },
+    // No cover file needed for check
+  ]),
+  handleUploadError,
+  checkTrackCopyright
 );
 
 // Route lấy danh sách tracks theo type (PUBLIC)

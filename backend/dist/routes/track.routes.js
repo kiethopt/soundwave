@@ -49,6 +49,9 @@ router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize
     { name: 'audioFile', maxCount: 1 },
     { name: 'coverFile', maxCount: 1 },
 ]), upload_middleware_1.handleUploadError, track_controller_1.createTrack);
+router.post('/check-copyright', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.fields([
+    { name: 'audioFile', maxCount: 1 },
+]), upload_middleware_1.handleUploadError, track_controller_1.checkTrackCopyright);
 router.get('/type/:type', auth_middleware_1.authenticate, track_controller_1.getTracksByType);
 router.get('/genre/:genreId', auth_middleware_1.authenticate, track_controller_1.getTracksByGenre);
 router.get('/type/:type/genre/:genreId', auth_middleware_1.authenticate, track_controller_1.getTracksByTypeAndGenre);

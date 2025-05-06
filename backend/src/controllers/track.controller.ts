@@ -72,8 +72,12 @@ export const createTrack = async (req: Request, res: Response): Promise<void> =>
 
     res.status(201).json({ message: 'Track created successfully', track: newTrack });
 
-  } catch (error) {
-    handleError(res, error, 'Create track');
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      res.status(409).json({ message: `A track with this title likely already exists for this artist.`, code: error.code });
+    } else {
+      handleError(res, error, 'Create track');
+    }
   }
 };
 
@@ -230,5 +234,60 @@ export const checkTrackLiked = async (req: Request, res: Response): Promise<void
   } catch (error) {
     console.error('Check track liked error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const checkTrackCopyright = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user || !user.artistProfile) {
+      res.status(403).json({ message: 'Forbidden: Only verified artists can check copyright.' });
+      return;
+    }
+
+    const files = req.files as { audioFile?: Express.Multer.File[] };
+    if (!files || !files.audioFile || files.audioFile.length === 0) {
+      res.status(400).json({ message: 'Audio file is required.' });
+      return;
+    }
+    const audioFile = files.audioFile[0];
+
+    const { title, releaseDate } = req.body;
+    if (!title || !releaseDate) {
+      res.status(400).json({ message: 'Title and release date are required for context during copyright check.' });
+      return;
+    }
+
+    // Extract featured artist information
+    const featuredArtistIds = (req.body.featuredArtistIds || []) as string[];
+    const featuredArtistNames = (req.body.featuredArtistNames || []) as string[];
+
+    const checkData = {
+      title,
+      releaseDate,
+      declaredFeaturedArtistIds: Array.isArray(featuredArtistIds) ? featuredArtistIds : [],
+      declaredFeaturedArtistNames: Array.isArray(featuredArtistNames) ? featuredArtistNames : [],
+    };
+
+    const result = await TrackService.checkTrackCopyrightOnly(
+      user.artistProfile.id,
+      checkData,
+      audioFile,
+      user
+    );
+
+    res.status(200).json(result);
+
+  } catch (error: any) {
+    if (error.isCopyrightConflict && error.copyrightDetails) {
+      res.status(409).json({
+        message: error.message,
+        isCopyrightConflict: true,
+        copyrightDetails: error.copyrightDetails,
+        isSafeToUpload: false,
+      });
+    } else {
+      handleError(res, error, 'Check track copyright');
+    }
   }
 };

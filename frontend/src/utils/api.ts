@@ -996,8 +996,61 @@ export const api = {
       }
     },
 
-    create: async (formData: FormData, token: string) =>
-      fetchWithAuth("/api/tracks", { method: "POST", body: formData }, token),
+    checkCopyright: async (formData: FormData, token: string) => {
+      // This function specifically calls the new check-copyright endpoint
+      try {
+        const response = await fetch(`${API_BASE}/api/tracks/check-copyright`, { 
+          method: "POST", 
+          body: formData, // Should contain audioFile, title, releaseDate
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Content-Type is handled automatically for FormData
+          },
+        });
+
+        const responseBody = await response.json();
+
+        if (!response.ok) {
+          // Throw error with response body for detailed handling
+          const error: any = new Error(responseBody.message || `HTTP error! status: ${response.status}`);
+          error.responseBody = responseBody;
+          error.statusCode = response.status;
+          throw error;
+        }
+
+        // On success, return the response which includes { isSafeToUpload, message, copyrightDetails? }
+        return responseBody;
+      } catch (error) {
+        console.error('Error checking track copyright:', error);
+        throw error; // Re-throw to be handled by the caller
+      }
+    },
+
+    create: async (formData: FormData, token: string) => {
+      // This calls the original /api/tracks POST endpoint for actual creation
+      try {
+        const response = await fetch(`${API_BASE}/api/tracks`, { 
+          method: "POST", 
+          body: formData, // Contains all track details + files
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const responseBody = await response.json();
+
+        if (!response.ok) {
+          const error: any = new Error(responseBody.message || `HTTP error! status: ${response.status}`);
+          error.responseBody = responseBody;
+          error.statusCode = response.status;
+          throw error;
+        }
+
+        return responseBody;
+      } catch (error) {
+        throw error;
+      }
+    },
 
     update: async (trackId: string, data: FormData, token: string) =>
       fetchWithAuth(
