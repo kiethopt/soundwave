@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { Role, ClaimStatus, Prisma, NotificationType, RecipientType } from '@prisma/client';
-=======
-import { Role, ClaimStatus, AlbumType } from '@prisma/client';
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
+import { Role, ClaimStatus, Prisma, NotificationType, RecipientType, AlbumType } from '@prisma/client';
 import { Request } from 'express';
 import prisma from '../config/db';
 import {
@@ -26,17 +22,14 @@ import { ArtistProfile } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { subMonths, endOfMonth } from 'date-fns';
 import * as emailService from './email.service';
-<<<<<<< HEAD
 import { getIO } from '../config/socket';
 import { getUserSockets } from '../config/socket';
-=======
 import { uploadFile } from './upload.service';
 import * as mm from 'music-metadata';
 import { Essentia, EssentiaWASM } from 'essentia.js';
 import { MPEGDecoder, MPEGDecodedAudio } from 'mpg123-decoder';
 import { getOrCreateArtistProfile } from './artist.service';
 import { faker } from '@faker-js/faker';
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 
 // Define a list of valid models here
 const VALID_GEMINI_MODELS = [

@@ -7,10 +7,7 @@ import {
   searchAlbum,
   addTracksToAlbum,
   getAllAlbums,
-<<<<<<< HEAD
   // playAlbum,
-=======
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
   toggleAlbumVisibility,
   getNewestAlbums,
   getHotAlbums,
@@ -67,12 +64,9 @@ router.post(
 // Route tìm kiếm album (có cache)
 router.get('/search', authenticate, cacheMiddleware, searchAlbum);
 
-<<<<<<< HEAD
 // Route phát album - Removed route definition
 // router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 
-=======
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 // Public routes
 router.get('/newest', cacheMiddleware, getNewestAlbums);
 router.get('/hot', cacheMiddleware, getHotAlbums);
