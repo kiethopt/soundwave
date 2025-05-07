@@ -49,18 +49,7 @@ const artist_service_1 = require("./artist.service");
 const mm = __importStar(require("music-metadata"));
 const essentia_js_1 = require("essentia.js");
 const mpg123_decoder_1 = require("mpg123-decoder");
-const audd_io_1 = require("audd.io");
-const fs = __importStar(require("fs/promises"));
-const path = __importStar(require("path"));
-const os_1 = require("os");
-const auddApiKey = process.env.AUDD_API_KEY;
-let auddInstance = null;
-if (auddApiKey) {
-    auddInstance = new audd_io_1.Audd(auddApiKey);
-}
-else {
-    console.warn('AUDD_API_KEY not found in .env. Copyright check will be skipped.');
-}
+const acrcloudService = __importStar(require("./acrcloud.service"));
 function normalizeString(str) {
     if (!str)
         return '';
@@ -69,64 +58,8 @@ function normalizeString(str) {
     result = result.replace(/[^a-z0-9]/g, '');
     return result;
 }
-async function checkCopyrightWithAudD(audioBuffer, originalFileName, title) {
-    if (!auddInstance) {
-        console.warn('AudD client not initialized. Skipping copyright check.');
-        return { isMatched: false, error: true };
-    }
-    let tempFilePath = null;
-    const MAX_RETRIES = 2;
-    const RETRY_DELAY_MS = 3000;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            if (tempFilePath) {
-                try {
-                    await fs.unlink(tempFilePath);
-                }
-                catch (e) { }
-                tempFilePath = null;
-            }
-            const fileExtension = originalFileName ? path.extname(originalFileName) : '.mp3';
-            const tempFileName = `audd_upload_${Date.now()}_attempt${attempt}${fileExtension}`;
-            tempFilePath = path.join((0, os_1.tmpdir)(), tempFileName);
-            await fs.writeFile(tempFilePath, audioBuffer);
-            const logTitleContext = title ? ` for track "${title}"` : '';
-            console.log(`[AudDCheck Attempt ${attempt + 1}/${MAX_RETRIES + 1}] Recognizing file "${originalFileName || tempFileName}"${logTitleContext}`);
-            const result = await auddInstance.recognize.fromFile(tempFilePath);
-            if (result && result.status === 'success' && result.result) {
-                return {
-                    isMatched: true,
-                    match: result.result,
-                };
-            }
-            if (result && result.status === 'error') {
-                console.error(`AudD API Error (Attempt ${attempt + 1}, file: ${originalFileName || 'N/A'}, title: ${title || 'N/A'}):`, result.error);
-                if (attempt === MAX_RETRIES) {
-                    return { isMatched: false, error: true, match: result.error };
-                }
-            }
-            else if (!result || result.status !== 'success') {
-                console.warn(`[AudDCheck Attempt ${attempt + 1}] Unexpected response from AudD:`, result);
-                if (attempt === MAX_RETRIES) {
-                    return { isMatched: false, error: true, match: { message: "Unexpected response from AudD after retries." } };
-                }
-            }
-            else {
-                return { isMatched: false };
-            }
-        }
-        catch (error) {
-            console.error(`Error during AudD copyright check (Attempt ${attempt + 1}, file: ${originalFileName || 'N/A'}, title: ${title || 'N/A'}, method: file):`, error);
-            if (attempt === MAX_RETRIES) {
-                return { isMatched: false, error: true, match: { message: error.message } };
-            }
-        }
-        if (attempt < MAX_RETRIES) {
-            console.log(`[AudDCheck] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-        }
-    }
-    return { isMatched: false, error: true, match: { message: "AudD check failed after all retries." } };
+async function checkCopyrightWithACRCloud(audioBuffer, originalFileName, title) {
+    return acrcloudService.recognizeAudioWithACRCloud(audioBuffer, originalFileName, title);
 }
 function getArtistNameSimilarity(name1, name2) {
     if (!name1 || !name2)
@@ -706,113 +639,99 @@ class TrackService {
             throw new Error(`Artist profile with ID ${artistProfileId} not found for copyright check.`);
         }
         const artistName = mainArtist.artistName;
-        console.log(`[CopyrightCheckOnly] Checking track "${title}" for artist "${artistName}" (ID: ${artistProfileId})`);
+        console.log(`[CopyrightCheckOnly] Checking track "${title}" for artist "${artistName}" (ID: ${artistProfileId}) with ACRCloud`);
         console.log(`[CopyrightCheckOnly] Declared featured IDs: ${declaredFeaturedArtistIds.join(', ') || 'None'}, Names: ${declaredFeaturedArtistNames.join(', ') || 'None'}`);
-        const copyrightCheckResult = await checkCopyrightWithAudD(audioFile.buffer, audioFile.originalname, title);
+        const copyrightCheckResult = await checkCopyrightWithACRCloud(audioFile.buffer, audioFile.originalname, title);
         if (copyrightCheckResult.error) {
-            console.warn(`[CopyrightCheckOnly] Copyright check with AudD failed or was skipped for track "${title}".`, copyrightCheckResult.match);
+            console.warn(`[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`);
             return {
                 isSafeToUpload: false,
-                message: "Copyright check service failed or was skipped. Cannot confirm safety.",
-                copyrightDetails: { serviceError: true, details: copyrightCheckResult.match }
+                message: copyrightCheckResult.errorMessage || "Copyright check service failed. Cannot confirm safety.",
+                copyrightDetails: { serviceError: true, details: { message: copyrightCheckResult.errorMessage, code: copyrightCheckResult.errorCode } }
             };
         }
         if (copyrightCheckResult.isMatched && copyrightCheckResult.match) {
             const match = copyrightCheckResult.match;
             const isAdminUpload = requestUser && requestUser.role === client_1.Role.ADMIN && requestUser.id !== mainArtist.id;
-            if (!match.artist) {
-                console.warn(`[CopyrightCheckOnly] AudD matched song "${match.title}" but did not provide an artist name for track "${title}".`);
+            const matchedArtistNames = match.artists?.map(a => a.name).filter(Boolean).join(', ') || 'Unknown Artist';
+            const primaryMatchedArtist = match.artists?.[0]?.name || 'Unknown Artist';
+            if (!primaryMatchedArtist || primaryMatchedArtist === 'Unknown Artist') {
+                console.warn(`[CopyrightCheckOnly] ACRCloud matched song "${match.title}" but did not provide a primary artist name for track "${title}".`);
                 const error = new Error(`Copyright violation detected. The uploaded audio appears to match "${match.title}" but the original artist couldn't be determined by the check.`);
                 error.isCopyrightConflict = true;
                 error.copyrightDetails = match;
                 throw error;
             }
             if (mainArtist.isVerified || isAdminUpload) {
-                const uploaderSimilarity = getArtistNameSimilarity(match.artist, artistName);
+                const uploaderSimilarity = getArtistNameSimilarity(primaryMatchedArtist, artistName);
                 const SIMILARITY_THRESHOLD = 0.7;
-                console.log(`[CopyrightCheckOnly] Artist name comparison for "${title}": "${match.artist}" (AudD) vs "${artistName}" (uploader: ${mainArtist.id})`);
-                console.log(`[CopyrightCheckOnly] Normalized comparison: "${normalizeString(match.artist)}" vs "${normalizeString(artistName)}"`);
+                console.log(`[CopyrightCheckOnly] Artist name comparison for "${title}": "${primaryMatchedArtist}" (ACRCloud) vs "${artistName}" (uploader: ${mainArtist.id})`);
+                console.log(`[CopyrightCheckOnly] Normalized comparison: "${normalizeString(primaryMatchedArtist)}" vs "${normalizeString(artistName)}"`);
                 console.log(`[CopyrightCheckOnly] Uploader Similarity score: ${uploaderSimilarity.toFixed(3)} (threshold: ${SIMILARITY_THRESHOLD})`);
                 if (uploaderSimilarity >= SIMILARITY_THRESHOLD) {
                     let allowUpload = true;
                     let blockingReason = "";
-                    let canonicalArtistDisplay = match.artist;
+                    let canonicalArtistDisplay = primaryMatchedArtist;
                     let messageSuffix = ".";
-                    const normalizedAudDArtist = normalizeString(match.artist);
+                    const normalizedAcrArtistString = normalizeString(matchedArtistNames);
                     if (declaredFeaturedArtistNames.length > 0 || declaredFeaturedArtistIds.length > 0) {
-                        console.log(`[CopyrightCheckOnly] Has declared featured artists. Analyzing match "${match.artist}" further.`);
-                        let mainArtistMatchConfidence = uploaderSimilarity;
-                        if (normalizedAudDArtist.includes(normalizeString(artistName))) {
+                        console.log(`[CopyrightCheckOnly] Has declared featured artists. Analyzing match "${matchedArtistNames}" further.`);
+                        if (normalizedAcrArtistString.includes(normalizeString(artistName))) {
                             messageSuffix = ", which appears to be your content or a collaboration you are part of.";
                             let allDeclaredFeaturedFound = declaredFeaturedArtistNames.length > 0;
                             for (const declaredFeatName of declaredFeaturedArtistNames) {
-                                if (!normalizedAudDArtist.includes(normalizeString(declaredFeatName))) {
+                                if (!normalizedAcrArtistString.includes(normalizeString(declaredFeatName))) {
                                     allDeclaredFeaturedFound = false;
-                                    console.log(`[CopyrightCheckOnly] Declared featured artist "${declaredFeatName}" NOT found in AudD match "${match.artist}".`);
+                                    console.log(`[CopyrightCheckOnly] Declared featured artist "${declaredFeatName}" NOT found in ACRCloud match "${matchedArtistNames}".`);
                                     break;
                                 }
                             }
                             if (allDeclaredFeaturedFound && declaredFeaturedArtistNames.length > 0) {
-                                console.log(`[CopyrightCheckOnly] All declared featured artists found in AudD match string.`);
+                                console.log(`[CopyrightCheckOnly] All declared featured artists found in ACRCloud match string.`);
                             }
                         }
                         else {
-                            console.warn(`[CopyrightCheckOnly] Uploader "${artistName}" not directly in AudD match "${match.artist}" despite high initial similarity and declared features.`);
+                            console.warn(`[CopyrightCheckOnly] Uploader "${artistName}" not directly in ACRCloud match "${matchedArtistNames}" despite high initial similarity and declared features.`);
                         }
                     }
                     if (mainArtist.isVerified && !isAdminUpload) {
                         console.log(`[CopyrightCheckOnly] Performing canonical check for verified artist ${mainArtist.artistName} (track: "${title}")`);
-                        const matchArtistName = match.artist.toLowerCase();
+                        const matchArtistNameLower = primaryMatchedArtist.toLowerCase();
                         const potentiallySimilarArtists = await db_1.default.artistProfile.findMany({
                             where: {
                                 id: { not: mainArtist.id },
                                 isVerified: true,
                                 OR: [
-                                    {
-                                        artistName: {
-                                            equals: match.artist,
-                                            mode: 'insensitive'
-                                        }
-                                    },
-                                    {
-                                        artistName: {
-                                            startsWith: matchArtistName.split(' ')[0],
-                                            mode: 'insensitive'
-                                        }
-                                    },
-                                    {
-                                        artistName: {
-                                            contains: matchArtistName,
-                                            mode: 'insensitive'
-                                        }
-                                    }
+                                    { artistName: { equals: primaryMatchedArtist, mode: 'insensitive' } },
+                                    { artistName: { startsWith: matchArtistNameLower.split(' ')[0], mode: 'insensitive' } },
+                                    { artistName: { contains: matchArtistNameLower, mode: 'insensitive' } }
                                 ]
                             },
                             select: { id: true, artistName: true, createdAt: true, isVerified: true }
                         });
-                        console.log(`[CopyrightCheckOnly] Found ${potentiallySimilarArtists.length} potentially similar verified artists for comparison with "${match.artist}" (track: "${title}").`);
+                        console.log(`[CopyrightCheckOnly] Found ${potentiallySimilarArtists.length} potentially similar verified artists for comparison with "${primaryMatchedArtist}" (track: "${title}").`);
                         let canonicalArtist = mainArtist;
                         let highestSimilarity = uploaderSimilarity;
                         for (const otherArtist of potentiallySimilarArtists) {
-                            const otherSimilarity = getArtistNameSimilarity(match.artist, otherArtist.artistName);
-                            console.log(`[CopyrightCheckOnly] Comparing with potentially similar artist "${otherArtist.artistName}" (ID: ${otherArtist.id}). Similarity to AudD match: ${otherSimilarity.toFixed(3)}`);
+                            const otherSimilarity = getArtistNameSimilarity(primaryMatchedArtist, otherArtist.artistName);
+                            console.log(`[CopyrightCheckOnly] Comparing with potentially similar artist "${otherArtist.artistName}" (ID: ${otherArtist.id}). Similarity to ACRCloud match: ${otherSimilarity.toFixed(3)}`);
                             if (otherSimilarity > highestSimilarity) {
                                 highestSimilarity = otherSimilarity;
                                 canonicalArtist = otherArtist;
                             }
                             else if (otherSimilarity === highestSimilarity && otherSimilarity > 0) {
-                                const normAudD = normalizeString(match.artist);
+                                const normAcr = normalizeString(primaryMatchedArtist);
                                 const normUploader = normalizeString(canonicalArtist.artistName);
                                 const normOther = normalizeString(otherArtist.artistName);
-                                if (normOther === normAudD && normUploader !== normAudD) {
+                                if (normOther === normAcr && normUploader !== normAcr) {
                                     canonicalArtist = otherArtist;
                                 }
-                                else if (normOther === normAudD && normUploader === normAudD) {
+                                else if (normOther === normAcr && normUploader === normAcr) {
                                     if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
                                         canonicalArtist = otherArtist;
                                     }
                                 }
-                                else if (normOther !== normAudD && normUploader !== normAudD) {
+                                else if (normOther !== normAcr && normUploader !== normAcr) {
                                     if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
                                         canonicalArtist = otherArtist;
                                     }
@@ -823,7 +742,7 @@ class TrackService {
                         if (canonicalArtist.id !== mainArtist.id) {
                             allowUpload = false;
                             blockingReason = `Upload blocked. While your artist name is similar, the song appears to more closely match verified artist "${canonicalArtist.artistName}".`;
-                            console.warn(`[CopyrightCheckOnly] Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Track "${title}" by "${match.artist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`);
+                            console.warn(`[CopyrightCheckOnly] Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Track "${title}" by "${primaryMatchedArtist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`);
                         }
                     }
                     if (allowUpload) {
@@ -843,10 +762,10 @@ class TrackService {
                     }
                 }
                 else {
-                    let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${match.artist}".`;
-                    errorMessage += ` Your artist name has a similarity score of ${(uploaderSimilarity * 100).toFixed(1)}% with the matched artist. A higher similarity is required.`;
-                    if (match.album)
-                        errorMessage += ` (Album: ${match.album})`;
+                    let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${matchedArtistNames}".`;
+                    errorMessage += ` Your artist name has a similarity score of ${(uploaderSimilarity * 100).toFixed(1)}% with the matched primary artist (${primaryMatchedArtist}). A higher similarity is required.`;
+                    if (match.album?.name)
+                        errorMessage += ` (Album: ${match.album.name})`;
                     const error = new Error(errorMessage);
                     error.isCopyrightConflict = true;
                     error.copyrightDetails = match;
@@ -855,9 +774,9 @@ class TrackService {
             }
             else {
                 let errorMessage = `Copyright violation detected. `;
-                errorMessage += `The uploaded audio appears to match "${match.title}" by ${match.artist}.`;
-                if (match.album)
-                    errorMessage += ` (Album: ${match.album})`;
+                errorMessage += `The uploaded audio appears to match "${match.title}" by ${matchedArtistNames}.`;
+                if (match.album?.name)
+                    errorMessage += ` (Album: ${match.album.name})`;
                 const error = new Error(errorMessage);
                 error.isCopyrightConflict = true;
                 error.copyrightDetails = match;
@@ -865,7 +784,7 @@ class TrackService {
             }
         }
         else {
-            console.log(`[CopyrightCheckOnly] No copyright match found for track "${title}" by artist "${artistName}"`);
+            console.log(`[CopyrightCheckOnly] No copyright match found by ACRCloud for track "${title}" by artist "${artistName}"`);
             return {
                 isSafeToUpload: true,
                 message: "No copyright match found by detection service.",
