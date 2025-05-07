@@ -2,7 +2,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from "../config/db";
 import { trackSelect } from "../utils/prisma-selects";
 import { Playlist } from "@prisma/client";
-import { PlaylistType, Prisma, PrismaClient } from "@prisma/client";
+import {
+  PlaylistType,
+  Prisma,
+  PrismaClient,
+  PlaylistPrivacy,
+} from "@prisma/client";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
@@ -16,14 +21,16 @@ const modelName = process.env.GEMINI_MODEL || "gemini-pro";
 let model;
 try {
   model = genAI.getGenerativeModel({
-  model: modelName,
-  systemInstruction:
-    "You are an expert music curator specializing in personalization. Your primary goal is to create highly personalized playlists that closely match each user's demonstrated preferences. PRIORITIZE tracks from artists the user has already listened to or liked. Only include tracks from other artists if they are extremely similar in style and genre to the user's favorites. Analyze the provided listening history and liked tracks carefully, identifying patterns in genres, artists, and moods. Return ONLY a valid JSON array of track IDs, without any duplicates or explanations. The tracks should strongly reflect the user's taste, with at least 80% being from artists they've shown interest in.",
-});
-console.log(`[AI] Using Gemini model: ${modelName}`);
+    model: modelName,
+    systemInstruction:
+      "You are an expert music curator. Your goal is to create a 10-track personalized playlist. Analyze the user's listening history (tracks, artists, genres, moods, tempo, energy) and liked tracks. \nPlaylist Composition:\n1.  Core (7-8 tracks): Closely match the user's demonstrated preferences. Prioritize artists the user has listened to or liked. If suggesting new artists, they must be extremely similar in style, genre, mood, and tempo to the user's favorites.\n2.  Exploratory (2-3 tracks): Introduce new artists or slightly different (but compatible) styles/genres. These should still align with moods, tempos, or broader genre categories evident in the user's history.\nEnsure variety in the overall playlist unless the user's taste is exceptionally narrow.\nReturn ONLY a valid JSON array of exactly 10 unique track IDs. Do not include any other text, formatting, or explanations.",
+  });
+  console.log(`[AI] Using Gemini model: ${modelName}`);
 } catch (error) {
   console.error("[AI] Error initializing Gemini model:", error);
-  throw new Error("Failed to initialize Gemini AI model. Please check your API key and model configuration.");
+  throw new Error(
+    "Failed to initialize Gemini AI model. Please check your API key and model configuration."
+  );
 }
 
 export { model };
@@ -48,21 +55,24 @@ export interface PlaylistGenerationOptions {
  */
 async function createEnhancedGenreFilter(genreInput: string): Promise<any> {
   // Analyze the genre input to find main, related, sub, and parent genres
-  const { mainGenre, mainGenreId, relatedGenres, subGenres, parentGenres } = await analyzeGenre(genreInput);
+  const { mainGenre, mainGenreId, relatedGenres, subGenres, parentGenres } =
+    await analyzeGenre(genreInput);
 
   // Create a filter that includes tracks from the genre and its related genres
-  const filter: Prisma.TrackWhereInput = mainGenreId ? {
-    genres: {
-      some: {
-        genreId: mainGenreId
+  const filter: Prisma.TrackWhereInput = mainGenreId
+    ? {
+        genres: {
+          some: {
+            genreId: mainGenreId,
+          },
+        },
       }
-    }
-  } : {};
+    : {};
 
   console.log("[AI] Created genre filter:", {
     mainGenre,
     mainGenreId,
-    filter
+    filter,
   });
 
   return filter;
@@ -79,7 +89,7 @@ export const generateAIPlaylist = async (
   options: PlaylistGenerationOptions = {}
 ): Promise<string[]> => {
   let playlistId: string | undefined;
-  
+
   try {
     console.log(
       `[AI] Generating playlist for user ${userId} with options:`,
@@ -88,49 +98,6 @@ export const generateAIPlaylist = async (
 
     // Số lượng bài hát cần tạo (mặc định là 10)
     const trackCount = options.trackCount || 10;
-
-    // Tạo hoặc cập nhật playlist
-    if (options.name) {
-      // Kiểm tra xem playlist đã tồn tại chưa
-      const existingPlaylist = await prisma.playlist.findFirst({
-        where: {
-          name: options.name,
-          userId,
-          type: PlaylistType.SYSTEM,
-          isAIGenerated: true
-        }
-      });
-
-      if (existingPlaylist) {
-        // Cập nhật playlist đã tồn tại
-        const updatedPlaylist = await prisma.playlist.update({
-          where: { id: existingPlaylist.id },
-          data: {
-            description: options.description || existingPlaylist.description,
-            coverUrl: options.coverUrl || existingPlaylist.coverUrl,
-            tracks: {
-              deleteMany: {} // Xóa tất cả các bài hát cũ
-            }
-          }
-        });
-        playlistId = updatedPlaylist.id;
-        console.log(`[AI] Updated existing playlist with ID: ${playlistId}`);
-      } else {
-        // Tạo playlist mới
-        const playlist = await prisma.playlist.create({
-          data: {
-            name: options.name,
-            description: options.description || "AI-generated playlist",
-            userId,
-            type: PlaylistType.SYSTEM,
-            isAIGenerated: true,
-            coverUrl: options.coverUrl,
-          }
-        });
-        playlistId = playlist.id;
-        console.log(`[AI] Created new playlist with ID: ${playlistId}`);
-      }
-    }
 
     // Lấy lịch sử nghe nhạc gần đây của người dùng
     const userHistory = await prisma.history.findMany({
@@ -183,7 +150,8 @@ export const generateAIPlaylist = async (
           history.track.genres.forEach((genreRel: any) => {
             if (genreRel.genreId) {
               preferredGenreIds.add(genreRel.genreId);
-              genreCounts[genreRel.genreId] = (genreCounts[genreRel.genreId] || 0) + 1;
+              genreCounts[genreRel.genreId] =
+                (genreCounts[genreRel.genreId] || 0) + 1;
             }
           });
         }
@@ -203,7 +171,8 @@ export const generateAIPlaylist = async (
           like.track.genres.forEach((genreRel: any) => {
             if (genreRel.genreId) {
               preferredGenreIds.add(genreRel.genreId);
-              genreCounts[genreRel.genreId] = (genreCounts[genreRel.genreId] || 0) + 3; // Weight likes higher
+              genreCounts[genreRel.genreId] =
+                (genreCounts[genreRel.genreId] || 0) + 3; // Weight likes higher
             }
           });
         }
@@ -233,8 +202,10 @@ export const generateAIPlaylist = async (
       enhancedGenreFilter = await createEnhancedGenreFilter(
         options.basedOnGenre
       );
-      console.log(`[AI] Using enhanced genre filter for: ${options.basedOnGenre}`);
-      
+      console.log(
+        `[AI] Using enhanced genre filter for: ${options.basedOnGenre}`
+      );
+
       // For backward compatibility, still get the selectedGenreId
       const genreByName = await prisma.genre.findFirst({
         where: {
@@ -271,9 +242,9 @@ export const generateAIPlaylist = async (
       const releaseTimeValue = String(options.basedOnReleaseTime).toLowerCase();
       const yearValue = Number(options.basedOnReleaseTime);
       if (!isNaN(yearValue) && yearValue > 1900 && yearValue <= currentYear) {
-        const startDate = new Date(yearValue, 0, 1); 
-        const endDate = new Date(yearValue, 11, 31, 23, 59, 59); 
-        
+        const startDate = new Date(yearValue, 0, 1);
+        const endDate = new Date(yearValue, 11, 31, 23, 59, 59);
+
         whereClause.releaseDate = {
           gte: startDate,
           lte: endDate,
@@ -289,15 +260,15 @@ export const generateAIPlaylist = async (
             };
             console.log("[AI] Filtering for new tracks released this year");
             break;
-            case "last year":
+          case "last year":
             whereClause.releaseDate = {
               gte: new Date(currentYear - 1, 0, 1),
               lt: new Date(currentYear, 0, 1),
             };
             console.log("[AI] Filtering for tracks released last year");
             break;
-            case "recent years":
-              case "last 5 years":
+          case "recent years":
+          case "last 5 years":
             whereClause.releaseDate = {
               gte: new Date(currentYear - 5, 0, 1),
             };
@@ -305,8 +276,8 @@ export const generateAIPlaylist = async (
               "[AI] Filtering for tracks released in the last 5 years"
             );
             break;
-            case "decade":
-            case "last decade":
+          case "decade":
+          case "last decade":
             whereClause.releaseDate = {
               gte: new Date(currentYear - 10, 0, 1),
             };
@@ -314,8 +285,8 @@ export const generateAIPlaylist = async (
               "[AI] Filtering for tracks released in the last decade"
             );
             break;
-            case "classic":
-            case "classics":
+          case "classic":
+          case "classics":
             whereClause.releaseDate = {
               lt: new Date(currentYear - 20, 0, 1),
             };
@@ -347,24 +318,26 @@ export const generateAIPlaylist = async (
 
     // Lọc theo độ dài bài hát
     if (options.basedOnSongLength) {
-      const lengthValue = Number(options.basedOnSongLength); 
+      const lengthValue = Number(options.basedOnSongLength);
       if (!isNaN(lengthValue)) {
         // Add a small buffer for exact length matches
         const buffer = 5; // 5 seconds buffer
-        whereClause.duration = { 
-            gte: lengthValue - buffer,
-            lte: lengthValue + buffer 
+        whereClause.duration = {
+          gte: lengthValue - buffer,
+          lte: lengthValue + buffer,
         };
-        console.log(`[AI] Song length filter: ${lengthValue} seconds (±${buffer}s)`);
+        console.log(
+          `[AI] Song length filter: ${lengthValue} seconds (±${buffer}s)`
+        );
       } else {
         const songLengthValue = String(options.basedOnSongLength).toLowerCase();
-        
+
         switch (songLengthValue) {
           case "short":
             whereClause.duration = { lte: 180 };
             console.log("[AI] Filtering for short tracks (under 3 minutes)");
             break;
-            case "medium":
+          case "medium":
             whereClause.duration = {
               gte: 180,
               lte: 300,
@@ -373,7 +346,7 @@ export const generateAIPlaylist = async (
               "[AI] Filtering for medium-length tracks (3-5 minutes)"
             );
             break;
-            case "long":
+          case "long":
             whereClause.duration = { gte: 300 };
             console.log("[AI] Filtering for longer tracks (over 5 minutes)");
             break;
@@ -393,153 +366,287 @@ export const generateAIPlaylist = async (
       hasGenreParam,
       hasMoodParam,
       hasSongLengthParam,
-      hasReleaseTimeParam
+      hasReleaseTimeParam,
     });
 
     // Thiết lập tỷ lệ mặc định cho các nguồn bài hát
-    let artistRatio = 0.55;  // Tỷ lệ bài hát từ nghệ sĩ ưa thích
-    let genreRatio = 0.25;   // Tỷ lệ bài hát từ thể loại ưa thích
+    let artistRatio = 0.55; // Tỷ lệ bài hát từ nghệ sĩ ưa thích
+    let genreRatio = 0.25; // Tỷ lệ bài hát từ thể loại ưa thích
     let popularRatio = 0.2;
 
     console.log("[AI] Initial ratios:", {
       artistRatio,
       genreRatio,
-      popularRatio
+      popularRatio,
     });
 
     // Điều chỉnh tỷ lệ dựa trên tham số được cung cấp
     // Case 1: Only basedOnMood
-    if (hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    if (
+      hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.4;
       genreRatio = 0.4;
       popularRatio = 0.3;
       console.log("[AI] Case 1: Only basedOnMood");
     }
     // Case 2: basedOnMood and basedOnGenre
-    else if (hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.05;
       genreRatio = 0.9;
       popularRatio = 0.05;
     }
     // Case 3: basedOnMood and basedOnArtist
-    else if (hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      !hasGenreParam &&
+      hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.7;
       genreRatio = 0.15;
       popularRatio = 0.15;
     }
     // Case 4: basedOnMood and basedOnSongLength
-    else if (hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.4;
       genreRatio = 0.4;
       popularRatio = 0.2;
     }
     // Case 5: basedOnMood and basedOnReleaseTime
-    else if (hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.4;
       genreRatio = 0.4;
       popularRatio = 0.2;
     }
     // Case 6: basedOnMood, basedOnGenre, basedOnArtist
-    else if (hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.6;
       genreRatio = 0.3;
       popularRatio = 0.1;
     }
     // Case 7: basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength
-    else if (hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.5;
       genreRatio = 0.4;
       popularRatio = 0.1;
     }
     // Case 8: All parameters (basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime)
-    else if (hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.5;
       genreRatio = 0.3;
       popularRatio = 0.2;
     }
     // Case 9: Only basedOnGenre
-    else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0;
       genreRatio = 1;
       popularRatio = 0;
     }
     // Case 10: basedOnGenre and basedOnArtist
-    else if (!hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-      artistRatio = 1; 
-      genreRatio = 0;   
-      popularRatio = 0; 
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
+      artistRatio = 1;
+      genreRatio = 0;
+      popularRatio = 0;
     }
     // Case 11: basedOnGenre, basedOnArtist, basedOnSongLength
-    else if (!hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.5;
       genreRatio = 0.4;
       popularRatio = 0.1;
     }
     // Case 12: basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime
-    else if (!hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.5;
       genreRatio = 0.3;
       popularRatio = 0.2;
     }
     // Case 13: Only basedOnArtist
-    else if (!hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      hasArtistParam &&
+      !hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 1;
       genreRatio = 0;
       popularRatio = 0;
     }
     // Case 14: basedOnArtist and basedOnSongLength
-    else if (!hasMoodParam && !hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 1;
       genreRatio = 0;
       popularRatio = 0;
     }
     // Case 15: basedOnArtist, basedOnSongLength, and basedOnReleaseTime
-    else if (!hasMoodParam && !hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      hasArtistParam &&
+      hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 1;
       genreRatio = 0;
       popularRatio = 0;
     }
     // Case 16: Only basedOnSongLength
-    else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.4;
       genreRatio = 0.4;
       popularRatio = 0.2;
     }
     // Case 17: basedOnSongLength and basedOnReleaseTime
-    else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.4;
       genreRatio = 0.4;
       popularRatio = 0.2;
     }
     // Case 18: Only basedOnReleaseTime
-    else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.45;
       genreRatio = 0.45;
       popularRatio = 0.1;
     }
     // Case 19: basedOnGenre and basedOnReleaseTime
-    else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      !hasArtistParam &&
+      !hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.3;
       genreRatio = 0.6;
       popularRatio = 0.1;
       console.log("[AI] Case 19: basedOnGenre and basedOnReleaseTime");
     }
     // Case 20: basedOnGenre and basedOnSongLength
-    else if (!hasMoodParam && hasGenreParam && !hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      !hasArtistParam &&
+      hasSongLengthParam &&
+      !hasReleaseTimeParam
+    ) {
       artistRatio = 0.3;
       genreRatio = 0.6;
       popularRatio = 0.1;
       console.log("[AI] Case 20: basedOnGenre and basedOnSongLength");
     }
     // Case 21: basedOnGenre, basedOnReleaseTime, and basedOnSongLength
-    else if (!hasMoodParam && hasGenreParam && !hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      hasGenreParam &&
+      !hasArtistParam &&
+      hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 0.2;
       genreRatio = 0.7;
       popularRatio = 0.1;
-      console.log("[AI] Case 21: basedOnGenre, basedOnReleaseTime, and basedOnSongLength");
+      console.log(
+        "[AI] Case 21: basedOnGenre, basedOnReleaseTime, and basedOnSongLength"
+      );
     }
     // Case 22: basedOnArtist and basedOnReleaseTime
-    else if (!hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
+    else if (
+      !hasMoodParam &&
+      !hasGenreParam &&
+      hasArtistParam &&
+      !hasSongLengthParam &&
+      hasReleaseTimeParam
+    ) {
       artistRatio = 1;
       genreRatio = 0;
       popularRatio = 0;
@@ -549,7 +656,7 @@ export const generateAIPlaylist = async (
     console.log("[AI] Final ratios after adjustment:", {
       artistRatio,
       genreRatio,
-      popularRatio
+      popularRatio,
     });
 
     // Tính toán số lượng bài hát cho mỗi nguồn
@@ -564,7 +671,9 @@ export const generateAIPlaylist = async (
     }
 
     console.log(`[AI] Track count: ${trackCount}`);
-    console.log(`[AI] Allocation: Artist=${artistTrackCount}, Genre=${genreTrackCount}, Popular=${popularTrackCount}`);
+    console.log(
+      `[AI] Allocation: Artist=${artistTrackCount}, Genre=${genreTrackCount}, Popular=${popularTrackCount}`
+    );
 
     // Biến để lưu trữ tất cả các bài hát của nghệ sĩ được tìm thấy
     let artistTracks: any[] = [];
@@ -613,37 +722,45 @@ export const generateAIPlaylist = async (
       };
 
       let artistTracks = await prisma.track.findMany(artistTracksQuery);
-      
+
       // Only try to find additional tracks if we don't have basedOnReleaseTime
-      if (artistTracks.length < artistTrackCount && !options.basedOnReleaseTime) {
+      if (
+        artistTracks.length < artistTrackCount &&
+        !options.basedOnReleaseTime
+      ) {
         const remainingCount = artistTrackCount - artistTracks.length;
         const additionalTracksQuery = {
           where: {
             isActive: true,
-            id: { notIn: artistTracks.map(t => t.id) },
+            id: { notIn: artistTracks.map((t) => t.id) },
             ...whereClause,
             ...moodFilter,
           },
           orderBy: [
-          { playCount: Prisma.SortOrder.desc },
+            { playCount: Prisma.SortOrder.desc },
             { createdAt: Prisma.SortOrder.desc },
           ],
           take: remainingCount * 3,
         };
 
-        const additionalTracks = await prisma.track.findMany(additionalTracksQuery);
+        const additionalTracks = await prisma.track.findMany(
+          additionalTracksQuery
+        );
         artistTracks = [...artistTracks, ...additionalTracks];
       }
 
       const scoredArtistTracks = artistTracks
-        .map(track => ({
-            ...track,
-          score: calculateTrackScore(track, options)
+        .map((track) => ({
+          ...track,
+          score: calculateTrackScore(track, options),
         }))
         .sort((a, b) => b.score - a.score);
 
-      const selectedArtistTracks = scoredArtistTracks.slice(0, artistTrackCount);
-      trackIds = selectedArtistTracks.map(track => track.id);
+      const selectedArtistTracks = scoredArtistTracks.slice(
+        0,
+        artistTrackCount
+      );
+      trackIds = selectedArtistTracks.map((track) => track.id);
     }
 
     // 2. Lấy bài hát từ thể loại ưa thích hoặc thể loại được chỉ định
@@ -665,13 +782,17 @@ export const generateAIPlaylist = async (
         where: {
           isActive: true,
           id: { notIn: trackIds },
-          ...(options.basedOnGenre ? enhancedGenreFilter : targetGenreIds.length > 0 ? {
-            genres: {
-              every: {
-                genreId: { in: targetGenreIds },
-              },
-            },
-          } : {}),
+          ...(options.basedOnGenre
+            ? enhancedGenreFilter
+            : targetGenreIds.length > 0
+            ? {
+                genres: {
+                  every: {
+                    genreId: { in: targetGenreIds },
+                  },
+                },
+              }
+            : {}),
           ...whereClause,
           ...moodFilter,
           ...(hasArtistParam && hasGenreParam
@@ -693,18 +814,18 @@ export const generateAIPlaylist = async (
       };
 
       const genreTracks = await prisma.track.findMany(genreTracksQuery);
-      
+
       // Tính điểm và sắp xếp bài hát
       const scoredGenreTracks = genreTracks
-        .map(track => ({
+        .map((track) => ({
           ...track,
-          score: calculateTrackScore(track, options)
+          score: calculateTrackScore(track, options),
         }))
         .sort((a, b) => b.score - a.score);
 
       // Chọn chính xác số lượng bài hát cần thiết
       const selectedGenreTracks = scoredGenreTracks.slice(0, genreTrackCount);
-      trackIds = [...trackIds, ...selectedGenreTracks.map(t => t.id)];
+      trackIds = [...trackIds, ...selectedGenreTracks.map((t) => t.id)];
     }
 
     // 3. Thêm các bài hát phổ biến nếu chưa đủ số lượng
@@ -720,105 +841,122 @@ export const generateAIPlaylist = async (
         where: {
           isActive: true,
           id: { notIn: trackIds },
-          ...(options.basedOnGenre && enhancedGenreFilter ? enhancedGenreFilter : {}),
+          ...(options.basedOnGenre && enhancedGenreFilter
+            ? enhancedGenreFilter
+            : {}),
           ...whereClause,
           ...moodFilter,
         },
         orderBy: [
           { playCount: Prisma.SortOrder.desc },
-          { createdAt: Prisma.SortOrder.desc }
+          { createdAt: Prisma.SortOrder.desc },
         ],
         take: remainingNeeded * 3, // Tăng số lượng để có nhiều lựa chọn hơn
       };
 
       const popularTracks = await prisma.track.findMany(popularTracksQuery);
-      
+
       // Tính điểm và sắp xếp bài hát
       const scoredPopularTracks = popularTracks
-        .map(track => ({
+        .map((track) => ({
           ...track,
-          score: calculateTrackScore(track, options)
+          score: calculateTrackScore(track, options),
         }))
         .sort((a, b) => b.score - a.score);
 
       // Chọn chính xác số lượng bài hát cần thiết
-      const selectedPopularTracks = scoredPopularTracks.slice(0, remainingNeeded);
-      trackIds = [...trackIds, ...selectedPopularTracks.map(t => t.id)];
+      const selectedPopularTracks = scoredPopularTracks.slice(
+        0,
+        remainingNeeded
+      );
+      trackIds = [...trackIds, ...selectedPopularTracks.map((t) => t.id)];
     }
 
     // Đảm bảo số lượng bài hát chính xác
     if (trackIds.length !== trackCount) {
-      console.log(`[AI] Warning: Generated ${trackIds.length} tracks instead of requested ${trackCount}`);
+      console.log(
+        `[AI] Warning: Generated ${trackIds.length} tracks instead of requested ${trackCount}`
+      );
     }
 
     // Lấy thông tin chi tiết của các bài hát trong playlist
     const playlistTracks = await prisma.track.findMany({
       where: {
-        id: { in: trackIds }
+        id: { in: trackIds },
       },
       include: {
         artist: {
           select: {
-            artistName: true
-          }
+            artistName: true,
+          },
         },
         genres: {
           include: {
             genre: {
               select: {
-                name: true
-              }
-            }
-          }
-        }
-      }
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Kiểm tra lại playlist bằng Gemini
     if (playlistTracks.length > 0 && options.basedOnMood) {
       try {
         // Tạo prompt cho Gemini
-        let prompt = "Please analyze these songs and verify if they match the following mood:\n\n";
-          prompt += `Mood: ${options.basedOnMood}\n`;
-        
+        let prompt =
+          "Please analyze these songs and verify if they match the following mood:\n\n";
+        prompt += `Mood: ${options.basedOnMood}\n`;
+
         prompt += "\nSongs in the playlist:\n";
         playlistTracks.forEach((track, index) => {
-          prompt += `${index + 1}. ${track.title} by ${track.artist?.artistName || 'Unknown'}\n`;
+          prompt += `${index + 1}. ${track.title} by ${
+            track.artist?.artistName || "Unknown"
+          }\n`;
           if (track.genres && track.genres.length > 0) {
-            prompt += `   Genres: ${track.genres.map(g => g.genre.name).join(', ')}\n`;
+            prompt += `   Genres: ${track.genres
+              .map((g) => g.genre.name)
+              .join(", ")}\n`;
           }
           prompt += `   Duration: ${track.duration} seconds\n`;
-          prompt += `   Release Date: ${track.releaseDate.toISOString().split('T')[0]}\n\n`;
+          prompt += `   Release Date: ${
+            track.releaseDate.toISOString().split("T")[0]
+          }\n\n`;
         });
-        
-        prompt += "\nFor each song, you MUST provide a definitive YES or NO answer (no MAYBE allowed) indicating if it matches the mood. If the answer is NO, explain why and suggest a replacement that would be more appropriate. Base your decision on the song title, genres, and any other available information. Be decisive and clear in your assessment.";
-        
+
+        prompt +=
+          "\nFor each song, you MUST provide a definitive YES or NO answer (no MAYBE allowed) indicating if it matches the mood. If the answer is NO, explain why and suggest a replacement that would be more appropriate. Base your decision on the song title, genres, and any other available information. Be decisive and clear in your assessment.";
+
         // Gọi Gemini API
         try {
           const apiKey = process.env.GEMINI_API_KEY;
           if (!apiKey) {
-            console.error("[AI] GEMINI_API_KEY is not set in environment variables");
+            console.error(
+              "[AI] GEMINI_API_KEY is not set in environment variables"
+            );
             return trackIds;
           }
 
           // Khởi tạo Gemini client với phiên bản mới
           const genAI = new GoogleGenerativeAI(apiKey);
           const modelName = process.env.GEMINI_MODEL || "gemini-pro";
-          const model = genAI.getGenerativeModel({ 
+          const model = genAI.getGenerativeModel({
             model: modelName,
             generationConfig: {
               temperature: 0.7,
               topK: 40,
               topP: 0.95,
               maxOutputTokens: 2048, // Increased from 1024
-            }
+            },
           });
-          
+
           // Thêm cơ chế retry
           const maxRetries = 3;
           let retryCount = 0;
           let result;
-          
+
           while (retryCount < maxRetries) {
             try {
               result = await model.generateContent(prompt);
@@ -827,121 +965,158 @@ export const generateAIPlaylist = async (
               if (error.status === 429 && retryCount < maxRetries - 1) {
                 // Tăng thời gian delay lên 2 phút (120 giây)
                 const retryDelay = 120 * 1000;
-                console.log(`[AI] Rate limit hit, waiting ${retryDelay/1000}s before retry...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                console.log(
+                  `[AI] Rate limit hit, waiting ${
+                    retryDelay / 1000
+                  }s before retry...`
+                );
+                await new Promise((resolve) => setTimeout(resolve, retryDelay));
                 retryCount++;
                 continue;
               }
               throw error;
             }
           }
-          
+
           if (!result) {
             throw new Error("Failed to generate content after retries");
           }
-          
+
           const response = await result.response;
           const text = response.text();
-          
+
           console.log("[AI] Received Gemini analysis");
 
           // --- BEGIN ADDED LOGS ---
           console.log("[AI] Prompt Feedback:", response.promptFeedback);
-          console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
-          console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+          console.log(
+            "[AI] Candidate Finish Reason:",
+            response.candidates?.[0]?.finishReason
+          );
+          console.log(
+            "[AI] Candidate Safety Ratings:",
+            response.candidates?.[0]?.safetyRatings
+          );
           // --- END ADDED LOGS ---
 
-          console.log("[AI] Raw Gemini response (first 500 chars):", text.substring(0, 500));
+          console.log(
+            "[AI] Raw Gemini response (first 500 chars):",
+            text.substring(0, 500)
+          );
           console.log("[AI] Response length:", text.length);
-          console.log("[AI] Response contains JSON array:", text.includes("[") && text.includes("]"));
-          
+          console.log(
+            "[AI] Response contains JSON array:",
+            text.includes("[") && text.includes("]")
+          );
+
           // Phân tích kết quả từ Gemini
-          const lines = text.split('\n');
-          const mismatchedTracks: { index: number, reason: string }[] = [];
-          
+          const lines = text.split("\n");
+          const mismatchedTracks: { index: number; reason: string }[] = [];
+
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (line.includes("NO") || line.toLowerCase().includes("doesn't match") || line.toLowerCase().includes("does not match")) {
+            if (
+              line.includes("NO") ||
+              line.toLowerCase().includes("doesn't match") ||
+              line.toLowerCase().includes("does not match")
+            ) {
               // Tìm index của bài hát từ dòng trước đó
-              const prevLine = lines[i-1];
+              const prevLine = lines[i - 1];
               if (prevLine && prevLine.match(/^\d+\./)) {
-                const index = parseInt(prevLine.split('.')[0]) - 1;
+                const index = parseInt(prevLine.split(".")[0]) - 1;
                 if (index >= 0 && index < playlistTracks.length) {
                   mismatchedTracks.push({
                     index,
-                    reason: line
+                    reason: line,
                   });
                 }
               }
             }
           }
-          
+
           // Nếu có bài hát không phù hợp, thay thế chúng
           if (mismatchedTracks.length > 0) {
-            console.log(`[AI] Found ${mismatchedTracks.length} tracks that don't match the criteria. Replacing them...`);
-            
-            // Xóa các bài hát không phù hợp
-            const validTrackIds = trackIds.filter((_, index) => 
-              !mismatchedTracks.some(mt => mt.index === index)
+            console.log(
+              `[AI] Found ${mismatchedTracks.length} tracks that don't match the criteria. Replacing them...`
             );
-            
+
+            // Xóa các bài hát không phù hợp
+            const validTrackIds = trackIds.filter(
+              (_, index) => !mismatchedTracks.some((mt) => mt.index === index)
+            );
+
             // Tìm bài hát thay thế
             const replacementCount = mismatchedTracks.length;
-            
+
             // Tạo điều kiện tìm kiếm dựa trên các tham số
             const replacementQuery = {
               where: {
                 isActive: true,
                 id: { notIn: validTrackIds },
                 ...whereClause,
-                ...(options.basedOnMood ? await getMoodFilter(options.basedOnMood) : {}),
+                ...(options.basedOnMood
+                  ? await getMoodFilter(options.basedOnMood)
+                  : {}),
                 ...(options.basedOnGenre ? enhancedGenreFilter : {}),
-                ...(options.basedOnArtist ? {
-                  artist: {
-                    artistName: {
-                      contains: options.basedOnArtist,
-                      mode: "insensitive",
-                    },
-                  },
-                } : {}),
+                ...(options.basedOnArtist
+                  ? {
+                      artist: {
+                        artistName: {
+                          contains: options.basedOnArtist,
+                          mode: "insensitive",
+                        },
+                      },
+                    }
+                  : {}),
               },
               include: {
                 artist: true,
                 genres: {
                   include: {
-                    genre: true
-                  }
-                }
+                    genre: true,
+                  },
+                },
               },
               orderBy: [
                 { playCount: Prisma.SortOrder.desc },
-                { createdAt: Prisma.SortOrder.desc }
+                { createdAt: Prisma.SortOrder.desc },
               ],
               take: replacementCount * 2, // Lấy nhiều hơn để có thể chọn ngẫu nhiên
             };
-            
-            const replacementTracks = await prisma.track.findMany(replacementQuery);
-            
+
+            const replacementTracks = await prisma.track.findMany(
+              replacementQuery
+            );
+
             if (replacementTracks.length === 0) {
-              console.log("[AI] No suitable replacement tracks found in database");
+              console.log(
+                "[AI] No suitable replacement tracks found in database"
+              );
               return trackIds;
             }
-            
+
             // Chọn ngẫu nhiên các bài hát thay thế
             const selectedReplacements = replacementTracks
               .sort(() => Math.random() - 0.5)
               .slice(0, replacementCount);
-            
-            console.log("[AI] Selected replacement tracks:", selectedReplacements.map(t => t.title));
-            
+
+            console.log(
+              "[AI] Selected replacement tracks:",
+              selectedReplacements.map((t) => t.title)
+            );
+
             // Cập nhật trackIds với các bài hát mới
             const updatedTrackIds = [...validTrackIds];
             mismatchedTracks.forEach((mt, index) => {
               if (selectedReplacements[index]) {
-                updatedTrackIds.splice(mt.index, 0, selectedReplacements[index].id);
+                updatedTrackIds.splice(
+                  mt.index,
+                  0,
+                  selectedReplacements[index].id
+                );
               }
             });
-            
+
             // Cập nhật playlist trong database
             if (playlistId) {
               try {
@@ -950,9 +1125,9 @@ export const generateAIPlaylist = async (
                   where: { id: playlistId },
                   data: {
                     tracks: {
-                      deleteMany: {} // Xóa tất cả các bài hát
-                    }
-                  }
+                      deleteMany: {}, // Xóa tất cả các bài hát
+                    },
+                  },
                 });
 
                 // Thêm các bài hát mới
@@ -962,20 +1137,22 @@ export const generateAIPlaylist = async (
                     tracks: {
                       create: updatedTrackIds.map((id, index) => ({
                         track: { connect: { id } },
-                        trackOrder: index
-                      }))
-                    }
-                  }
+                        trackOrder: index,
+                      })),
+                    },
+                  },
                 });
-                console.log(`[AI] Successfully updated playlist with ${updatedTrackIds.length} tracks`);
+                console.log(
+                  `[AI] Successfully updated playlist with ${updatedTrackIds.length} tracks`
+                );
               } catch (error) {
                 console.error("[AI] Error updating playlist:", error);
               }
             }
-            
+
             // Cập nhật trackIds để trả về
             trackIds = updatedTrackIds;
-            
+
             // Kiểm tra lại playlist sau khi cập nhật
             if (playlistId) {
               const updatedPlaylist = await prisma.playlist.findUnique({
@@ -988,21 +1165,24 @@ export const generateAIPlaylist = async (
                           artist: true,
                           genres: {
                             include: {
-                              genre: true
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
+                              genre: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               });
-              
+
               if (updatedPlaylist) {
-                console.log("[AI] Updated playlist tracks:", updatedPlaylist.tracks.map(t => t.track.title));
+                console.log(
+                  "[AI] Updated playlist tracks:",
+                  updatedPlaylist.tracks.map((t) => t.track.title)
+                );
               }
             }
-            
+
             return trackIds;
           } else {
             console.log("[AI] All tracks match the criteria.");
@@ -1010,7 +1190,9 @@ export const generateAIPlaylist = async (
         } catch (error) {
           console.error("[AI] Error during Gemini verification:", error);
           // Nếu có lỗi trong quá trình kiểm tra, vẫn trả về playlist đã tạo
-          console.log("[AI] Continuing with original playlist due to verification error");
+          console.log(
+            "[AI] Continuing with original playlist due to verification error"
+          );
         }
       } catch (error) {
         console.error("[AI] Error during Gemini verification:", error);
@@ -1028,6 +1210,36 @@ export const generateAIPlaylist = async (
   }
 };
 
+// Placeholder function - Implement actual AI logic later
+async function generatePlaylistNameAndDescriptionAI(
+  userId: string,
+  trackIds: string[],
+  userName: string,
+  options: PlaylistGenerationOptions
+): Promise<{ name: string; description: string }> {
+  console.log(
+    `[AI Service Placeholder] Generating name/desc for user ${userId} with ${trackIds.length} tracks.`
+  );
+  // Simple default name and description
+  const trackCount = trackIds.length;
+  const name =
+    options.name ||
+    `AI Playlist for ${
+      userName || "User"
+    } (${new Date().toLocaleTimeString()})`;
+  const description =
+    options.description ||
+    `An AI-curated mix of ${trackCount} tracks, just for you.`;
+
+  // TODO: Implement actual call to Gemini or other AI to generate creative name and description based on tracks/user preferences
+  // For example:
+  // const prompt = `Given these track IDs [...], suggest a cool playlist name and a catchy 1-2 sentence description for user ${userName}.`;
+  // const aiResponse = await callSomeGeminiHelper(prompt);
+  // return { name: aiResponse.name, description: aiResponse.description };
+
+  return { name, description };
+}
+
 /**
  * Tạo hoặc cập nhật danh sách phát do AI tạo ra cho người dùng
  * @param userId - The user ID to create the playlist for
@@ -1036,149 +1248,102 @@ export const generateAIPlaylist = async (
  */
 export const createAIGeneratedPlaylist = async (
   userId: string,
-  options: PlaylistGenerationOptions = {}
+  options: PlaylistGenerationOptions = {},
+  trackIdsInput?: string[]
 ): Promise<Playlist> => {
-  try {
-    // Use the name from options if provided, otherwise generate one
-    const playlistName = options.name || "Soundwave Discoveries";
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error(`User with ID ${userId} not found.`);
+  }
 
-    // Generate track recommendations
-    const trackIds = await generateAIPlaylist(userId, options);
+  console.log(
+    `[AI Service] Attempting to generate AI playlist for user ${userId}`
+  );
 
-    // Lấy thông tin bài hát để cải thiện mô tả
-    const tracks = await prisma.track.findMany({
-      where: { id: { in: trackIds } },
-      select: {
-        id: true,
-        duration: true,
-        artist: {
-          select: {
-            id: true,
-            artistName: true,
-          },
-        },
-      },
-    });
+  let trackIdsToUse: string[];
 
-    // Tính tổng thời lượng
-    const totalDuration = tracks.reduce(
-      (sum, track) => sum + track.duration,
-      0
+  if (trackIdsInput && trackIdsInput.length > 0) {
+    trackIdsToUse = trackIdsInput;
+    console.log(
+      `[AI Service] Using ${trackIdsToUse.length} pre-fetched track IDs.`
     );
-
-    // Trích xuất nghệ sĩ duy nhất để có mô tả tốt hơn
-    const artistsInPlaylist = new Map<string, string>();
-    tracks.forEach((track) => {
-      if (track.artist?.artistName) {
-        artistsInPlaylist.set(track.artist.id, track.artist.artistName);
-      }
-    });
-
-    // Phân tích để hiển thị nghệ sĩ hàng đầu trước trong mô tả
-    const artistsCount: Record<string, number> = {};
-    tracks.forEach((track) => {
-      if (track.artist?.id) {
-        artistsCount[track.artist.id] =
-          (artistsCount[track.artist.id] || 0) + 1;
-      }
-    });
-
-    // Sắp xếp nghệ sĩ theo số lần xuất hiện trong danh sách phát
-    const sortedArtistIds = Object.keys(artistsCount).sort(
-      (a, b) => artistsCount[b] - artistsCount[a]
+  } else {
+    console.log(
+      `[AI Service] No pre-fetched track IDs, calling generateAIPlaylist for user ${userId}.`
     );
+    trackIdsToUse = await generateAIPlaylist(userId, options);
+  }
 
-    // Lấy tên nghệ sĩ đã sắp xếp theo mức độ phổ biến
-    const sortedArtistNames = sortedArtistIds
-      .map((id) => artistsInPlaylist.get(id))
-      .filter(Boolean) as string[];
-
-    // Use description from options if provided, otherwise generate a default one
-    let playlistDescription =
-      options.description ||
-      `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(", ")}${
-        sortedArtistNames.length > 3 ? " and more" : ""
-      }. Refreshed regularly based on your listening patterns.`;
-    // Default cover URL for AI-generated playlists
-    const defaultCoverUrl =
-      "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
-
-    // Find if the user already has a personalized system playlist with this name
-    // It should match the base playlist name used for generation.
-    let playlist = await prisma.playlist.findFirst({
-      where: {
-        userId,
-        name: playlistName,
-        type: PlaylistType.SYSTEM, // Ensure we are looking for the user's personalized system playlist
-      },
-    });
-
-    const playlistData = {
-      description: playlistDescription,
-      coverUrl:
-        options.coverUrl === null ? null : options.coverUrl || defaultCoverUrl,
-      totalTracks: trackIds.length,
-      totalDuration,
-      updatedAt: new Date(),
-      lastGeneratedAt: new Date(),
-      tracks: {
-        createMany: {
-          data: trackIds.map((trackId, index) => ({
-            trackId,
-            trackOrder: index,
-          })),
-          skipDuplicates: true,
-        },
-      },
-    };
-
-    if (playlist) {
-      // Update existing personalized system playlist
-      console.log(
-        `[AI] Updating personalized system playlist ${playlist.id} for user ${userId}`
-      );
-
-      // Remove existing tracks first
-      await prisma.playlistTrack.deleteMany({
-        where: { playlistId: playlist.id },
-      });
-
-      // Update playlist details and add new tracks
-      playlist = await prisma.playlist.update({
-        where: { id: playlist.id },
-        data: playlistData,
-      });
-
-      console.log(
-        `[AI] Updated playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`
-      );
-    } else {
-      // Create new personalized system playlist for the user
-      console.log(
-        `[AI] Creating new personalized system playlist "${playlistName}" for user ${userId}`
-      );
-
-      playlist = await prisma.playlist.create({
-        data: {
-          name: playlistName,
-          userId,
-          type: PlaylistType.SYSTEM, // Mark as user's personalized system playlist
-          privacy: "PRIVATE", // User's personalized playlists are private
-          isAIGenerated: true,
-          ...playlistData,
-        },
-      });
-
-      console.log(
-        `[AI] Created playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`
+  // Fallback if generateAIPlaylist (or input) also returns no tracks
+  if (!trackIdsToUse || trackIdsToUse.length === 0) {
+    console.warn(
+      `[AI Service] generateAIPlaylist (or input) returned no tracks for user ${userId}. Falling back to top played tracks.`
+    );
+    trackIdsToUse = await getTopPlayedTrackIds(10);
+    if (!trackIdsToUse || trackIdsToUse.length === 0) {
+      throw new Error(
+        "Failed to obtain any track IDs for AI playlist generation, even after fallback to top tracks."
       );
     }
-
-    return playlist;
-  } catch (error) {
-    console.error("[AI] Error creating/updating AI-generated playlist:", error);
-    throw error;
+    console.log(
+      `[AI Service] Using ${trackIdsToUse.length} top played tracks as fallback for user ${userId}.`
+    );
   }
+
+  console.log(
+    "[AI Service DEBUG] Calling placeholder generatePlaylistNameAndDescriptionAI..."
+  );
+  const playlistDetails = await generatePlaylistNameAndDescriptionAI(
+    userId,
+    trackIdsToUse,
+    user.name || user.username || "User", // Ensure string type for username
+    options
+  );
+  console.log("[AI Service DEBUG] Placeholder returned:", playlistDetails);
+  console.log(
+    "[AI Service DEBUG] options object passed to createAIGeneratedPlaylist:",
+    options
+  );
+
+  const playlistName = options.name || playlistDetails.name;
+  const playlistDescription =
+    options.description || playlistDetails.description;
+  console.log(`[AI Service DEBUG] Final determined Name: "${playlistName}"`);
+  console.log(
+    `[AI Service DEBUG] Final determined Description: "${playlistDescription}"`
+  );
+
+  console.log(
+    `[AI Service] Creating NEW AI playlist "${playlistName}" for user ${userId}`
+  );
+  const newPlaylist = await prisma.playlist.create({
+    data: {
+      name: playlistName,
+      description: playlistDescription,
+      userId: userId,
+      type: PlaylistType.SYSTEM, // Changed from PlaylistType.AI
+      isAIGenerated: true,
+      privacy: PlaylistPrivacy.PRIVATE,
+      coverUrl: options.coverUrl,
+      tracks: {
+        create: trackIdsToUse.map((trackId: string, index: number) => ({
+          trackId: trackId,
+          trackOrder: index,
+        })),
+      },
+      totalTracks: trackIdsToUse.length,
+    },
+    include: {
+      tracks: { include: { track: true } },
+      user: true,
+    },
+  });
+
+  console.log(
+    `[AI Service] Successfully created NEW AI playlist with ID: ${newPlaylist.id} for user ${userId}`
+  );
+
+  return newPlaylist;
 };
 
 /**
@@ -1259,44 +1424,204 @@ export const generateDefaultPlaylistForNewUser = async (
   }
 };
 
-
 async function getMoodFilter(mood: string): Promise<Prisma.TrackWhereInput> {
   const moodKeywords: Record<string, string[]> = {
-    happy: ['happy', 'joy', 'cheerful', 'upbeat', 'energetic', 'positive', 'sunny', 'bright', 'uplifting', 'fun', 'party', 'dance', 'celebrate', 'smile', 'laugh'],
-    sad: ['sad', 'melancholy', 'depressing', 'down', 'emotional', 'heartbreak', 'tears', 'cry', 'pain', 'lonely', 'missing', 'hurt', 'broken', 'sorrow', 'grief'],
-    calm: ['calm', 'peaceful', 'relaxing', 'serene', 'tranquil', 'gentle', 'soothing', 'quiet', 'meditation', 'zen', 'peace', 'soft', 'smooth', 'easy', 'light'],
-    energetic: ['energetic', 'powerful', 'strong', 'intense', 'dynamic', 'power', 'force', 'drive', 'pump', 'boost', 'high', 'rush', 'adrenaline', 'fast', 'loud'],
-    romantic: ['romantic', 'love', 'passion', 'intimate', 'sweet', 'tender', 'affection', 'heart', 'soul', 'forever', 'together', 'kiss', 'embrace', 'devotion', 'adore'],
-    nostalgic: ['nostalgic', 'memories', 'retro', 'vintage', 'classic', 'old', 'remember', 'past', 'yesterday', 'childhood', 'memory', 'throwback', 'throw back', 'old school'],
-    mysterious: ['mysterious', 'mystery', 'dark', 'enigmatic', 'secret', 'hidden', 'unknown', 'strange', 'weird', 'curious', 'enigma', 'puzzle', 'riddle', 'shadow', 'veil'],
-    dreamy: ['dreamy', 'ethereal', 'atmospheric', 'ambient', 'floating', 'space', 'cloud', 'dream', 'fantasy', 'magical', 'heavenly', 'celestial', 'cosmic', 'astral', 'ether'],
-    angry: ['angry', 'rage', 'furious', 'aggressive', 'intense', 'hate', 'frustrated', 'mad', 'angst', 'fury', 'wrath', 'outrage', 'violent', 'hostile', 'hostility'],
-    hopeful: ['hopeful', 'optimistic', 'inspiring', 'uplifting', 'motivation', 'dream', 'future', 'hope', 'faith', 'believe', 'trust', 'confidence', 'courage', 'strength', 'light']
+    happy: [
+      "happy",
+      "joy",
+      "cheerful",
+      "upbeat",
+      "energetic",
+      "positive",
+      "sunny",
+      "bright",
+      "uplifting",
+      "fun",
+      "party",
+      "dance",
+      "celebrate",
+      "smile",
+      "laugh",
+    ],
+    sad: [
+      "sad",
+      "melancholy",
+      "depressing",
+      "down",
+      "emotional",
+      "heartbreak",
+      "tears",
+      "cry",
+      "pain",
+      "lonely",
+      "missing",
+      "hurt",
+      "broken",
+      "sorrow",
+      "grief",
+    ],
+    calm: [
+      "calm",
+      "peaceful",
+      "relaxing",
+      "serene",
+      "tranquil",
+      "gentle",
+      "soothing",
+      "quiet",
+      "meditation",
+      "zen",
+      "peace",
+      "soft",
+      "smooth",
+      "easy",
+      "light",
+    ],
+    energetic: [
+      "energetic",
+      "powerful",
+      "strong",
+      "intense",
+      "dynamic",
+      "power",
+      "force",
+      "drive",
+      "pump",
+      "boost",
+      "high",
+      "rush",
+      "adrenaline",
+      "fast",
+      "loud",
+    ],
+    romantic: [
+      "romantic",
+      "love",
+      "passion",
+      "intimate",
+      "sweet",
+      "tender",
+      "affection",
+      "heart",
+      "soul",
+      "forever",
+      "together",
+      "kiss",
+      "embrace",
+      "devotion",
+      "adore",
+    ],
+    nostalgic: [
+      "nostalgic",
+      "memories",
+      "retro",
+      "vintage",
+      "classic",
+      "old",
+      "remember",
+      "past",
+      "yesterday",
+      "childhood",
+      "memory",
+      "throwback",
+      "throw back",
+      "old school",
+    ],
+    mysterious: [
+      "mysterious",
+      "mystery",
+      "dark",
+      "enigmatic",
+      "secret",
+      "hidden",
+      "unknown",
+      "strange",
+      "weird",
+      "curious",
+      "enigma",
+      "puzzle",
+      "riddle",
+      "shadow",
+      "veil",
+    ],
+    dreamy: [
+      "dreamy",
+      "ethereal",
+      "atmospheric",
+      "ambient",
+      "floating",
+      "space",
+      "cloud",
+      "dream",
+      "fantasy",
+      "magical",
+      "heavenly",
+      "celestial",
+      "cosmic",
+      "astral",
+      "ether",
+    ],
+    angry: [
+      "angry",
+      "rage",
+      "furious",
+      "aggressive",
+      "intense",
+      "hate",
+      "frustrated",
+      "mad",
+      "angst",
+      "fury",
+      "wrath",
+      "outrage",
+      "violent",
+      "hostile",
+      "hostility",
+    ],
+    hopeful: [
+      "hopeful",
+      "optimistic",
+      "inspiring",
+      "uplifting",
+      "motivation",
+      "dream",
+      "future",
+      "hope",
+      "faith",
+      "believe",
+      "trust",
+      "confidence",
+      "courage",
+      "strength",
+      "light",
+    ],
   };
 
   const moodGenres: Record<string, string[]> = {
-    happy: ['pop', 'dance', 'disco', 'funk'],
-    sad: ['blues', 'soul', 'ballad', 'indie'],
-    calm: ['ambient', 'classical', 'jazz', 'acoustic'],
-    energetic: ['rock', 'metal', 'electronic', 'hip-hop'],
-    romantic: ['r&b', 'soul', 'jazz', 'pop'],
-    nostalgic: ['oldies', 'classic rock', 'folk', 'retro'],
-    mysterious: ['electronic', 'ambient', 'experimental', 'instrumental'],
-    dreamy: ['ambient', 'electronic', 'indie', 'alternative'],
-    angry: ['metal', 'rock', 'punk', 'hardcore'],
-    hopeful: ['gospel', 'pop', 'indie', 'alternative']
+    happy: ["pop", "dance", "disco", "funk"],
+    sad: ["blues", "soul", "ballad", "indie"],
+    calm: ["ambient", "classical", "jazz", "acoustic"],
+    energetic: ["rock", "metal", "electronic", "hip-hop"],
+    romantic: ["r&b", "soul", "jazz", "pop"],
+    nostalgic: ["oldies", "classic rock", "folk", "retro"],
+    mysterious: ["electronic", "ambient", "experimental", "instrumental"],
+    dreamy: ["ambient", "electronic", "indie", "alternative"],
+    angry: ["metal", "rock", "punk", "hardcore"],
+    hopeful: ["gospel", "pop", "indie", "alternative"],
   };
 
   const normalizedMood = mood.toLowerCase().trim();
-  
+
   // Find matching mood category and keywords
   let matchingKeywords: string[] = [];
-  let matchingCategory = '';
+  let matchingCategory = "";
   for (const [category, keywords] of Object.entries(moodKeywords)) {
-    if (keywords.some(keyword => normalizedMood.includes(keyword))) {
+    if (keywords.some((keyword) => normalizedMood.includes(keyword))) {
       matchingKeywords = keywords;
       matchingCategory = category;
-      console.log(`[AI] Found mood category: ${category} with ${keywords.length} keywords`);
+      console.log(
+        `[AI] Found mood category: ${category} with ${keywords.length} keywords`
+      );
       break;
     }
   }
@@ -1304,60 +1629,65 @@ async function getMoodFilter(mood: string): Promise<Prisma.TrackWhereInput> {
   // If no specific mood match found, use the input mood as a keyword
   if (matchingKeywords.length === 0) {
     matchingKeywords = [normalizedMood];
-    console.log(`[AI] No specific mood category found, using input mood: ${normalizedMood}`);
+    console.log(
+      `[AI] No specific mood category found, using input mood: ${normalizedMood}`
+    );
   }
 
   // Take up to 5 most relevant keywords to create a focused filter
   const selectedKeywords = matchingKeywords.slice(0, 5);
-  console.log(`[AI] Using keywords for mood filter: ${selectedKeywords.join(', ')}`);
+  console.log(
+    `[AI] Using keywords for mood filter: ${selectedKeywords.join(", ")}`
+  );
 
   // Create OR conditions for each keyword
-  const orConditions: Prisma.TrackWhereInput[] = selectedKeywords.flatMap(keyword => [
-    // Search in track title with higher weight
-    {
-      title: {
-        contains: keyword,
-        mode: Prisma.QueryMode.insensitive
-      }
-    },
-    // Search in genre names
-    {
-      genres: {
-        some: {
-          genre: {
-            name: {
-              contains: keyword,
-              mode: Prisma.QueryMode.insensitive
-            }
-          }
-        }
-      }
-    }
-  ]);
+  const orConditions: Prisma.TrackWhereInput[] = selectedKeywords.flatMap(
+    (keyword) => [
+      // Search in track title with higher weight
+      {
+        title: {
+          contains: keyword,
+          mode: Prisma.QueryMode.insensitive,
+        },
+      },
+      // Search in genre names
+      {
+        genres: {
+          some: {
+            genre: {
+              name: {
+                contains: keyword,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
+          },
+        },
+      },
+    ]
+  );
 
   // Add genre-based conditions if we have a matching category
   if (matchingCategory && moodGenres[matchingCategory]) {
-    const genreConditions: Prisma.TrackWhereInput[] = moodGenres[matchingCategory].map(genre => ({
+    const genreConditions: Prisma.TrackWhereInput[] = moodGenres[
+      matchingCategory
+    ].map((genre) => ({
       genres: {
         some: {
           genre: {
             name: {
               contains: genre,
-              mode: Prisma.QueryMode.insensitive
-            }
-          }
-        }
-      }
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        },
+      },
     }));
     orConditions.push(...genreConditions);
   }
 
   // Return the filter with all OR conditions and ensure active tracks only
   return {
-    AND: [
-      { isActive: true },
-      { OR: orConditions }
-    ]
+    AND: [{ isActive: true }, { OR: orConditions }],
   };
 }
 
@@ -1374,29 +1704,29 @@ async function analyzeGenre(genreInput: string): Promise<{
   parentGenres: { id: string; name: string }[];
 }> {
   console.log(`[AI] Analyzing genre: "${genreInput}"`);
-  
+
   // Normalize input string
   const normalizedInput = genreInput.trim().toLowerCase();
   console.log(`[AI] Normalized input: "${normalizedInput}"`);
-  
+
   let mainGenre: string | null = null;
   let mainGenreId: string | null = null;
   const foundSubGenres: { id: string; name: string }[] = [];
   const foundRelatedGenres: { id: string; name: string }[] = [];
   const foundParentGenres: { id: string; name: string }[] = [];
-  
+
   // Lấy tất cả thể loại từ cơ sở dữ liệu để kiểm tra
   const allGenres = await prisma.genre.findMany({
     select: { id: true, name: true },
   });
-  
+
   console.log(`[AI] Found ${allGenres.length} genres in database`);
-  
+
   // Step 1: Try exact match first
   const exactGenre = allGenres.find(
     (genre) => genre.name.toLowerCase() === normalizedInput
   );
-  
+
   if (exactGenre) {
     console.log(`[AI] Found exact genre match: ${exactGenre.name}`);
     mainGenre = exactGenre.name;
@@ -1409,11 +1739,11 @@ async function analyzeGenre(genreInput: string): Promise<{
         synonyms.some((s) => s.toLowerCase() === normalizedInput)
       ) {
         console.log(`[AI] Found genre from synonyms: ${genre}`);
-        
+
         const dbGenre = allGenres.find(
           (g) => g.name.toLowerCase() === genre.toLowerCase()
         );
-        
+
         if (dbGenre) {
           mainGenre = dbGenre.name;
           mainGenreId = dbGenre.id;
@@ -1421,25 +1751,25 @@ async function analyzeGenre(genreInput: string): Promise<{
         }
       }
     }
-    
+
     // Step 3: Try fuzzy matching if still no match
     if (!mainGenre) {
       // Tìm kiếm với từ khóa chính xác trong tên thể loại
-      const keywordGenres = allGenres.filter(
-        (genre) => genre.name.toLowerCase().includes(normalizedInput)
+      const keywordGenres = allGenres.filter((genre) =>
+        genre.name.toLowerCase().includes(normalizedInput)
       );
-      
+
       if (keywordGenres.length > 0) {
         // Tìm kết quả khớp nhất bằng cách tính điểm
         let bestMatch = keywordGenres[0];
         let bestScore = 0;
-        
+
         for (const genre of keywordGenres) {
           const genreName = genre.name.toLowerCase();
-          
+
           // Tính điểm dựa trên độ khớp
           let score = 0;
-          
+
           // Điểm cao nhất cho khớp chính xác
           if (genreName === normalizedInput) {
             score += 100;
@@ -1456,7 +1786,7 @@ async function analyzeGenre(genreInput: string): Promise<{
           else if (genreName.includes(normalizedInput)) {
             score += 40;
           }
-          
+
           // Thêm điểm dựa trên độ dài tương đối
           const lengthRatio = normalizedInput.length / genreName.length;
           if (lengthRatio > 0.8) {
@@ -1464,25 +1794,27 @@ async function analyzeGenre(genreInput: string): Promise<{
           } else if (lengthRatio > 0.5) {
             score += 10; // Khớp một phần đáng kể
           }
-          
+
           // Cập nhật kết quả tốt nhất
           if (score > bestScore) {
             bestScore = score;
             bestMatch = genre;
           }
         }
-        
+
         // Chỉ sử dụng kết quả nếu điểm đủ cao
         if (bestScore >= 40) {
-          console.log(`[AI] Found best keyword match: ${bestMatch.name} (score: ${bestScore})`);
+          console.log(
+            `[AI] Found best keyword match: ${bestMatch.name} (score: ${bestScore})`
+          );
           mainGenre = bestMatch.name;
           mainGenreId = bestMatch.id;
         } else {
           // Thử tìm kiếm mờ với Levenshtein distance
-          const fuzzyResults = allGenres.filter(
-            (genre) => genre.name.toLowerCase().includes(normalizedInput.substring(0, 3))
+          const fuzzyResults = allGenres.filter((genre) =>
+            genre.name.toLowerCase().includes(normalizedInput.substring(0, 3))
           );
-          
+
           if (fuzzyResults.length > 0) {
             // Find the closest match using Levenshtein distance
             let closestMatch = fuzzyResults[0];
@@ -1490,15 +1822,18 @@ async function analyzeGenre(genreInput: string): Promise<{
               normalizedInput,
               closestMatch.name.toLowerCase()
             );
-            
+
             for (const result of fuzzyResults) {
-              const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
+              const distance = levenshteinDistance(
+                normalizedInput,
+                result.name.toLowerCase()
+              );
               if (distance < minDistance) {
                 minDistance = distance;
                 closestMatch = result;
               }
             }
-            
+
             // Chỉ sử dụng kết quả mờ nếu khoảng cách đủ nhỏ (giảm ngưỡng từ 3 xuống 2)
             if (minDistance < 2) {
               console.log(
@@ -1512,7 +1847,7 @@ async function analyzeGenre(genreInput: string): Promise<{
       }
     }
   }
-  
+
   // If we found a main genre, populate related genres
   if (mainGenre) {
     // Find sub-genres
@@ -1521,7 +1856,7 @@ async function analyzeGenre(genreInput: string): Promise<{
       const dbSubGenre = allGenres.find(
         (g) => g.name.toLowerCase() === subGenre.toLowerCase()
       );
-      
+
       if (dbSubGenre) {
         foundSubGenres.push({
           id: dbSubGenre.id,
@@ -1529,14 +1864,14 @@ async function analyzeGenre(genreInput: string): Promise<{
         });
       }
     }
-    
+
     // Find related genres
     const related = relatedGenres[mainGenre.toLowerCase()] || [];
     for (const relatedGenre of related) {
       const dbRelatedGenre = allGenres.find(
         (g) => g.name.toLowerCase() === relatedGenre.toLowerCase()
       );
-      
+
       if (dbRelatedGenre) {
         foundRelatedGenres.push({
           id: dbRelatedGenre.id,
@@ -1544,7 +1879,7 @@ async function analyzeGenre(genreInput: string): Promise<{
         });
       }
     }
-    
+
     // Find parent genres
     for (const [parent, children] of Object.entries(genreHierarchy)) {
       if (
@@ -1555,7 +1890,7 @@ async function analyzeGenre(genreInput: string): Promise<{
         const dbParentGenre = allGenres.find(
           (g) => g.name.toLowerCase() === parent.toLowerCase()
         );
-        
+
         if (dbParentGenre) {
           foundParentGenres.push({
             id: dbParentGenre.id,
@@ -1565,7 +1900,7 @@ async function analyzeGenre(genreInput: string): Promise<{
       }
     }
   }
-  
+
   console.log(`[AI] Analysis results:`, {
     mainGenre,
     mainGenreId,
@@ -1573,7 +1908,7 @@ async function analyzeGenre(genreInput: string): Promise<{
     relatedGenres: foundRelatedGenres.length,
     parentGenres: foundParentGenres.length,
   });
-  
+
   return {
     mainGenre,
     mainGenreId,
@@ -1887,63 +2222,65 @@ function levenshteinDistance(a: string, b: string): number {
 // Thêm hàm tính điểm cho bài hát
 function calculateTrackScore(track: any, params: any): number {
   let score = 0;
-  
+
   // 1. Tính điểm dựa trên sự phù hợp với tham số (0-80 điểm)
   let parameterMatchScore = 0;
-  
+
   // Kiểm tra phù hợp với thể loại
   if (params.basedOnGenre && track.genres) {
-    const genreMatch = track.genres.some((g: any) => 
+    const genreMatch = track.genres.some((g: any) =>
       g.genre.name.toLowerCase().includes(params.basedOnGenre.toLowerCase())
     );
     if (genreMatch) parameterMatchScore += 20;
   }
-  
+
   // Kiểm tra phù hợp với nghệ sĩ
   if (params.basedOnArtist && track.artist) {
-    const artistMatch = track.artist.artistName.toLowerCase().includes(params.basedOnArtist.toLowerCase());
+    const artistMatch = track.artist.artistName
+      .toLowerCase()
+      .includes(params.basedOnArtist.toLowerCase());
     if (artistMatch) parameterMatchScore += 20;
   }
-  
+
   // Kiểm tra phù hợp với độ dài bài hát
   if (params.basedOnSongLength && track.duration) {
     const lengthDiff = Math.abs(track.duration - params.basedOnSongLength);
     if (lengthDiff <= 30) parameterMatchScore += 20; // Cho phép sai lệch 30 giây
   }
-  
+
   // Kiểm tra phù hợp với thời gian phát hành
   if (params.basedOnReleaseTime && track.releaseDate) {
     const releaseYear = new Date(track.releaseDate).getFullYear();
     const currentYear = new Date().getFullYear();
-    
-    switch(params.basedOnReleaseTime.toLowerCase()) {
-      case 'new':
+
+    switch (params.basedOnReleaseTime.toLowerCase()) {
+      case "new":
         if (releaseYear === currentYear) parameterMatchScore += 20;
         break;
-      case 'recent':
+      case "recent":
         if (releaseYear >= currentYear - 2) parameterMatchScore += 20;
         break;
-      case 'classic':
+      case "classic":
         if (releaseYear <= currentYear - 20) parameterMatchScore += 20;
         break;
     }
   }
-  
+
   score += parameterMatchScore;
-  
+
   // 2. Tính điểm dựa trên độ mới (0-10 điểm)
   const trackAge = Date.now() - new Date(track.createdAt).getTime();
   const daysOld = trackAge / (1000 * 60 * 60 * 24);
-  const newnessScore = Math.max(0, 10 - (daysOld / 90)); // Giảm 1 điểm mỗi 90 ngày
+  const newnessScore = Math.max(0, 10 - daysOld / 90); // Giảm 1 điểm mỗi 90 ngày
   score += newnessScore;
-  
+
   // 3. Tính điểm dựa trên độ phổ biến (0-10 điểm)
   const popularityScore = Math.min(10, (track.playCount || 0) / 200); // 1 điểm cho mỗi 200 lượt nghe, tối đa 10 điểm
   score += popularityScore;
-  
+
   // Thêm yếu tố ngẫu nhiên nhỏ (0-5 điểm) để tạo sự đa dạng
   score += Math.random() * 5;
-  
+
   return score;
 }
 
@@ -1960,8 +2297,10 @@ export const suggestMoreTracksUsingAI = async (
   count: number = 5
 ): Promise<string[]> => {
   try {
-    console.log(`[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`);
-    
+    console.log(
+      `[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`
+    );
+
     // Get user's play history
     const userHistory = await prisma.history.findMany({
       where: {
@@ -1987,16 +2326,24 @@ export const suggestMoreTracksUsingAI = async (
     });
 
     // Filter out null tracks and create a type-safe array
-    const validUserHistory = userHistory.filter((h): h is typeof userHistory[0] & { track: NonNullable<typeof h.track> } => h.track !== null);
-    const userPlayedTrackIds = new Set(validUserHistory.map(h => h.track.id));
-    
+    const validUserHistory = userHistory.filter(
+      (
+        h
+      ): h is (typeof userHistory)[0] & {
+        track: NonNullable<typeof h.track>;
+      } => h.track !== null
+    );
+    const userPlayedTrackIds = new Set(validUserHistory.map((h) => h.track.id));
+
     // Lấy playlist hiện tại
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
       include: {
-        tracks: { // Lấy danh sách các bài hát trong playlist
+        tracks: {
+          // Lấy danh sách các bài hát trong playlist
           include: {
-            track: { // Lấy thông tin chi tiết của từng bài hát
+            track: {
+              // Lấy thông tin chi tiết của từng bài hát
               include: {
                 artist: true, // Lấy thông tin nghệ sĩ chính
                 genres: {
@@ -2005,11 +2352,12 @@ export const suggestMoreTracksUsingAI = async (
                   },
                 },
                 album: true,
-                featuredArtists: { // Lấy thông tin nghệ sĩ khách mời
+                featuredArtists: {
+                  // Lấy thông tin nghệ sĩ khách mời
                   include: {
-                    artistProfile: true
-                  }
-                }
+                    artistProfile: true,
+                  },
+                },
               },
             },
           },
@@ -2026,10 +2374,12 @@ export const suggestMoreTracksUsingAI = async (
 
     // Check nếu trong playlist có ít nhất 3 track hay chưa
     if (playlist.tracks.length < 3) {
-      throw new Error("Playlist must have at least 3 tracks to use this feature.");
+      throw new Error(
+        "Playlist must have at least 3 tracks to use this feature."
+      );
     }
     // Lấy trackId từ Tracks trong Playlist
-    const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
+    const existingTrackIds = playlist.tracks.map((pt) => pt.track.id);
 
     // Lấy tất cả artist có trong playlist (gồm main artists và featured artists)
     const playlistArtists = new Set<string>();
@@ -2038,7 +2388,7 @@ export const suggestMoreTracksUsingAI = async (
     const featuredArtistIds = new Set<string>();
 
     // Lấy main artist, genres, và featured Artist từ Track trong Playlist
-    playlist.tracks.forEach(pt => {
+    playlist.tracks.forEach((pt) => {
       // Add main artist
       if (pt.track.artist?.id) {
         playlistArtists.add(pt.track.artist.id);
@@ -2046,14 +2396,14 @@ export const suggestMoreTracksUsingAI = async (
       }
 
       // Add genres
-      pt.track.genres.forEach(g => {
+      pt.track.genres.forEach((g) => {
         if (g.genre) {
           relevantGenres.add(g.genre.id);
         }
       });
 
       // Add featured artists
-      pt.track.featuredArtists.forEach(f => {
+      pt.track.featuredArtists.forEach((f) => {
         if (f.artistProfile) {
           featuredArtistIds.add(f.artistProfile.id);
           artistNames.add(f.artistProfile.artistName);
@@ -2061,180 +2411,249 @@ export const suggestMoreTracksUsingAI = async (
       });
     });
 
-    console.log(`[AI] Found ${playlistArtists.size} main artists and ${featuredArtistIds.size} featured artists in playlist`);
+    console.log(
+      `[AI] Found ${playlistArtists.size} main artists and ${featuredArtistIds.size} featured artists in playlist`
+    );
 
     // 1. Lấy thêm track của artist không có trong playlist
-    const artistTracks = playlistArtists.size > 0 ? await prisma.track.findMany({
-      where: {
-        isActive: true,
-        id: { notIn: existingTrackIds },
-        artistId: {
-          in: Array.from(playlistArtists)
-        }
-      },
-      include: {
-        artist: true,
-        genres: {
-          include: {
-            genre: true
-          }
-        },
-        featuredArtists: {
-          include: {
-            artistProfile: true
-          }
-        }
-      },
-      orderBy: {
-        playCount: 'desc'
-      },
-      take: count * 2
-    }) : [];
+    const artistTracks =
+      playlistArtists.size > 0
+        ? await prisma.track.findMany({
+            where: {
+              isActive: true,
+              id: { notIn: existingTrackIds },
+              artistId: {
+                in: Array.from(playlistArtists),
+              },
+            },
+            include: {
+              artist: true,
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              featuredArtists: {
+                include: {
+                  artistProfile: true,
+                },
+              },
+            },
+            orderBy: {
+              playCount: "desc",
+            },
+            take: count * 2,
+          })
+        : [];
 
     // 2. Lấy track có featured artist là main artist
-    const featuredTracks = playlistArtists.size > 0 ? await prisma.track.findMany({
-      where: {
-        isActive: true,
-        id: { 
-          notIn: [...existingTrackIds, ...artistTracks.map(t => t.id)]
-        },
-        featuredArtists: {
-          some: {
-            artistProfile: {
+    const featuredTracks =
+      playlistArtists.size > 0
+        ? await prisma.track.findMany({
+            where: {
+              isActive: true,
               id: {
-                in: Array.from(playlistArtists)
-              }
-            }
-          }
-        }
-      },
-      include: {
-        artist: true,
-        genres: {
-          include: {
-            genre: true
-          }
-        },
-        featuredArtists: {
-          include: {
-            artistProfile: true
-          }
-        }
-      },
-      orderBy: {
-        playCount: 'desc'
-      },
-      take: count * 2
-    }) : [];
+                notIn: [...existingTrackIds, ...artistTracks.map((t) => t.id)],
+              },
+              featuredArtists: {
+                some: {
+                  artistProfile: {
+                    id: {
+                      in: Array.from(playlistArtists),
+                    },
+                  },
+                },
+              },
+            },
+            include: {
+              artist: true,
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              featuredArtists: {
+                include: {
+                  artistProfile: true,
+                },
+              },
+            },
+            orderBy: {
+              playCount: "desc",
+            },
+            take: count * 2,
+          })
+        : [];
 
     // 3. Lấy track của featured artist có trong Playlist
-    const collaboratorTracks = featuredArtistIds.size > 0 ? await prisma.track.findMany({
-      where: {
-        isActive: true,
-        id: { 
-          notIn: [...existingTrackIds, ...artistTracks.map(t => t.id), ...featuredTracks.map(t => t.id)]
-        },
-        artistId: {
-          in: Array.from(featuredArtistIds)
-        }
-      },
-      include: {
-        artist: true,
-        genres: {
-          include: {
-            genre: true
-          }
-        },
-        featuredArtists: {
-          include: {
-            artistProfile: true
-          }
-        }
-      },
-      orderBy: {
-        playCount: 'desc'
-      },
-      take: count * 2
-    }) : [];
+    const collaboratorTracks =
+      featuredArtistIds.size > 0
+        ? await prisma.track.findMany({
+            where: {
+              isActive: true,
+              id: {
+                notIn: [
+                  ...existingTrackIds,
+                  ...artistTracks.map((t) => t.id),
+                  ...featuredTracks.map((t) => t.id),
+                ],
+              },
+              artistId: {
+                in: Array.from(featuredArtistIds),
+              },
+            },
+            include: {
+              artist: true,
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              featuredArtists: {
+                include: {
+                  artistProfile: true,
+                },
+              },
+            },
+            orderBy: {
+              playCount: "desc",
+            },
+            take: count * 2,
+          })
+        : [];
 
     // 4. Lấy tracks có cùng thể loại với track trong Playlist
-    const genreTracks = relevantGenres.size > 0 ? await prisma.track.findMany({
-      where: {
-        isActive: true,
-        id: { 
-          notIn: [
-            ...existingTrackIds, 
-            ...artistTracks.map(t => t.id), 
-            ...featuredTracks.map(t => t.id), 
-            ...collaboratorTracks.map(t => t.id)
-          ]
-        },
-        genres: {
-          some: {
-            genreId: {
-              in: Array.from(relevantGenres)
-            }
-          }
-        }
-      },
-      include: {
-        artist: true,
-        genres: {
-          include: {
-            genre: true
-          }
-        },
-        featuredArtists: {
-          include: {
-            artistProfile: true
-          }
-        }
-      },
-      orderBy: {
-        playCount: 'desc'
-      },
-      take: count * 2
-    }) : [];
+    const genreTracks =
+      relevantGenres.size > 0
+        ? await prisma.track.findMany({
+            where: {
+              isActive: true,
+              id: {
+                notIn: [
+                  ...existingTrackIds,
+                  ...artistTracks.map((t) => t.id),
+                  ...featuredTracks.map((t) => t.id),
+                  ...collaboratorTracks.map((t) => t.id),
+                ],
+              },
+              genres: {
+                some: {
+                  genreId: {
+                    in: Array.from(relevantGenres),
+                  },
+                },
+              },
+            },
+            include: {
+              artist: true,
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              featuredArtists: {
+                include: {
+                  artistProfile: true,
+                },
+              },
+            },
+            orderBy: {
+              playCount: "desc",
+            },
+            take: count * 2,
+          })
+        : [];
 
     // Tạo prompt để gửi cho Gemini phân tích
     let prompt = `I need to analyze a playlist and its potential suggested tracks to ensure they match well. Here's the information:
     Current Playlist Analysis:
-    Artists: ${Array.from(artistNames).join(', ')}
-    Genres: ${Array.from(new Set(playlist.tracks.flatMap(pt => pt.track.genres.map(g => g.genre.name)))).join(', ')}
+    Artists: ${Array.from(artistNames).join(", ")}
+    Genres: ${Array.from(
+      new Set(
+        playlist.tracks.flatMap((pt) =>
+          pt.track.genres.map((g) => g.genre.name)
+        )
+      )
+    ).join(", ")}
 
     Sample tracks from current playlist:
-    ${playlist.tracks.slice(0, 5).map(pt => 
-      `- "${pt.track.id}" by ${pt.track.artist?.artistName || 'Unknown'} (${pt.track.genres.map(g => g.genre.name).join(', ')})`
-    ).join('\n')}
+    ${playlist.tracks
+      .slice(0, 5)
+      .map(
+        (pt) =>
+          `- "${pt.track.id}" by ${
+            pt.track.artist?.artistName || "Unknown"
+          } (${pt.track.genres.map((g) => g.genre.name).join(", ")})`
+      )
+      .join("\n")}
 
-    ${userHistory.length > 0 ? `
+    ${
+      userHistory.length > 0
+        ? `
     User's Recent Play History (Last ${userHistory.length} tracks):
-    ${validUserHistory.map(h => 
-      `- "${h.track.id}" by ${h.track.artist?.artistName || 'Unknown'} (${h.track.genres.map(g => g.genre.name).join(', ')})`
-    ).join('\n')}
-    ` : ''}
+    ${validUserHistory
+      .map(
+        (h) =>
+          `- "${h.track.id}" by ${
+            h.track.artist?.artistName || "Unknown"
+          } (${h.track.genres.map((g) => g.genre.name).join(", ")})`
+      )
+      .join("\n")}
+    `
+        : ""
+    }
 
     Potential suggestions to analyze:
 
     1. More tracks by same artists:
-    ${artistTracks.map(t => 
-      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
-    ).join('\n')}
+    ${artistTracks
+      .map(
+        (t) =>
+          `- "${t.id}" by ${t.artist?.artistName || "Unknown"} (${t.genres
+            .map((g) => g.genre.name)
+            .join(", ")}) [${
+            userPlayedTrackIds.has(t.id) ? "Previously Played" : "New"
+          }]`
+      )
+      .join("\n")}
 
     2. Tracks featuring playlist artists:
-    ${featuredTracks.map(t => 
-      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} ft. ${t.featuredArtists.map(f => f.artistProfile?.artistName).join(', ')} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
-    ).join('\n')}
+    ${featuredTracks
+      .map(
+        (t) =>
+          `- "${t.id}" by ${
+            t.artist?.artistName || "Unknown"
+          } ft. ${t.featuredArtists
+            .map((f) => f.artistProfile?.artistName)
+            .join(", ")} (${t.genres.map((g) => g.genre.name).join(", ")}) [${
+            userPlayedTrackIds.has(t.id) ? "Previously Played" : "New"
+          }]`
+      )
+      .join("\n")}
 
     3. Tracks by collaborating artists:
-    ${collaboratorTracks.map(t => 
-      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
-    ).join('\n')}
+    ${collaboratorTracks
+      .map(
+        (t) =>
+          `- "${t.id}" by ${t.artist?.artistName || "Unknown"} (${t.genres
+            .map((g) => g.genre.name)
+            .join(", ")}) [${
+            userPlayedTrackIds.has(t.id) ? "Previously Played" : "New"
+          }]`
+      )
+      .join("\n")}
 
     4. Genre-based suggestions:
-    ${genreTracks.map(t => 
-      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
-    ).join('\n')}
+    ${genreTracks
+      .map(
+        (t) =>
+          `- "${t.id}" by ${t.artist?.artistName || "Unknown"} (${t.genres
+            .map((g) => g.genre.name)
+            .join(", ")}) [${
+            userPlayedTrackIds.has(t.id) ? "Previously Played" : "New"
+          }]`
+      )
+      .join("\n")}
 
     For each track, analyze if it would be a good fit for the playlist based on:
     1. Artist compatibility
@@ -2256,39 +2675,53 @@ export const suggestMoreTracksUsingAI = async (
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        console.error("[AI] GEMINI_API_KEY is not set in environment variables");
+        console.error(
+          "[AI] GEMINI_API_KEY is not set in environment variables"
+        );
         throw new Error("Gemini API key not configured");
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
       const modelName = process.env.GEMINI_MODEL || "gemini-pro";
-      const model = genAI.getGenerativeModel({ 
+      const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: {
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 2048,
-        }
+        },
       });
 
       console.log("[AI] Sending playlist analysis to Gemini");
-      
+
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const responseText = response.text();
-      
+
       console.log("[AI] Received Gemini analysis");
 
       // --- BEGIN ADDED LOGS ---
       console.log("[AI] Prompt Feedback:", response.promptFeedback);
-      console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
-      console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+      console.log(
+        "[AI] Candidate Finish Reason:",
+        response.candidates?.[0]?.finishReason
+      );
+      console.log(
+        "[AI] Candidate Safety Ratings:",
+        response.candidates?.[0]?.safetyRatings
+      );
       // --- END ADDED LOGS ---
 
-      console.log("[AI] Raw Gemini response (first 500 chars):", responseText.substring(0, 500));
+      console.log(
+        "[AI] Raw Gemini response (first 500 chars):",
+        responseText.substring(0, 500)
+      );
       console.log("[AI] Response length:", responseText.length);
-      console.log("[AI] Response contains JSON array:", responseText.includes("[") && responseText.includes("]"));
+      console.log(
+        "[AI] Response contains JSON array:",
+        responseText.includes("[") && responseText.includes("]")
+      );
 
       // Lấy trackId từ response của Gemini
       let aiRecommendedIds: string[] = [];
@@ -2298,7 +2731,9 @@ export const suggestMoreTracksUsingAI = async (
         if (jsonMatch) {
           const jsonString = jsonMatch[0];
           aiRecommendedIds = JSON.parse(jsonString);
-          console.log("[AI] Successfully parsed recommended track IDs from Gemini");
+          console.log(
+            "[AI] Successfully parsed recommended track IDs from Gemini"
+          );
         }
       } catch (error) {
         console.error("[AI] Error parsing Gemini response:", error);
@@ -2306,16 +2741,23 @@ export const suggestMoreTracksUsingAI = async (
 
       // If AI provided recommendations, use them to filter and reorder our suggestions
       if (aiRecommendedIds.length > 0) {
-        const allTracks = [...artistTracks, ...featuredTracks, ...collaboratorTracks, ...genreTracks];
+        const allTracks = [
+          ...artistTracks,
+          ...featuredTracks,
+          ...collaboratorTracks,
+          ...genreTracks,
+        ];
         const aiFilteredTracks = aiRecommendedIds
-          .map(id => allTracks.find(t => t.id === id))
-          .filter((t): t is typeof allTracks[0] => t !== undefined);
+          .map((id) => allTracks.find((t) => t.id === id))
+          .filter((t): t is (typeof allTracks)[0] => t !== undefined);
 
         // Ensure at least one new track is included
-        const hasNewTrack = aiFilteredTracks.some(t => !userPlayedTrackIds.has(t.id));
+        const hasNewTrack = aiFilteredTracks.some(
+          (t) => !userPlayedTrackIds.has(t.id)
+        );
         if (!hasNewTrack && aiFilteredTracks.length > 0) {
           // Find a new track from our pool
-          const newTrack = allTracks.find(t => !userPlayedTrackIds.has(t.id));
+          const newTrack = allTracks.find((t) => !userPlayedTrackIds.has(t.id));
           if (newTrack) {
             aiFilteredTracks.pop(); // Remove last track
             aiFilteredTracks.push(newTrack); // Add new track
@@ -2325,9 +2767,11 @@ export const suggestMoreTracksUsingAI = async (
 
         // Nếu AI đã lọc ra được track, sử dụng cái này
         if (aiFilteredTracks.length > 0) {
-          console.log(`[AI] Using ${aiFilteredTracks.length} AI-filtered recommendations`);
+          console.log(
+            `[AI] Using ${aiFilteredTracks.length} AI-filtered recommendations`
+          );
           // Chọn ra 5 track
-          return aiFilteredTracks.slice(0, count).map(t => t.id);
+          return aiFilteredTracks.slice(0, count).map((t) => t.id);
         }
       }
     } catch (error) {
@@ -2336,10 +2780,10 @@ export const suggestMoreTracksUsingAI = async (
 
     // Fallback to original prioritized suggestions if AI analysis fails
     const allSuggestedTracks = [
-      ...artistTracks,           // Highest priority: More tracks from same artists
-      ...featuredTracks,         // Second priority: Tracks featuring playlist artists
-      ...collaboratorTracks,     // Third priority: Tracks by collaborating artists
-      ...genreTracks,            // Fourth priority: Tracks with similar genres
+      ...artistTracks, // Highest priority: More tracks from same artists
+      ...featuredTracks, // Second priority: Tracks featuring playlist artists
+      ...collaboratorTracks, // Third priority: Tracks by collaborating artists
+      ...genreTracks, // Fourth priority: Tracks with similar genres
     ];
 
     console.log(`[AI] Using fallback recommendations:
@@ -2350,10 +2794,16 @@ export const suggestMoreTracksUsingAI = async (
     `);
 
     // Ensure at least one new track in fallback recommendations
-    const suggestedTrackIds = allSuggestedTracks.slice(0, count).map(t => t.id);
-    const hasNewTrack = suggestedTrackIds.some(id => !userPlayedTrackIds.has(id));
+    const suggestedTrackIds = allSuggestedTracks
+      .slice(0, count)
+      .map((t) => t.id);
+    const hasNewTrack = suggestedTrackIds.some(
+      (id) => !userPlayedTrackIds.has(id)
+    );
     if (!hasNewTrack && suggestedTrackIds.length > 0) {
-      const newTrack = allSuggestedTracks.find(t => !userPlayedTrackIds.has(t.id));
+      const newTrack = allSuggestedTracks.find(
+        (t) => !userPlayedTrackIds.has(t.id)
+      );
       if (newTrack) {
         suggestedTrackIds[suggestedTrackIds.length - 1] = newTrack.id;
         console.log("[AI] Added one new track to fallback recommendations");
@@ -2367,3 +2817,26 @@ export const suggestMoreTracksUsingAI = async (
   }
 };
 
+export const getTopPlayedTrackIds = async (
+  count: number = 10
+): Promise<string[]> => {
+  console.log(`[AI Service] Fetching top ${count} played track IDs overall.`);
+  try {
+    const topTracks = await prisma.track.findMany({
+      where: {
+        isActive: true, // Only consider active tracks
+      },
+      orderBy: {
+        playCount: "desc",
+      },
+      select: {
+        id: true,
+      },
+      take: count,
+    });
+    return topTracks.map((track) => track.id);
+  } catch (error) {
+    console.error("[AI Service] Error fetching top played track IDs:", error);
+    return []; // Return empty array on error
+  }
+};

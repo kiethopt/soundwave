@@ -22,12 +22,10 @@ import { useTrack } from "@/contexts/TrackContext";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlayHandler } from "@/hooks/usePlayHandler";
+import Image from "next/image";
 
 // Define the names of playlists to filter out (use the same set as in TrackList)
-const filteredPlaylistNames = new Set([
-  "Welcome Mix",
-  "Favorites",
-]);
+const filteredPlaylistNames = new Set(["Welcome Mix", "Favorites"]);
 
 type FilterType = "all" | "albums" | "tracks" | "artists" | "users";
 
@@ -79,14 +77,7 @@ function SearchContent() {
   const { addToQueue } = useTrack();
 
   // Audio states
-  const {
-    currentTrack,
-    isPlaying,
-    pauseTrack,
-    queueType,
-    setQueueType,
-    trackQueue,
-  } = useTrack();
+  const { currentTrack, isPlaying, playTrack, queueType } = useTrack();
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
 
   // Filter buttons
@@ -360,11 +351,12 @@ function SearchContent() {
                       }
                     >
                       <div className="relative">
-                        <div className="aspect-square mb-4">
-                          <img
-                            src={artist.avatar || "/images/default-avatar.jpg"}
-                            alt={artist.artistName || "Artist"}
-                            className="w-full h-full object-cover rounded-full"
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={artist.avatar || "/images/default-avatar.png"}
+                            alt={artist.artistName}
+                            fill
+                            className="rounded-full object-cover"
                           />
                           <button
                             onClick={(event) => {
@@ -418,29 +410,32 @@ function SearchContent() {
                       onClick={() => router.push(`/album/${album.id}`)}
                     >
                       <div className="relative">
-                        <img
-                          src={album.coverUrl || "/images/default-album.png"}
-                          alt={album.title}
-                          className="w-full aspect-square object-cover rounded-md mb-4"
-                        />
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handlePlay(album);
-                          }}
-                          className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          {currentTrack &&
-                          album.tracks.some(
-                            (track) => track.id === currentTrack.id
-                          ) &&
-                          isPlaying &&
-                          queueType === "album" ? (
-                            <Pause className="w-5 h-5 text-white" />
-                          ) : (
-                            <Play className="w-5 h-5 text-white" />
-                          )}
-                        </button>
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={album.coverUrl || "/images/default-album.jpg"}
+                            alt={album.title}
+                            fill
+                            className="rounded object-cover"
+                          />
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handlePlay(album);
+                            }}
+                            className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            {currentTrack &&
+                            album.tracks.some(
+                              (track) => track.id === currentTrack.id
+                            ) &&
+                            isPlaying &&
+                            queueType === "album" ? (
+                              <Pause className="w-5 h-5 text-white" />
+                            ) : (
+                              <Play className="w-5 h-5 text-white" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <h3
                         className={`font-medium truncate ${
@@ -491,11 +486,12 @@ function SearchContent() {
                             : "hover:bg-white/5"
                         }`}
                       >
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={track.coverUrl || "/images/default-avatar.jpg"}
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={track.coverUrl || "/images/default-track.jpg"}
                             alt={track.title}
-                            className="w-12 h-12 object-cover rounded"
+                            fill
+                            className="rounded object-cover"
                           />
                           <button
                             onClick={() => handlePlay(track)}
@@ -605,8 +601,7 @@ function SearchContent() {
                                   ) : (
                                     playlists
                                       .filter(
-                                        (playlist) =>
-                                          playlist.type === 'NORMAL'
+                                        (playlist) => playlist.type === "NORMAL"
                                       ) // Filter out specific playlists
                                       .map((playlist) => (
                                         <DropdownMenuItem
@@ -620,24 +615,17 @@ function SearchContent() {
                                           }}
                                         >
                                           <div className="flex items-center gap-2 w-full">
-                                            <div className="w-6 h-6 relative flex-shrink-0">
-                                              {playlist.coverUrl ? (
-                                                <img
-                                                  src={playlist.coverUrl}
-                                                  alt={playlist.name}
-                                                  className="w-full h-full object-cover rounded"
-                                                />
-                                              ) : (
-                                                <div className="w-full h-full bg-white/10 rounded flex items-center justify-center">
-                                                  <svg
-                                                    className="w-4 h-4 text-white/70"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                  >
-                                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                                                  </svg>
-                                                </div>
-                                              )}
+                                            <div className="relative w-16 h-16 flex-shrink-0">
+                                              <Image
+                                                src={
+                                                  playlist.coverUrl ||
+                                                  "/images/default-playlist.jpg"
+                                                }
+                                                alt={playlist.name}
+                                                fill
+                                                className="object-cover"
+                                              />
+                                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                                             </div>
                                             <span className="truncate">
                                               {playlist.name}
@@ -701,27 +689,30 @@ function SearchContent() {
                       }`}
                     >
                       <div className="relative">
-                        <img
-                          src={track.coverUrl || "/images/default-avatar.jpg"}
-                          alt={track.title}
-                          className="w-full aspect-square object-cover rounded-md mb-4"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlay(track);
-                          }}
-                          className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          {currentTrack &&
-                          track.id === currentTrack.id &&
-                          isPlaying &&
-                          queueType === "track" ? (
-                            <Pause className="w-5 h-5 text-white" />
-                          ) : (
-                            <Play className="w-5 h-5 text-white" />
-                          )}
-                        </button>
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={track.coverUrl || "/images/default-track.jpg"}
+                            alt={track.title}
+                            fill
+                            className="rounded object-cover"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlay(track);
+                            }}
+                            className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            {currentTrack &&
+                            track.id === currentTrack.id &&
+                            isPlaying &&
+                            queueType === "track" ? (
+                              <Pause className="w-5 h-5 text-white" />
+                            ) : (
+                              <Play className="w-5 h-5 text-white" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex-grow min-w-0">
@@ -810,8 +801,7 @@ function SearchContent() {
                                   ) : (
                                     playlists
                                       .filter(
-                                        (playlist) =>
-                                          playlist.type === 'NORMAL'
+                                        (playlist) => playlist.type === "NORMAL"
                                       ) // Filter out specific playlists
                                       .map((playlist) => (
                                         <DropdownMenuItem
@@ -825,24 +815,17 @@ function SearchContent() {
                                           }}
                                         >
                                           <div className="flex items-center gap-2 w-full">
-                                            <div className="w-6 h-6 relative flex-shrink-0">
-                                              {playlist.coverUrl ? (
-                                                <img
-                                                  src={playlist.coverUrl}
-                                                  alt={playlist.name}
-                                                  className="w-full h-full object-cover rounded"
-                                                />
-                                              ) : (
-                                                <div className="w-full h-full bg-white/10 rounded flex items-center justify-center">
-                                                  <svg
-                                                    className="w-4 h-4 text-white/70"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                  >
-                                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                                                  </svg>
-                                                </div>
-                                              )}
+                                            <div className="relative w-16 h-16 flex-shrink-0">
+                                              <Image
+                                                src={
+                                                  playlist.coverUrl ||
+                                                  "/images/default-playlist.jpg"
+                                                }
+                                                alt={playlist.name}
+                                                fill
+                                                className="object-cover"
+                                              />
+                                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                                             </div>
                                             <span className="truncate">
                                               {playlist.name}
@@ -904,7 +887,7 @@ function SearchContent() {
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">
-                          <img
+                          <Image
                             src={user.avatar || "/images/default-avatar.jpg"}
                             alt={user.name || "User"}
                             className="w-full h-full object-cover rounded-full"
@@ -932,9 +915,10 @@ function SearchContent() {
             results.albums.length === 0 &&
             results.artists.length === 0 &&
             results.users.length === 0 && (
-              <p className="text-white/60">
-                No results found for "{query}". Try searching for something
-                else.
+              <p className="text-center text-white/60">
+                Can&apos;t find what you&apos;re looking for?
+                <br /> Try a different search term or explore our curated
+                playlists!
               </p>
             )}
         </div>

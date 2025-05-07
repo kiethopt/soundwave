@@ -36,23 +36,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
 const emailService = __importStar(require("../services/email.service"));
 const client_1 = require("@prisma/client");
+const trackService = __importStar(require("../services/track.service"));
 const getAllUsers = async (req, res) => {
     try {
         if (!req.user) {
-            res.status(401).json({ message: 'Unauthorized' });
+            res.status(401).json({ message: "Unauthorized" });
             return;
         }
         const { users, pagination } = await adminService.getUsers(req, req.user);
         res.json({ users, pagination });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get all users');
+        (0, handle_utils_1.handleError)(res, error, "Get all users");
     }
 };
 exports.getAllUsers = getAllUsers;
@@ -61,17 +62,17 @@ const getUserById = async (req, res) => {
         const { id } = req.params;
         const user = await adminService.getUserById(id);
         if (!user) {
-            res.status(404).json({ message: 'User not found' });
+            res.status(404).json({ message: "User not found" });
             return;
         }
         res.json(user);
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'User not found') {
-            res.status(404).json({ message: 'User not found' });
+        if (error instanceof Error && error.message === "User not found") {
+            res.status(404).json({ message: "User not found" });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Get user by id');
+        (0, handle_utils_1.handleError)(res, error, "Get user by id");
     }
 };
 exports.getUserById = getUserById;
@@ -81,7 +82,7 @@ const getAllArtistRequests = async (req, res) => {
         res.json({ requests, pagination });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get artist requests');
+        (0, handle_utils_1.handleError)(res, error, "Get artist requests");
     }
 };
 exports.getAllArtistRequests = getAllArtistRequests;
@@ -92,11 +93,11 @@ const getArtistRequestDetail = async (req, res) => {
         res.json(request);
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'Request not found') {
-            res.status(404).json({ message: 'Request not found' });
+        if (error instanceof Error && error.message === "Request not found") {
+            res.status(404).json({ message: "Request not found" });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Get artist request details');
+        (0, handle_utils_1.handleError)(res, error, "Get artist request details");
     }
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
@@ -106,39 +107,41 @@ const updateUser = async (req, res) => {
         const userData = { ...req.body };
         const requestingUser = req.user;
         if (!requestingUser) {
-            res.status(401).json({ message: "Unauthorized: Requesting user data missing." });
+            res
+                .status(401)
+                .json({ message: "Unauthorized: Requesting user data missing." });
             return;
         }
         const updatedUser = await adminService.updateUserInfo(id, userData, requestingUser);
         res.json({
-            message: 'User updated successfully',
+            message: "User updated successfully",
             user: updatedUser,
         });
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message.startsWith('Permission denied:')) {
+            if (error.message.startsWith("Permission denied:")) {
                 res.status(403).json({ message: error.message });
                 return;
             }
-            if (error.message === 'User not found') {
-                res.status(404).json({ message: 'User not found' });
+            if (error.message === "User not found") {
+                res.status(404).json({ message: "User not found" });
                 return;
             }
-            else if (error.message === 'Email already exists' ||
-                error.message === 'Username already exists') {
+            else if (error.message === "Email already exists" ||
+                error.message === "Username already exists") {
                 res.status(400).json({ message: error.message });
                 return;
             }
-            else if (error.message === 'Current password is incorrect') {
+            else if (error.message === "Current password is incorrect") {
                 res.status(400).json({ message: error.message });
                 return;
             }
-            else if (error.message.includes('password change')) {
+            else if (error.message.includes("password change")) {
                 res.status(400).json({ message: error.message });
                 return;
             }
-            else if (error.message === 'Password must be at least 6 characters long.') {
+            else if (error.message === "Password must be at least 6 characters long.") {
                 res.status(400).json({ message: error.message });
                 return;
             }
@@ -147,7 +150,7 @@ const updateUser = async (req, res) => {
                 return;
             }
         }
-        (0, handle_utils_1.handleError)(res, error, 'Update user');
+        (0, handle_utils_1.handleError)(res, error, "Update user");
     }
 };
 exports.updateUser = updateUser;
@@ -156,31 +159,31 @@ const updateArtist = async (req, res) => {
         const { id } = req.params;
         const artistData = { ...req.body };
         if (!id) {
-            res.status(400).json({ message: 'Artist ID is required' });
+            res.status(400).json({ message: "Artist ID is required" });
             return;
         }
         const updatedArtist = await adminService.updateArtistInfo(id, artistData);
         res.json({
-            message: 'Artist updated successfully',
+            message: "Artist updated successfully",
             artist: updatedArtist,
         });
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message === 'Artist not found') {
-                res.status(404).json({ message: 'Artist not found' });
+            if (error.message === "Artist not found") {
+                res.status(404).json({ message: "Artist not found" });
                 return;
             }
-            else if (error.message === 'Artist name already exists') {
-                res.status(400).json({ message: 'Artist name already exists' });
+            else if (error.message === "Artist name already exists") {
+                res.status(400).json({ message: "Artist name already exists" });
                 return;
             }
-            else if (error.message.includes('Validation failed')) {
+            else if (error.message.includes("Validation failed")) {
                 res.status(400).json({ message: error.message });
                 return;
             }
         }
-        (0, handle_utils_1.handleError)(res, error, 'Update artist');
+        (0, handle_utils_1.handleError)(res, error, "Update artist");
     }
 };
 exports.updateArtist = updateArtist;
@@ -190,18 +193,19 @@ const deleteUser = async (req, res) => {
         const requestingUser = req.user;
         const { reason } = req.body;
         if (!requestingUser || requestingUser.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            res.status(403).json({ message: "Forbidden: Admin access required." });
             return;
         }
         await adminService.deleteUserById(id, requestingUser, reason);
-        res.json({ message: 'User deleted successfully' });
+        res.json({ message: "User deleted successfully" });
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'Permission denied: Admins cannot be deleted.') {
+        if (error instanceof Error &&
+            error.message === "Permission denied: Admins cannot be deleted.") {
             res.status(403).json({ message: error.message });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Delete user');
+        (0, handle_utils_1.handleError)(res, error, "Delete user");
     }
 };
 exports.deleteUser = deleteUser;
@@ -210,10 +214,10 @@ const deleteArtist = async (req, res) => {
         const { id } = req.params;
         const { reason } = req.body;
         await adminService.deleteArtistById(id, reason);
-        res.json({ message: 'Artist deleted permanently' });
+        res.json({ message: "Artist deleted permanently" });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Delete artist');
+        (0, handle_utils_1.handleError)(res, error, "Delete artist");
     }
 };
 exports.deleteArtist = deleteArtist;
@@ -223,7 +227,7 @@ const getAllArtists = async (req, res) => {
         res.status(200).json(result);
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get all artists');
+        (0, handle_utils_1.handleError)(res, error, "Get all artists");
     }
 };
 exports.getAllArtists = getAllArtists;
@@ -234,11 +238,11 @@ const getArtistById = async (req, res) => {
         res.json(artist);
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'Artist not found') {
-            res.status(404).json({ message: 'Artist not found' });
+        if (error instanceof Error && error.message === "Artist not found") {
+            res.status(404).json({ message: "Artist not found" });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Get artist by id');
+        (0, handle_utils_1.handleError)(res, error, "Get artist by id");
     }
 };
 exports.getArtistById = getArtistById;
@@ -246,26 +250,26 @@ const createGenre = async (req, res) => {
     try {
         const { name } = req.body;
         const validationErrors = (0, handle_utils_1.runValidations)([
-            (0, handle_utils_1.validateField)(name, 'Name', { required: true }),
-            name && (0, handle_utils_1.validateField)(name.trim(), 'Name', { minLength: 1 }),
-            name && (0, handle_utils_1.validateField)(name, 'Name', { maxLength: 50 }),
+            (0, handle_utils_1.validateField)(name, "Name", { required: true }),
+            name && (0, handle_utils_1.validateField)(name.trim(), "Name", { minLength: 1 }),
+            name && (0, handle_utils_1.validateField)(name, "Name", { maxLength: 50 }),
         ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
-                .json({ message: 'Validation failed', errors: validationErrors });
+                .json({ message: "Validation failed", errors: validationErrors });
             return;
         }
         const genre = await adminService.createNewGenre(name);
-        res.status(201).json({ message: 'Genre created successfully', genre });
+        res.status(201).json({ message: "Genre created successfully", genre });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message === 'Genre name already exists') {
-            res.status(400).json({ message: 'Genre name already exists' });
+            error.message === "Genre name already exists") {
+            res.status(400).json({ message: "Genre name already exists" });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Create genre');
+        (0, handle_utils_1.handleError)(res, error, "Create genre");
     }
 };
 exports.createGenre = createGenre;
@@ -274,35 +278,35 @@ const updateGenre = async (req, res) => {
         const { id } = req.params;
         const { name } = req.body;
         const validationErrors = (0, handle_utils_1.runValidations)([
-            (0, handle_utils_1.validateField)(id, 'Genre ID', { required: true }),
-            (0, handle_utils_1.validateField)(name, 'Name', { required: true }),
-            name && (0, handle_utils_1.validateField)(name.trim(), 'Name', { minLength: 1 }),
-            name && (0, handle_utils_1.validateField)(name, 'Name', { maxLength: 50 }),
+            (0, handle_utils_1.validateField)(id, "Genre ID", { required: true }),
+            (0, handle_utils_1.validateField)(name, "Name", { required: true }),
+            name && (0, handle_utils_1.validateField)(name.trim(), "Name", { minLength: 1 }),
+            name && (0, handle_utils_1.validateField)(name, "Name", { maxLength: 50 }),
         ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
-                .json({ message: 'Validation failed', errors: validationErrors });
+                .json({ message: "Validation failed", errors: validationErrors });
             return;
         }
         const updatedGenre = await adminService.updateGenreInfo(id, name);
         res.json({
-            message: 'Genre updated successfully',
+            message: "Genre updated successfully",
             genre: updatedGenre,
         });
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message === 'Genre not found') {
-                res.status(404).json({ message: 'Genre not found' });
+            if (error.message === "Genre not found") {
+                res.status(404).json({ message: "Genre not found" });
                 return;
             }
-            else if (error.message === 'Genre name already exists') {
-                res.status(400).json({ message: 'Genre name already exists' });
+            else if (error.message === "Genre name already exists") {
+                res.status(400).json({ message: "Genre name already exists" });
                 return;
             }
         }
-        (0, handle_utils_1.handleError)(res, error, 'Update genre');
+        (0, handle_utils_1.handleError)(res, error, "Update genre");
     }
 };
 exports.updateGenre = updateGenre;
@@ -310,10 +314,10 @@ const deleteGenre = async (req, res) => {
     try {
         const { id } = req.params;
         await adminService.deleteGenreById(id);
-        res.json({ message: 'Genre deleted successfully' });
+        res.json({ message: "Genre deleted successfully" });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Delete genre');
+        (0, handle_utils_1.handleError)(res, error, "Delete genre");
     }
 };
 exports.deleteGenre = deleteGenre;
@@ -324,9 +328,9 @@ const approveArtistRequest = async (req, res) => {
         if (updatedProfile?.user?.id) {
             await db_1.default.notification.create({
                 data: {
-                    type: 'ARTIST_REQUEST_APPROVE',
-                    message: 'Your request to become an Artist has been approved!',
-                    recipientType: 'USER',
+                    type: "ARTIST_REQUEST_APPROVE",
+                    message: "Your request to become an Artist has been approved!",
+                    recipientType: "USER",
                     userId: updatedProfile.user.id,
                     isRead: false,
                 },
@@ -337,32 +341,32 @@ const approveArtistRequest = async (req, res) => {
         }
         if (updatedProfile?.user?.email) {
             try {
-                const emailOptions = emailService.createArtistRequestApprovedEmail(updatedProfile.user.email, updatedProfile.user.name || updatedProfile.user.username || 'User');
+                const emailOptions = emailService.createArtistRequestApprovedEmail(updatedProfile.user.email, updatedProfile.user.name || updatedProfile.user.username || "User");
                 await emailService.sendEmail(emailOptions);
                 console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
             }
             catch (emailError) {
-                console.error('Failed to send artist approval email:', emailError);
+                console.error("Failed to send artist approval email:", emailError);
             }
         }
         else {
-            console.warn(`Could not send approval email: No email found for user ${updatedProfile?.user?.id ?? 'unknown'}`);
+            console.warn(`Could not send approval email: No email found for user ${updatedProfile?.user?.id ?? "unknown"}`);
         }
         res.json({
-            message: 'Artist role approved successfully',
+            message: "Artist role approved successfully",
             user: updatedProfile.user,
-            hasPendingRequest: false
+            hasPendingRequest: false,
         });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message.includes('not found, already verified, or rejected')) {
-            res
-                .status(404)
-                .json({ message: 'Artist request not found, already verified, or rejected' });
+            error.message.includes("not found, already verified, or rejected")) {
+            res.status(404).json({
+                message: "Artist request not found, already verified, or rejected",
+            });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Approve artist request');
+        (0, handle_utils_1.handleError)(res, error, "Approve artist request");
     }
 };
 exports.approveArtistRequest = approveArtistRequest;
@@ -370,16 +374,16 @@ const rejectArtistRequest = async (req, res) => {
     try {
         const { requestId, reason } = req.body;
         const result = await adminService.rejectArtistRequest(requestId);
-        let notificationMessage = 'Your request to become an Artist has been rejected.';
-        if (reason && reason.trim() !== '') {
+        let notificationMessage = "Your request to become an Artist has been rejected.";
+        if (reason && reason.trim() !== "") {
             notificationMessage += ` Reason: ${reason.trim()}`;
         }
         if (result?.user?.id) {
             await db_1.default.notification.create({
                 data: {
-                    type: 'ARTIST_REQUEST_REJECT',
+                    type: "ARTIST_REQUEST_REJECT",
                     message: notificationMessage,
-                    recipientType: 'USER',
+                    recipientType: "USER",
                     userId: result.user.id,
                     isRead: false,
                 },
@@ -390,32 +394,32 @@ const rejectArtistRequest = async (req, res) => {
         }
         if (result?.user?.email) {
             try {
-                const emailOptions = emailService.createArtistRequestRejectedEmail(result.user.email, result.user.name || result.user.username || 'User', reason);
+                const emailOptions = emailService.createArtistRequestRejectedEmail(result.user.email, result.user.name || result.user.username || "User", reason);
                 await emailService.sendEmail(emailOptions);
                 console.log(`Artist rejection email sent to ${result.user.email}`);
             }
             catch (emailError) {
-                console.error('Failed to send artist rejection email:', emailError);
+                console.error("Failed to send artist rejection email:", emailError);
             }
         }
         else {
-            console.warn(`Could not send rejection email: No email found for user ${result?.user?.id ?? 'unknown'}`);
+            console.warn(`Could not send rejection email: No email found for user ${result?.user?.id ?? "unknown"}`);
         }
         res.json({
-            message: 'Artist role request rejected successfully',
+            message: "Artist role request rejected successfully",
             user: result.user,
-            hasPendingRequest: result.hasPendingRequest
+            hasPendingRequest: result.hasPendingRequest,
         });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message.includes('not found, already verified, or rejected')) {
-            res
-                .status(404)
-                .json({ message: 'Artist request not found, already verified, or rejected' });
+            error.message.includes("not found, already verified, or rejected")) {
+            res.status(404).json({
+                message: "Artist request not found, already verified, or rejected",
+            });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Reject artist request');
+        (0, handle_utils_1.handleError)(res, error, "Reject artist request");
     }
 };
 exports.rejectArtistRequest = rejectArtistRequest;
@@ -423,17 +427,17 @@ const deleteArtistRequest = async (req, res) => {
     try {
         const { id } = req.params;
         await adminService.deleteArtistRequest(id);
-        res.json({ message: 'Artist request deleted successfully' });
+        res.json({ message: "Artist request deleted successfully" });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message.includes('not found or already verified/rejected')) {
-            res
-                .status(404)
-                .json({ message: 'Artist request not found or already verified/rejected' });
+            error.message.includes("not found or already verified/rejected")) {
+            res.status(404).json({
+                message: "Artist request not found or already verified/rejected",
+            });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Delete artist request');
+        (0, handle_utils_1.handleError)(res, error, "Delete artist request");
     }
 };
 exports.deleteArtistRequest = deleteArtistRequest;
@@ -443,42 +447,42 @@ const getDashboardStats = async (req, res) => {
         res.json(statsData);
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get dashboard stats');
+        (0, handle_utils_1.handleError)(res, error, "Get dashboard stats");
     }
 };
 exports.getDashboardStats = getDashboardStats;
 const handleCacheStatus = async (req, res) => {
     try {
-        const { enabled } = req.method === 'POST' ? req.body : {};
+        const { enabled } = req.method === "POST" ? req.body : {};
         const result = await adminService.updateCacheStatus(enabled);
         res.json(result);
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Manage cache status');
+        (0, handle_utils_1.handleError)(res, error, "Manage cache status");
     }
 };
 exports.handleCacheStatus = handleCacheStatus;
 const handleAIModelStatus = async (req, res) => {
     try {
-        if (req.method === 'GET') {
+        if (req.method === "GET") {
             const aiStatus = await adminService.getAIModelStatus();
             res.json({ success: true, data: aiStatus });
         }
-        else if (req.method === 'POST') {
+        else if (req.method === "POST") {
             const { model } = req.body;
             const result = await adminService.updateAIModel(model);
             res.status(200).json({
                 success: true,
-                message: 'AI model settings updated successfully',
+                message: "AI model settings updated successfully",
                 data: result,
             });
         }
     }
     catch (error) {
-        console.error('Error updating AI model settings:', error);
+        console.error("Error updating AI model settings:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update AI model settings',
+            message: "Failed to update AI model settings",
             error: error instanceof Error ? error.message : String(error),
         });
     }
@@ -490,48 +494,49 @@ const getSystemStatus = async (req, res) => {
         res.json({ success: true, data: statuses });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get system status');
+        (0, handle_utils_1.handleError)(res, error, "Get system status");
     }
 };
 exports.getSystemStatus = getSystemStatus;
 const getAllArtistClaimRequests = async (req, res) => {
     try {
         if (!req.user || req.user.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            res.status(403).json({ message: "Forbidden: Admin access required." });
             return;
         }
         const { claimRequests, pagination } = await adminService.getArtistClaimRequests(req);
         res.json({ claimRequests, pagination });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get artist claim requests');
+        (0, handle_utils_1.handleError)(res, error, "Get artist claim requests");
     }
 };
 exports.getAllArtistClaimRequests = getAllArtistClaimRequests;
 const getArtistClaimRequestDetail = async (req, res) => {
     try {
         if (!req.user || req.user.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            res.status(403).json({ message: "Forbidden: Admin access required." });
             return;
         }
         const { id } = req.params;
         if (!id) {
-            res.status(400).json({ message: 'Claim Request ID is required.' });
+            res.status(400).json({ message: "Claim Request ID is required." });
             return;
         }
         const claimRequest = await adminService.getArtistClaimRequestDetail(id);
         res.json(claimRequest);
     }
     catch (error) {
-        if (error instanceof Error && error.message.includes('not found')) {
+        if (error instanceof Error && error.message.includes("not found")) {
             res.status(404).json({ message: error.message });
             return;
         }
-        if (error instanceof Error && error.message.includes('no longer available')) {
+        if (error instanceof Error &&
+            error.message.includes("no longer available")) {
             res.status(409).json({ message: error.message });
             return;
         }
-        (0, handle_utils_1.handleError)(res, error, 'Get artist claim request detail');
+        (0, handle_utils_1.handleError)(res, error, "Get artist claim request detail");
     }
 };
 exports.getArtistClaimRequestDetail = getArtistClaimRequestDetail;
@@ -539,12 +544,12 @@ const approveArtistClaimRequest = async (req, res) => {
     try {
         const adminUser = req.user;
         if (!adminUser || adminUser.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            res.status(403).json({ message: "Forbidden: Admin access required." });
             return;
         }
         const { id } = req.params;
         if (!id) {
-            res.status(400).json({ message: 'Claim Request ID is required.' });
+            res.status(400).json({ message: "Claim Request ID is required." });
             return;
         }
         const result = await adminService.approveArtistClaim(id, adminUser.id);
@@ -552,16 +557,17 @@ const approveArtistClaimRequest = async (req, res) => {
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message.includes('not found')) {
+            if (error.message.includes("not found")) {
                 res.status(404).json({ message: error.message });
                 return;
             }
-            if (error.message.includes('Cannot approve claim request') || error.message.includes('no longer available')) {
+            if (error.message.includes("Cannot approve claim request") ||
+                error.message.includes("no longer available")) {
                 res.status(409).json({ message: error.message });
                 return;
             }
         }
-        (0, handle_utils_1.handleError)(res, error, 'Approve artist claim request');
+        (0, handle_utils_1.handleError)(res, error, "Approve artist claim request");
     }
 };
 exports.approveArtistClaimRequest = approveArtistClaimRequest;
@@ -569,17 +575,17 @@ const rejectArtistClaimRequest = async (req, res) => {
     try {
         const adminUser = req.user;
         if (!adminUser || adminUser.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            res.status(403).json({ message: "Forbidden: Admin access required." });
             return;
         }
         const { id } = req.params;
         const { reason } = req.body;
         if (!id) {
-            res.status(400).json({ message: 'Claim Request ID is required.' });
+            res.status(400).json({ message: "Claim Request ID is required." });
             return;
         }
-        if (!reason || typeof reason !== 'string' || reason.trim() === '') {
-            res.status(400).json({ message: 'Rejection reason is required.' });
+        if (!reason || typeof reason !== "string" || reason.trim() === "") {
+            res.status(400).json({ message: "Rejection reason is required." });
             return;
         }
         const result = await adminService.rejectArtistClaim(id, adminUser.id, reason);
@@ -587,41 +593,150 @@ const rejectArtistClaimRequest = async (req, res) => {
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message.includes('not found')) {
+            if (error.message.includes("not found")) {
                 res.status(404).json({ message: error.message });
                 return;
             }
-            if (error.message.includes('Cannot reject claim request') || error.message.includes('Rejection reason is required')) {
+            if (error.message.includes("Cannot reject claim request") ||
+                error.message.includes("Rejection reason is required")) {
                 res.status(400).json({ message: error.message });
                 return;
             }
         }
-        (0, handle_utils_1.handleError)(res, error, 'Reject artist claim request');
+        (0, handle_utils_1.handleError)(res, error, "Reject artist claim request");
     }
 };
 exports.rejectArtistClaimRequest = rejectArtistClaimRequest;
 const bulkUploadTracks = async (req, res) => {
     try {
-        const files = req.files;
-        if (!files || files.length === 0) {
-            res.status(400).json({ message: 'No files uploaded' });
+        if (!req.files || req.files.length === 0) {
+            res.status(400).json({ message: "No files uploaded." });
             return;
         }
-        const createdTracks = await adminService.processBulkUpload(files);
-        const successfulUploads = createdTracks.filter(track => track.success).length;
-        res.status(201).json({
-            message: `Successfully processed ${successfulUploads} out of ${files.length} files`,
-            createdTracks,
-            stats: {
-                total: files.length,
-                successful: successfulUploads,
-                failed: files.length - successfulUploads
-            }
+        const files = req.files;
+        const results = await adminService.processBulkUpload(files);
+        res.status(200).json({
+            message: "Bulk upload process initiated.",
+            results,
         });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Bulk upload tracks');
+        (0, handle_utils_1.handleError)(res, error, "Bulk upload tracks");
     }
 };
 exports.bulkUploadTracks = bulkUploadTracks;
+const generateUserAiPlaylistHandler = async (req, res) => {
+    try {
+        const adminId = req.user?.id;
+        const { userId: targetUserId } = req.params;
+        if (!adminId) {
+            res.status(401).json({ message: "Unauthorized: Admin ID missing." });
+            return;
+        }
+        if (!targetUserId) {
+            res.status(400).json({ message: "Target User ID is required." });
+            return;
+        }
+        const playlist = await adminService.generateAndAssignAiPlaylistToUser(adminId, targetUserId);
+        res.status(201).json({
+            message: "AI Playlist generated successfully for user.",
+            playlist,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Generate AI Playlist for User");
+    }
+};
+exports.generateUserAiPlaylistHandler = generateUserAiPlaylistHandler;
+const updateAiPlaylistVisibilityHandler = async (req, res) => {
+    try {
+        const adminId = req.user?.id;
+        const { playlistId } = req.params;
+        const { newVisibility } = req.body;
+        if (!adminId) {
+            res.status(401).json({ message: "Unauthorized: Admin ID missing." });
+            return;
+        }
+        if (!playlistId) {
+            res.status(400).json({ message: "Playlist ID is required." });
+            return;
+        }
+        if (!newVisibility ||
+            (newVisibility !== "PUBLIC" && newVisibility !== "PRIVATE")) {
+            res.status(400).json({
+                message: "Invalid newVisibility value. Must be 'PUBLIC' or 'PRIVATE'.",
+            });
+            return;
+        }
+        const playlist = await adminService.setAiPlaylistVisibilityForUser(adminId, playlistId, newVisibility);
+        res.status(200).json({
+            message: `AI Playlist visibility updated to ${newVisibility}.`,
+            playlist,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Update AI Playlist Visibility");
+    }
+};
+exports.updateAiPlaylistVisibilityHandler = updateAiPlaylistVisibilityHandler;
+const getUserAiPlaylistsHandler = async (req, res) => {
+    try {
+        const adminId = req.user?.id;
+        const { userId: targetUserId } = req.params;
+        if (!adminId) {
+            res.status(401).json({ message: "Unauthorized: Admin ID missing." });
+            return;
+        }
+        if (!targetUserId) {
+            res.status(400).json({ message: "Target User ID is required." });
+            return;
+        }
+        const result = await adminService.getUserAiPlaylists(adminId, targetUserId, req);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Get User AI Playlists");
+    }
+};
+exports.getUserAiPlaylistsHandler = getUserAiPlaylistsHandler;
+const getUserListeningHistoryHandler = async (req, res) => {
+    try {
+        const adminId = req.user?.id;
+        const { userId: targetUserId } = req.params;
+        if (!adminId) {
+            res.status(401).json({ message: "Unauthorized: Admin ID missing." });
+            return;
+        }
+        if (!targetUserId) {
+            res.status(400).json({ message: "Target User ID is required." });
+            return;
+        }
+        const result = await adminService.getUserListeningHistoryDetails(adminId, targetUserId, req);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Get User Listening History");
+    }
+};
+exports.getUserListeningHistoryHandler = getUserListeningHistoryHandler;
+const reanalyzeTrackHandler = async (req, res) => {
+    try {
+        const { trackId } = req.params;
+        console.log(`[Admin Controller] Received request to re-analyze track: ${trackId}`);
+        if (!trackId) {
+            res.status(400).json({ message: "Track ID is required" });
+            return;
+        }
+        const updatedTrack = await trackService.reanalyzeTrackAudioFeatures(trackId);
+        res.json({
+            message: "Track audio features re-analyzed and updated successfully",
+            track: updatedTrack,
+        });
+    }
+    catch (error) {
+        console.error(`[Admin Controller] Error re-analyzing track ${req.params.trackId}:`, error);
+        (0, handle_utils_1.handleError)(res, error, "Re-analyze track");
+    }
+};
+exports.reanalyzeTrackHandler = reanalyzeTrackHandler;
 //# sourceMappingURL=admin.controller.js.map

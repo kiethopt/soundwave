@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Playlist } from "@/types";
-import { api } from "@/utils/api";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import { useTheme } from "@/contexts/ThemeContext";
 import Image from "next/image";
 import {
@@ -88,7 +87,6 @@ export function EditPlaylistDialog({
     }
   }, [open, playlist]);
 
-  const isFavorite = playlist.type === "FAVORITE";
   const canChangeImage = playlist.type === "NORMAL";
 
   const handleInputChange = (

@@ -23,12 +23,6 @@ import { useState, useEffect } from "react";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import Image from "next/image";
 
-// Define the names of playlists to filter out
-const filteredPlaylistNames = new Set([
-  "Welcome Mix",
-  "Favorites",
-]);
-
 interface AlbumTracksProps {
   tracks: Track[];
   onTrackPlay: (track: Track) => void;
@@ -407,10 +401,7 @@ export function AlbumTracks({
                           </DropdownMenuItem>
                         ) : (
                           playlists
-                            .filter(
-                              (playlist) =>
-                                playlist.type === 'NORMAL'
-                            )
+                            .filter((playlist) => playlist.type === "NORMAL")
                             .map((playlist) => (
                               <DropdownMenuItem
                                 key={playlist.id}

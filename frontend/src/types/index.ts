@@ -133,7 +133,7 @@ export interface UserFollow {
   followingType: "USER" | "ARTIST";
   createdAt: string;
   follower: User;
-  followingUser?: User; 
+  followingUser?: User;
   followingArtist?: ArtistProfile;
 }
 
@@ -283,12 +283,12 @@ export interface Track {
   playCount: number;
   type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
-  tempo?: number;
-  mood?: string;
-  key?: string;
-  scale?: string;
-  danceability?: number;
-  energy?: number;
+  tempo?: number | null;
+  mood?: string | null;
+  key?: string | null;
+  scale?: string | null;
+  danceability?: number | null;
+  energy?: number | null;
   createdAt: string;
   updatedAt: string;
   artistId: string;
@@ -354,7 +354,10 @@ export interface History {
 }
 
 // Define and export PlaylistPrivacy type
-export type PlaylistPrivacy = "PUBLIC" | "PRIVATE";
+export enum PlaylistPrivacy {
+  PUBLIC = "PUBLIC",
+  PRIVATE = "PRIVATE",
+}
 
 export interface Playlist {
   id: string;
@@ -549,7 +552,7 @@ export interface ArtistRequest {
   isVerified: boolean;
 }
 
-// --- NEW TYPE for Artist Claim Request --- 
+// --- NEW TYPE for Artist Claim Request ---
 export interface ArtistClaimRequest {
   id: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
@@ -574,8 +577,12 @@ export interface ArtistClaimRequest {
   } | null;
 }
 
-export type ReportType = 'COPYRIGHT_VIOLATION' | 'INAPPROPRIATE_CONTENT' | 'AI_GENERATION_ISSUE' | 'OTHER';
-export type ReportStatus = 'PENDING' | 'RESOLVED' | 'REJECTED';
+export type ReportType =
+  | "COPYRIGHT_VIOLATION"
+  | "INAPPROPRIATE_CONTENT"
+  | "AI_GENERATION_ISSUE"
+  | "OTHER";
+export type ReportStatus = "PENDING" | "RESOLVED" | "REJECTED";
 
 export interface Report {
   id: string;
@@ -586,7 +593,7 @@ export interface Report {
   updatedAt: string;
   resolvedAt?: string;
   resolution?: string;
-  
+
   reporter: {
     id: string;
     name?: string;
@@ -594,14 +601,14 @@ export interface Report {
     username?: string;
     avatar?: string;
   };
-  
+
   resolver?: {
     id: string;
     name?: string;
     username?: string;
     avatar?: string;
   };
-  
+
   track?: {
     id: string;
     title: string;
@@ -619,7 +626,7 @@ export interface Report {
     coverUrl?: string;
     isActive: boolean;
   };
-  
+
   playlist?: {
     id: string;
     name: string;
@@ -633,7 +640,7 @@ export interface Report {
       avatar?: string;
     };
   };
-  
+
   album?: {
     id: string;
     title: string;

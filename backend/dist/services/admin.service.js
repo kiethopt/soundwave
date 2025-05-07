@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -46,7 +46,6 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const email_service_1 = require("./email.service");
-const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
@@ -56,44 +55,46 @@ const upload_service_1 = require("./upload.service");
 const mm = __importStar(require("music-metadata"));
 const essentia_js_1 = require("essentia.js");
 const mpg123_decoder_1 = require("mpg123-decoder");
+const aiService = __importStar(require("./ai.service"));
+const errors_1 = require("../utils/errors");
 const VALID_GEMINI_MODELS = [
-    'gemini-2.5-flash-preview-04-17',
-    'gemini-2.5-pro-preview-03-25',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-pro',
+    "gemini-2.5-flash-preview-04-17",
+    "gemini-2.5-pro-preview-03-25",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
 ];
 const getUsers = async (req, requestingUser) => {
     const { search, status, sortBy, sortOrder } = req.query;
     const where = {
         id: { not: requestingUser.id },
     };
-    if (search && typeof search === 'string') {
+    if (search && typeof search === "string") {
         where.OR = [
-            { email: { contains: search, mode: 'insensitive' } },
-            { username: { contains: search, mode: 'insensitive' } },
-            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: "insensitive" } },
+            { username: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
         ];
     }
-    if (status && typeof status === 'string' && status !== 'ALL') {
-        where.isActive = status === 'true';
+    if (status && typeof status === "string" && status !== "ALL") {
+        where.isActive = status === "true";
     }
-    let orderBy = { createdAt: 'desc' };
+    let orderBy = { createdAt: "desc" };
     const validSortFields = [
-        'name',
-        'email',
-        'username',
-        'role',
-        'isActive',
-        'createdAt',
-        'lastLoginAt',
+        "name",
+        "email",
+        "username",
+        "role",
+        "isActive",
+        "createdAt",
+        "lastLoginAt",
     ];
     if (sortBy &&
-        typeof sortBy === 'string' &&
+        typeof sortBy === "string" &&
         validSortFields.includes(sortBy)) {
-        const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+        const direction = sortOrder === "asc" ? "asc" : "desc";
         orderBy = { [sortBy]: direction };
     }
     const options = {
@@ -114,7 +115,7 @@ const getUserById = async (id) => {
         select: prisma_selects_1.userSelect,
     });
     if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
     }
     return user;
 };
@@ -129,22 +130,22 @@ const getArtistRequests = async (req) => {
         isVerified: false,
         AND: [],
     };
-    if (typeof search === 'string' && search.trim()) {
+    if (typeof search === "string" && search.trim()) {
         const trimmedSearch = search.trim();
         if (Array.isArray(where.AND)) {
             where.AND.push({
                 OR: [
-                    { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
-                    { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+                    { artistName: { contains: trimmedSearch, mode: "insensitive" } },
+                    { user: { name: { contains: trimmedSearch, mode: "insensitive" } } },
                     {
-                        user: { email: { contains: trimmedSearch, mode: 'insensitive' } },
+                        user: { email: { contains: trimmedSearch, mode: "insensitive" } },
                     },
                 ],
             });
         }
     }
     const dateFilter = {};
-    if (typeof startDate === 'string' && startDate) {
+    if (typeof startDate === "string" && startDate) {
         try {
             const startOfDay = new Date(startDate);
             startOfDay.setUTCHours(0, 0, 0, 0);
@@ -154,7 +155,7 @@ const getArtistRequests = async (req) => {
             console.error("Invalid start date format:", startDate);
         }
     }
-    if (typeof endDate === 'string' && endDate) {
+    if (typeof endDate === "string" && endDate) {
         try {
             const endOfDay = new Date(endDate);
             endOfDay.setUTCHours(23, 59, 59, 999);
@@ -172,7 +173,7 @@ const getArtistRequests = async (req) => {
     const options = {
         where,
         select: prisma_selects_1.artistRequestSelect,
-        orderBy: { verificationRequestedAt: 'desc' },
+        orderBy: { verificationRequestedAt: "desc" },
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
     return {
@@ -190,13 +191,13 @@ const getArtistRequestDetail = async (id) => {
         request = await db_1.default.artistProfile.findFirst({
             where: {
                 userId: id,
-                verificationRequestedAt: { not: null }
+                verificationRequestedAt: { not: null },
             },
             select: prisma_selects_1.artistRequestDetailsSelect,
         });
     }
     if (!request) {
-        throw new Error('Request not found');
+        throw new Error("Request not found");
     }
     return request;
 };
@@ -205,12 +206,14 @@ const updateUserInfo = async (id, data, requestingUser) => {
     const { name, username, email, newPassword, isActive, reason } = data;
     const existingUser = await db_1.default.user.findUnique({ where: { id } });
     if (!existingUser) {
-        throw new Error('User not found');
+        throw new Error("User not found");
     }
     if (requestingUser.role !== client_1.Role.ADMIN && existingUser.role === client_1.Role.ADMIN) {
         throw new Error(`Permission denied: Cannot modify Admin users.`);
     }
-    if (requestingUser.role === client_1.Role.ADMIN && requestingUser.id !== id && existingUser.role === client_1.Role.ADMIN) {
+    if (requestingUser.role === client_1.Role.ADMIN &&
+        requestingUser.id !== id &&
+        existingUser.role === client_1.Role.ADMIN) {
         throw new Error(`Permission denied: Admins cannot modify other Admin users.`);
     }
     const updateData = {};
@@ -218,21 +221,25 @@ const updateUserInfo = async (id, data, requestingUser) => {
         updateData.name = name;
     }
     if (email !== undefined && email !== existingUser.email) {
-        const existingEmail = await db_1.default.user.findFirst({ where: { email, NOT: { id } } });
+        const existingEmail = await db_1.default.user.findFirst({
+            where: { email, NOT: { id } },
+        });
         if (existingEmail)
-            throw new Error('Email already exists');
+            throw new Error("Email already exists");
         updateData.email = email;
     }
     if (username !== undefined && username !== existingUser.username) {
-        const existingUsername = await db_1.default.user.findFirst({ where: { username, NOT: { id } } });
+        const existingUsername = await db_1.default.user.findFirst({
+            where: { username, NOT: { id } },
+        });
         if (existingUsername)
-            throw new Error('Username already exists');
+            throw new Error("Username already exists");
         updateData.username = username;
     }
     if (isActive !== undefined) {
         const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
         if (isActiveBool === undefined) {
-            throw new Error('Invalid value for isActive status');
+            throw new Error("Invalid value for isActive status");
         }
         if (requestingUser.id === id && !isActiveBool) {
             throw new Error("Permission denied: Cannot deactivate your own account.");
@@ -241,7 +248,7 @@ const updateUserInfo = async (id, data, requestingUser) => {
     }
     if (newPassword) {
         if (newPassword.length < 6) {
-            throw new Error('Password must be at least 6 characters long.');
+            throw new Error("Password must be at least 6 characters long.");
         }
         updateData.password = await bcrypt_1.default.hash(newPassword, 10);
     }
@@ -253,45 +260,54 @@ const updateUserInfo = async (id, data, requestingUser) => {
         data: updateData,
         select: prisma_selects_1.userSelect,
     });
-    if (updateData.isActive !== undefined && updateData.isActive !== existingUser.isActive) {
-        const userName = updatedUser.name || updatedUser.username || 'User';
+    if (updateData.isActive !== undefined &&
+        updateData.isActive !== existingUser.isActive) {
+        const userName = updatedUser.name || updatedUser.username || "User";
         if (updatedUser.isActive === false) {
-            db_1.default.notification.create({
+            db_1.default.notification
+                .create({
                 data: {
-                    type: 'ACCOUNT_DEACTIVATED',
-                    message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
-                    recipientType: 'USER',
+                    type: "ACCOUNT_DEACTIVATED",
+                    message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ""}`,
+                    recipientType: "USER",
                     userId: id,
                     isRead: false,
                 },
-            }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
+            })
+                .catch((err) => console.error("[Async Notify Error] Failed to create deactivation notification:", err));
             if (updatedUser.email) {
                 try {
-                    const emailOptions = emailService.createAccountDeactivatedEmail(updatedUser.email, userName, 'user', reason);
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
+                    const emailOptions = emailService.createAccountDeactivatedEmail(updatedUser.email, userName, "user", reason);
+                    emailService
+                        .sendEmail(emailOptions)
+                        .catch((err) => console.error("[Async Email Error] Failed to send deactivation email:", err));
                 }
                 catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
+                    console.error("[Email Setup Error] Failed to create deactivation email options:", syncError);
                 }
             }
         }
         else if (updatedUser.isActive === true) {
-            db_1.default.notification.create({
+            db_1.default.notification
+                .create({
                 data: {
-                    type: 'ACCOUNT_ACTIVATED',
-                    message: 'Your account has been reactivated.',
-                    recipientType: 'USER',
+                    type: "ACCOUNT_ACTIVATED",
+                    message: "Your account has been reactivated.",
+                    recipientType: "USER",
                     userId: id,
                     isRead: false,
                 },
-            }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
+            })
+                .catch((err) => console.error("[Async Notify Error] Failed to create activation notification:", err));
             if (updatedUser.email) {
                 try {
-                    const emailOptions = emailService.createAccountActivatedEmail(updatedUser.email, userName, 'user');
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
+                    const emailOptions = emailService.createAccountActivatedEmail(updatedUser.email, userName, "user");
+                    emailService
+                        .sendEmail(emailOptions)
+                        .catch((err) => console.error("[Async Email Error] Failed to send activation email:", err));
                 }
                 catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create activation email options:', syncError);
+                    console.error("[Email Setup Error] Failed to create activation email options:", syncError);
                 }
             }
         }
@@ -308,26 +324,26 @@ const updateArtistInfo = async (id, data) => {
             artistName: true,
             isActive: true,
             userId: true,
-            user: { select: { id: true, email: true, name: true, username: true } }
-        }
+            user: { select: { id: true, email: true, name: true, username: true } },
+        },
     });
     if (!existingArtist) {
-        throw new Error('Artist not found');
+        throw new Error("Artist not found");
     }
     const validationErrors = [];
     if (artistName !== undefined) {
         if (artistName.length < 3) {
-            validationErrors.push('Artist name must be at least 3 characters');
+            validationErrors.push("Artist name must be at least 3 characters");
         }
         if (artistName.length > 100) {
-            validationErrors.push('Artist name cannot exceed 100 characters');
+            validationErrors.push("Artist name cannot exceed 100 characters");
         }
     }
     if (bio !== undefined && bio.length > 1000) {
-        validationErrors.push('Biography cannot exceed 1000 characters');
+        validationErrors.push("Biography cannot exceed 1000 characters");
     }
     if (validationErrors.length > 0) {
-        throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+        throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
     }
     let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
@@ -338,7 +354,7 @@ const updateArtistInfo = async (id, data) => {
             },
         });
         if (nameExists) {
-            throw new Error('Artist name already exists');
+            throw new Error("Artist name already exists");
         }
         validatedArtistName = artistName;
     }
@@ -352,62 +368,71 @@ const updateArtistInfo = async (id, data) => {
     if (isActive !== undefined) {
         const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
         if (isActiveBool === undefined) {
-            throw new Error('Invalid value for isActive status');
+            throw new Error("Invalid value for isActive status");
         }
         updateData.isActive = isActiveBool;
     }
     if (Object.keys(updateData).length === 0) {
-        throw new Error('No valid data provided for update');
+        throw new Error("No valid data provided for update");
     }
     const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
         data: updateData,
         select: prisma_selects_1.artistProfileSelect,
     });
-    if (isActive !== undefined && existingArtist.isActive !== updatedArtist.isActive) {
+    if (isActive !== undefined &&
+        existingArtist.isActive !== updatedArtist.isActive) {
         const ownerUser = existingArtist.user;
-        const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
+        const ownerUserName = ownerUser?.name || ownerUser?.username || "Artist";
         if (updatedArtist.isActive === false) {
             if (ownerUser?.id) {
-                db_1.default.notification.create({
+                db_1.default.notification
+                    .create({
                     data: {
-                        type: 'ACCOUNT_DEACTIVATED',
-                        message: `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
-                        recipientType: 'USER',
+                        type: "ACCOUNT_DEACTIVATED",
+                        message: `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ""}`,
+                        recipientType: "USER",
                         userId: ownerUser.id,
                         isRead: false,
                     },
-                }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
+                })
+                    .catch((err) => console.error("[Async Notify Error] Failed to create artist deactivation notification:", err));
             }
             if (ownerUser?.email) {
                 try {
-                    const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, 'artist', reason);
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
+                    const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, "artist", reason);
+                    emailService
+                        .sendEmail(emailOptions)
+                        .catch((err) => console.error("[Async Email Error] Failed to send artist deactivation email:", err));
                 }
                 catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
+                    console.error("[Email Setup Error] Failed to create artist deactivation email options:", syncError);
                 }
             }
         }
         else if (updatedArtist.isActive === true) {
             if (ownerUser?.id) {
-                db_1.default.notification.create({
+                db_1.default.notification
+                    .create({
                     data: {
-                        type: 'ACCOUNT_ACTIVATED',
-                        message: 'Your artist account has been reactivated.',
-                        recipientType: 'USER',
+                        type: "ACCOUNT_ACTIVATED",
+                        message: "Your artist account has been reactivated.",
+                        recipientType: "USER",
                         userId: ownerUser.id,
                         isRead: false,
                     },
-                }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
+                })
+                    .catch((err) => console.error("[Async Notify Error] Failed to create artist activation notification:", err));
             }
             if (ownerUser?.email) {
                 try {
-                    const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, 'artist');
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
+                    const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, "artist");
+                    emailService
+                        .sendEmail(emailOptions)
+                        .catch((err) => console.error("[Async Email Error] Failed to send artist activation email:", err));
                 }
                 catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
+                    console.error("[Email Setup Error] Failed to create artist activation email options:", syncError);
                 }
             }
         }
@@ -421,29 +446,33 @@ const deleteUserById = async (id, requestingUser, reason) => {
         select: { role: true, email: true, name: true, username: true },
     });
     if (!userToDelete) {
-        throw new Error('User not found');
+        throw new Error("User not found");
     }
     if (!requestingUser || !requestingUser.role) {
-        throw new Error('Permission denied: Invalid requesting user data.');
+        throw new Error("Permission denied: Invalid requesting user data.");
     }
     if (userToDelete.role === client_1.Role.ADMIN) {
         if (requestingUser.id === id) {
-            throw new Error('Permission denied: Admins cannot delete themselves.');
+            throw new Error("Permission denied: Admins cannot delete themselves.");
         }
-        throw new Error('Permission denied: Admins cannot delete other admins.');
+        throw new Error("Permission denied: Admins cannot delete other admins.");
     }
     if (userToDelete.email) {
         try {
-            const userName = userToDelete.name || userToDelete.username || 'User';
+            const userName = userToDelete.name || userToDelete.username || "User";
             const emailOptions = emailService.createAccountDeletedEmail(userToDelete.email, userName, reason);
-            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send account deletion email:', err));
+            emailService
+                .sendEmail(emailOptions)
+                .catch((err) => console.error("[Async Email Error] Failed to send account deletion email:", err));
         }
         catch (syncError) {
-            console.error('[Email Setup Error] Failed to create deletion email options:', syncError);
+            console.error("[Email Setup Error] Failed to create deletion email options:", syncError);
         }
     }
     await db_1.default.user.delete({ where: { id } });
-    return { message: `User ${id} deleted successfully. Reason: ${reason || 'No reason provided'}` };
+    return {
+        message: `User ${id} deleted successfully. Reason: ${reason || "No reason provided"}`,
+    };
 };
 exports.deleteUserById = deleteUserById;
 const deleteArtistById = async (id, reason) => {
@@ -457,27 +486,34 @@ const deleteArtistById = async (id, reason) => {
                     id: true,
                     email: true,
                     name: true,
-                    username: true
-                }
-            }
-        }
+                    username: true,
+                },
+            },
+        },
     });
     if (!artistToDelete) {
-        throw new Error('Artist not found');
+        throw new Error("Artist not found");
     }
     const associatedUser = artistToDelete.user;
     if (associatedUser && associatedUser.email) {
         try {
-            const nameToSend = artistToDelete.artistName || associatedUser.name || associatedUser.username || 'Artist';
+            const nameToSend = artistToDelete.artistName ||
+                associatedUser.name ||
+                associatedUser.username ||
+                "Artist";
             const emailOptions = emailService.createAccountDeletedEmail(associatedUser.email, nameToSend, reason);
-            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist account deletion email:', err));
+            emailService
+                .sendEmail(emailOptions)
+                .catch((err) => console.error("[Async Email Error] Failed to send artist account deletion email:", err));
         }
         catch (syncError) {
-            console.error('[Email Setup Error] Failed to create artist deletion email options:', syncError);
+            console.error("[Email Setup Error] Failed to create artist deletion email options:", syncError);
         }
     }
     await db_1.default.artistProfile.delete({ where: { id: artistToDelete.id } });
-    return { message: `Artist ${id} deleted permanently. Reason: ${reason || 'No reason provided'}` };
+    return {
+        message: `Artist ${id} deleted permanently. Reason: ${reason || "No reason provided"}`,
+    };
 };
 exports.deleteArtistById = deleteArtistById;
 const getArtists = async (req) => {
@@ -485,29 +521,29 @@ const getArtists = async (req) => {
     const where = {
         role: client_1.Role.ARTIST,
     };
-    if (search && typeof search === 'string') {
+    if (search && typeof search === "string") {
         where.OR = [
-            { artistName: { contains: search, mode: 'insensitive' } },
-            { user: { email: { contains: search, mode: 'insensitive' } } },
-            { user: { name: { contains: search, mode: 'insensitive' } } },
+            { artistName: { contains: search, mode: "insensitive" } },
+            { user: { email: { contains: search, mode: "insensitive" } } },
+            { user: { name: { contains: search, mode: "insensitive" } } },
         ];
     }
-    if (status && typeof status === 'string' && status !== 'ALL') {
-        where.isActive = status === 'true';
+    if (status && typeof status === "string" && status !== "ALL") {
+        where.isActive = status === "true";
     }
     let orderBy = {
-        createdAt: 'desc',
+        createdAt: "desc",
     };
     const validSortFields = [
-        'artistName',
-        'isActive',
-        'monthlyListeners',
-        'createdAt',
+        "artistName",
+        "isActive",
+        "monthlyListeners",
+        "createdAt",
     ];
     if (sortBy &&
-        typeof sortBy === 'string' &&
+        typeof sortBy === "string" &&
         validSortFields.includes(sortBy)) {
-        const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+        const direction = sortOrder === "asc" ? "asc" : "desc";
         orderBy = { [sortBy]: direction };
     }
     const options = {
@@ -528,39 +564,39 @@ const getArtistById = async (id) => {
         select: {
             ...prisma_selects_1.artistProfileSelect,
             albums: {
-                orderBy: { releaseDate: 'desc' },
+                orderBy: { releaseDate: "desc" },
                 select: prisma_selects_1.artistProfileSelect.albums.select,
             },
             tracks: {
                 where: {
-                    type: 'SINGLE',
+                    type: "SINGLE",
                     albumId: null,
                 },
-                orderBy: { releaseDate: 'desc' },
+                orderBy: { releaseDate: "desc" },
                 select: prisma_selects_1.artistProfileSelect.tracks.select,
             },
         },
     });
     if (!artist) {
-        throw new Error('Artist not found');
+        throw new Error("Artist not found");
     }
     return artist;
 };
 exports.getArtistById = getArtistById;
 const getGenres = async (req) => {
-    const { search = '' } = req.query;
+    const { search = "" } = req.query;
     const where = search
         ? {
             name: {
                 contains: String(search),
-                mode: 'insensitive',
+                mode: "insensitive",
             },
         }
         : {};
     const options = {
         where,
         select: prisma_selects_1.genreSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.genre, req, options);
     return {
@@ -571,10 +607,10 @@ const getGenres = async (req) => {
 exports.getGenres = getGenres;
 const createNewGenre = async (name) => {
     const existingGenre = await db_1.default.genre.findFirst({
-        where: { name: { equals: name, mode: 'insensitive' } },
+        where: { name: { equals: name, mode: "insensitive" } },
     });
     if (existingGenre) {
-        throw new Error('Genre name already exists');
+        throw new Error("Genre name already exists");
     }
     return db_1.default.genre.create({
         data: { name },
@@ -586,17 +622,17 @@ const updateGenreInfo = async (id, name) => {
         where: { id },
     });
     if (!existingGenre) {
-        throw new Error('Genre not found');
+        throw new Error("Genre not found");
     }
     if (name.toLowerCase() !== existingGenre.name.toLowerCase()) {
         const existingGenreWithName = await db_1.default.genre.findFirst({
             where: {
-                name: { equals: name, mode: 'insensitive' },
-                NOT: { id }
+                name: { equals: name, mode: "insensitive" },
+                NOT: { id },
             },
         });
         if (existingGenreWithName) {
-            throw new Error('Genre name already exists');
+            throw new Error("Genre name already exists");
         }
     }
     return db_1.default.genre.update({
@@ -620,11 +656,11 @@ const approveArtistRequest = async (requestId) => {
             id: true,
             userId: true,
             requestedLabelName: true,
-            user: { select: { id: true, email: true, name: true, username: true } }
-        }
+            user: { select: { id: true, email: true, name: true, username: true } },
+        },
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found, already verified, or rejected.');
+        throw new Error("Artist request not found, already verified, or rejected.");
     }
     const requestedLabelName = artistProfile.requestedLabelName;
     const userForNotification = artistProfile.user;
@@ -638,7 +674,7 @@ const approveArtistRequest = async (requestId) => {
                 verificationRequestedAt: null,
                 requestedLabelName: null,
             },
-            select: { id: true }
+            select: { id: true },
         });
         let finalLabelId = null;
         if (requestedLabelName) {
@@ -646,7 +682,7 @@ const approveArtistRequest = async (requestId) => {
                 where: { name: requestedLabelName },
                 update: {},
                 create: { name: requestedLabelName },
-                select: { id: true }
+                select: { id: true },
             });
             finalLabelId = labelRecord.id;
         }
@@ -655,15 +691,15 @@ const approveArtistRequest = async (requestId) => {
                 where: { id: verifiedProfile.id },
                 data: {
                     labelId: finalLabelId,
-                }
+                },
             });
         }
         const finalProfile = await tx.artistProfile.findUnique({
             where: { id: verifiedProfile.id },
             include: {
                 user: { select: prisma_selects_1.userSelect },
-                label: true
-            }
+                label: true,
+            },
         });
         if (!finalProfile) {
             throw new Error("Failed to retrieve updated profile after transaction.");
@@ -671,22 +707,26 @@ const approveArtistRequest = async (requestId) => {
         return finalProfile;
     });
     if (userForNotification) {
-        db_1.default.notification.create({
+        db_1.default.notification
+            .create({
             data: {
-                type: 'ARTIST_REQUEST_APPROVE',
-                message: 'Your request to become an Artist has been approved!',
-                recipientType: 'USER',
+                type: "ARTIST_REQUEST_APPROVE",
+                message: "Your request to become an Artist has been approved!",
+                recipientType: "USER",
                 userId: userForNotification.id,
-                artistId: updatedProfile.id
+                artistId: updatedProfile.id,
             },
-        }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
+        })
+            .catch((err) => console.error("[Async Notify Error] Failed to create approval notification:", err));
         if (userForNotification.email) {
             try {
-                const emailOptions = emailService.createArtistRequestApprovedEmail(userForNotification.email, userForNotification.name || userForNotification.username || 'User');
-                emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send approval email:', err));
+                const emailOptions = emailService.createArtistRequestApprovedEmail(userForNotification.email, userForNotification.name || userForNotification.username || "User");
+                emailService
+                    .sendEmail(emailOptions)
+                    .catch((err) => console.error("[Async Email Error] Failed to send approval email:", err));
             }
             catch (syncError) {
-                console.error('[Email Setup Error] Failed to create approval email options:', syncError);
+                console.error("[Email Setup Error] Failed to create approval email options:", syncError);
             }
         }
         else {
@@ -694,11 +734,11 @@ const approveArtistRequest = async (requestId) => {
         }
     }
     else {
-        console.error('[Approve Request] User data missing for notification/email.');
+        console.error("[Approve Request] User data missing for notification/email.");
     }
     return {
         ...updatedProfile,
-        hasPendingRequest: false
+        hasPendingRequest: false,
     };
 };
 exports.approveArtistRequest = approveArtistRequest;
@@ -714,7 +754,7 @@ const rejectArtistRequest = async (requestId) => {
         },
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found, already verified, or rejected.');
+        throw new Error("Artist request not found, already verified, or rejected.");
     }
     await db_1.default.artistProfile.delete({
         where: { id: requestId },
@@ -733,7 +773,7 @@ const deleteArtistRequest = async (requestId) => {
         },
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found or not in a deletable state (e.g., approved).');
+        throw new Error("Artist request not found or not in a deletable state (e.g., approved).");
     }
     await db_1.default.artistProfile.delete({
         where: { id: requestId },
@@ -744,25 +784,46 @@ exports.deleteArtistRequest = deleteArtistRequest;
 const getDashboardStats = async () => {
     const coreStatsPromise = Promise.all([
         db_1.default.user.count({ where: { role: { not: client_1.Role.ADMIN } } }),
-        db_1.default.artistProfile.count({ where: { role: client_1.Role.ARTIST, isVerified: true } }),
-        db_1.default.artistProfile.count({ where: { verificationRequestedAt: { not: null }, isVerified: false } }),
+        db_1.default.artistProfile.count({
+            where: { role: client_1.Role.ARTIST, isVerified: true },
+        }),
+        db_1.default.artistProfile.count({
+            where: { verificationRequestedAt: { not: null }, isVerified: false },
+        }),
         db_1.default.artistProfile.findMany({
             where: { role: client_1.Role.ARTIST, isVerified: true },
-            orderBy: [{ monthlyListeners: 'desc' }],
+            orderBy: [{ monthlyListeners: "desc" }],
             take: 4,
-            select: { id: true, artistName: true, avatar: true, monthlyListeners: true },
+            select: {
+                id: true,
+                artistName: true,
+                avatar: true,
+                monthlyListeners: true,
+            },
         }),
         db_1.default.genre.count(),
         db_1.default.label.count(),
         db_1.default.album.count({ where: { isActive: true } }),
         db_1.default.track.count({ where: { isActive: true } }),
-        db_1.default.playlist.count({ where: { type: client_2.PlaylistType.SYSTEM, userId: null } }),
+        db_1.default.playlist.count({
+            where: { type: client_1.PlaylistType.SYSTEM, userId: null },
+        }),
     ]);
     const monthlyUserDataPromise = (async () => {
         const monthlyData = [];
         const allMonths = [
-            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
         ];
         const now = new Date();
         for (let i = 11; i >= 0; i--) {
@@ -807,120 +868,147 @@ const getSystemStatus = async () => {
     const statuses = [];
     try {
         await db_1.default.$queryRaw `SELECT 1`;
-        statuses.push({ name: 'Database (PostgreSQL)', status: 'Available' });
+        statuses.push({ name: "Database (PostgreSQL)", status: "Available" });
     }
     catch (error) {
-        console.error('[System Status] Database check failed:', error);
+        console.error("[System Status] Database check failed:", error);
         statuses.push({
-            name: 'Database (PostgreSQL)',
-            status: 'Outage',
-            message: error instanceof Error ? error.message : 'Unknown error',
+            name: "Database (PostgreSQL)",
+            status: "Outage",
+            message: error instanceof Error ? error.message : "Unknown error",
         });
     }
-    const useRedis = process.env.USE_REDIS_CACHE === 'true';
+    const useRedis = process.env.USE_REDIS_CACHE === "true";
     if (useRedis) {
-        if (cache_middleware_1.client && typeof cache_middleware_1.client.ping === 'function') {
+        if (cache_middleware_1.client && typeof cache_middleware_1.client.ping === "function") {
             try {
                 if (!cache_middleware_1.client.isOpen) {
-                    statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
+                    statuses.push({
+                        name: "Cache (Redis)",
+                        status: "Outage",
+                        message: "Client not connected",
+                    });
                 }
                 else {
                     await cache_middleware_1.client.ping();
-                    statuses.push({ name: 'Cache (Redis)', status: 'Available' });
+                    statuses.push({ name: "Cache (Redis)", status: "Available" });
                 }
             }
             catch (error) {
-                console.error('[System Status] Redis ping failed:', error);
+                console.error("[System Status] Redis ping failed:", error);
                 statuses.push({
-                    name: 'Cache (Redis)',
-                    status: 'Issue',
-                    message: error instanceof Error ? error.message : 'Ping failed',
+                    name: "Cache (Redis)",
+                    status: "Issue",
+                    message: error instanceof Error ? error.message : "Ping failed",
                 });
             }
         }
         else {
-            console.warn('[System Status] Redis client seems uninitialized or mock.');
+            console.warn("[System Status] Redis client seems uninitialized or mock.");
             statuses.push({
-                name: 'Cache (Redis)',
-                status: 'Issue',
-                message: 'Redis client not properly initialized or is a mock.',
+                name: "Cache (Redis)",
+                status: "Issue",
+                message: "Redis client not properly initialized or is a mock.",
             });
         }
     }
     else {
-        statuses.push({ name: 'Cache (Redis)', status: 'Disabled', message: 'USE_REDIS_CACHE is false' });
+        statuses.push({
+            name: "Cache (Redis)",
+            status: "Disabled",
+            message: "USE_REDIS_CACHE is false",
+        });
     }
     try {
-        const cloudinary = (await Promise.resolve().then(() => __importStar(require('cloudinary')))).v2;
+        const cloudinary = (await Promise.resolve().then(() => __importStar(require("cloudinary")))).v2;
         const pingResult = await cloudinary.api.ping();
-        if (pingResult?.status === 'ok') {
-            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Available' });
+        if (pingResult?.status === "ok") {
+            statuses.push({
+                name: "Cloudinary (Media Storage)",
+                status: "Available",
+            });
         }
         else {
-            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: `Ping failed or unexpected status: ${pingResult?.status}` });
+            statuses.push({
+                name: "Cloudinary (Media Storage)",
+                status: "Issue",
+                message: `Ping failed or unexpected status: ${pingResult?.status}`,
+            });
         }
     }
     catch (error) {
-        console.error('[System Status] Cloudinary check failed:', error);
+        console.error("[System Status] Cloudinary check failed:", error);
         statuses.push({
-            name: 'Cloudinary (Media Storage)',
-            status: 'Outage',
-            message: error instanceof Error ? error.message : 'Connection or Auth failed',
+            name: "Cloudinary (Media Storage)",
+            status: "Outage",
+            message: error instanceof Error ? error.message : "Connection or Auth failed",
         });
     }
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (geminiApiKey) {
         try {
-            const { GoogleGenerativeAI } = await Promise.resolve().then(() => __importStar(require('@google/generative-ai')));
+            const { GoogleGenerativeAI } = await Promise.resolve().then(() => __importStar(require("@google/generative-ai")));
             const genAI = new GoogleGenerativeAI(geminiApiKey);
-            const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+            const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
             const model = genAI.getGenerativeModel({ model: modelName });
             await model.countTokens("test");
-            statuses.push({ name: 'Gemini AI (Playlists)', status: 'Available', message: `API Key valid. Configured model: ${modelName}` });
-        }
-        catch (error) {
-            console.error('[System Status] Gemini AI check failed:', error);
             statuses.push({
-                name: 'Gemini AI (Playlists)',
-                status: 'Issue',
-                message: error.message || 'Failed to initialize or connect to Gemini',
+                name: "Gemini AI (Playlists)",
+                status: "Available",
+                message: `API Key valid. Configured model: ${modelName}`,
             });
         }
-    }
-    else {
-        statuses.push({ name: 'Gemini AI (Playlists)', status: 'Disabled', message: 'GEMINI_API_KEY not set' });
-    }
-    if (email_service_1.transporter) {
-        try {
-            const verified = await email_service_1.transporter.verify();
-            if (verified) {
-                statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
-            }
-            else {
-                statuses.push({ name: 'Email (Nodemailer)', status: 'Issue', message: 'Verification returned false' });
-            }
-        }
         catch (error) {
-            console.error('[System Status] Nodemailer verification failed:', error);
+            console.error("[System Status] Gemini AI check failed:", error);
             statuses.push({
-                name: 'Email (Nodemailer)',
-                status: 'Outage',
-                message: error.message || 'Verification failed',
+                name: "Gemini AI (Playlists)",
+                status: "Issue",
+                message: error.message || "Failed to initialize or connect to Gemini",
             });
         }
     }
     else {
         statuses.push({
-            name: 'Email (Nodemailer)',
-            status: 'Disabled',
-            message: 'SMTP configuration incomplete or transporter not initialized',
+            name: "Gemini AI (Playlists)",
+            status: "Disabled",
+            message: "GEMINI_API_KEY not set",
+        });
+    }
+    if (email_service_1.transporter) {
+        try {
+            const verified = await email_service_1.transporter.verify();
+            if (verified) {
+                statuses.push({ name: "Email (Nodemailer)", status: "Available" });
+            }
+            else {
+                statuses.push({
+                    name: "Email (Nodemailer)",
+                    status: "Issue",
+                    message: "Verification returned false",
+                });
+            }
+        }
+        catch (error) {
+            console.error("[System Status] Nodemailer verification failed:", error);
+            statuses.push({
+                name: "Email (Nodemailer)",
+                status: "Outage",
+                message: error.message || "Verification failed",
+            });
+        }
+    }
+    else {
+        statuses.push({
+            name: "Email (Nodemailer)",
+            status: "Disabled",
+            message: "SMTP configuration incomplete or transporter not initialized",
         });
     }
     return statuses;
 };
 exports.getSystemStatus = getSystemStatus;
 const getCacheStatus = async () => {
-    const useCache = process.env.USE_REDIS_CACHE === 'true';
+    const useCache = process.env.USE_REDIS_CACHE === "true";
     let redisConnected = false;
     if (cache_middleware_1.client && cache_middleware_1.client.isOpen) {
         try {
@@ -936,7 +1024,7 @@ const getCacheStatus = async () => {
 };
 exports.getCacheStatus = getCacheStatus;
 const getAIModelStatus = async () => {
-    const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const currentModel = process.env.GEMINI_MODEL || "gemini-2.0-flash";
     return {
         model: currentModel,
         validModels: VALID_GEMINI_MODELS,
@@ -945,22 +1033,22 @@ const getAIModelStatus = async () => {
 exports.getAIModelStatus = getAIModelStatus;
 const updateCacheStatus = async (enabled) => {
     try {
-        const envPath = process.env.NODE_ENV === 'production'
-            ? path.resolve(process.cwd(), '../.env')
-            : path.resolve(process.cwd(), '.env');
+        const envPath = process.env.NODE_ENV === "production"
+            ? path.resolve(process.cwd(), "../.env")
+            : path.resolve(process.cwd(), ".env");
         if (!fs.existsSync(envPath)) {
             console.error(`.env file not found at ${envPath}`);
-            throw new Error('Environment file not found.');
+            throw new Error("Environment file not found.");
         }
-        const currentStatus = process.env.USE_REDIS_CACHE === 'true';
+        const currentStatus = process.env.USE_REDIS_CACHE === "true";
         if (enabled === undefined) {
             return { enabled: currentStatus };
         }
         if (enabled === currentStatus) {
-            console.log(`[Redis] Cache status already ${enabled ? 'enabled' : 'disabled'}. No change needed.`);
+            console.log(`[Redis] Cache status already ${enabled ? "enabled" : "disabled"}. No change needed.`);
             return { enabled };
         }
-        let envContent = fs.readFileSync(envPath, 'utf8');
+        let envContent = fs.readFileSync(envPath, "utf8");
         const regex = /USE_REDIS_CACHE=.*/;
         const newLine = `USE_REDIS_CACHE=${enabled}`;
         if (envContent.match(regex)) {
@@ -972,31 +1060,31 @@ ${newLine}`;
         }
         fs.writeFileSync(envPath, envContent);
         process.env.USE_REDIS_CACHE = String(enabled);
-        console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}. Restart might be required for full effect.`);
-        const { client: dynamicRedisClient } = require('../middleware/cache.middleware');
+        console.log(`[Redis] Cache ${enabled ? "enabled" : "disabled"}. Restart might be required for full effect.`);
+        const { client: dynamicRedisClient, } = require("../middleware/cache.middleware");
         if (enabled && dynamicRedisClient && !dynamicRedisClient.isOpen) {
             try {
                 await dynamicRedisClient.connect();
-                console.log('[Redis] Connected successfully.');
+                console.log("[Redis] Connected successfully.");
             }
             catch (connectError) {
-                console.error('[Redis] Failed to connect after enabling:', connectError);
+                console.error("[Redis] Failed to connect after enabling:", connectError);
             }
         }
         else if (!enabled && dynamicRedisClient && dynamicRedisClient.isOpen) {
             try {
                 await dynamicRedisClient.disconnect();
-                console.log('[Redis] Disconnected successfully.');
+                console.log("[Redis] Disconnected successfully.");
             }
             catch (disconnectError) {
-                console.error('[Redis] Failed to disconnect after disabling:', disconnectError);
+                console.error("[Redis] Failed to disconnect after disabling:", disconnectError);
             }
         }
         return { enabled };
     }
     catch (error) {
-        console.error('Error updating cache status:', error);
-        const currentStatusAfterError = process.env.USE_REDIS_CACHE === 'true';
+        console.error("Error updating cache status:", error);
+        const currentStatusAfterError = process.env.USE_REDIS_CACHE === "true";
         throw new Error(`Failed to update cache status. Current status: ${currentStatusAfterError}`);
     }
 };
@@ -1004,20 +1092,20 @@ exports.updateCacheStatus = updateCacheStatus;
 const updateAIModel = async (model) => {
     try {
         const validModels = [
-            'gemini-2.5-flash-preview-04-17',
-            'gemini-2.5-pro-preview-03-25',
-            'gemini-2.0-flash',
-            'gemini-2.0-flash-lite',
-            'gemini-1.5-flash',
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-pro',
+            "gemini-2.5-flash-preview-04-17",
+            "gemini-2.5-pro-preview-03-25",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-pro",
         ];
-        const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        const currentModel = process.env.GEMINI_MODEL || "gemini-2.0-flash";
         const isEnabled = !!process.env.GEMINI_API_KEY;
         if (model === undefined) {
             return {
                 success: true,
-                message: 'Current AI model settings retrieved',
+                message: "Current AI model settings retrieved",
                 data: {
                     model: currentModel,
                     enabled: isEnabled,
@@ -1026,15 +1114,15 @@ const updateAIModel = async (model) => {
             };
         }
         if (!validModels.includes(model)) {
-            throw new Error(`Invalid model name. Valid models are: ${validModels.join(', ')}`);
+            throw new Error(`Invalid model name. Valid models are: ${validModels.join(", ")}`);
         }
-        const envPath = process.env.NODE_ENV === 'production'
-            ? path.resolve(process.cwd(), '../.env')
-            : path.resolve(process.cwd(), '.env');
+        const envPath = process.env.NODE_ENV === "production"
+            ? path.resolve(process.cwd(), "../.env")
+            : path.resolve(process.cwd(), ".env");
         if (!fs.existsSync(envPath)) {
             throw new Error(`.env file not found at ${envPath}`);
         }
-        let envContent = fs.readFileSync(envPath, 'utf8');
+        let envContent = fs.readFileSync(envPath, "utf8");
         const regex = /GEMINI_MODEL=.*/;
         const newLine = `GEMINI_MODEL=${model}`;
         if (envContent.match(regex)) {
@@ -1058,10 +1146,10 @@ ${newLine}`;
         };
     }
     catch (error) {
-        console.error('[Admin] Error updating AI model:', error);
+        console.error("[Admin] Error updating AI model:", error);
         return {
             success: false,
-            message: error instanceof Error ? error.message : 'Failed to update AI model',
+            message: error instanceof Error ? error.message : "Failed to update AI model",
             error: true,
         };
     }
@@ -1073,21 +1161,37 @@ const getArtistClaimRequests = async (req) => {
         status: client_1.ClaimStatus.PENDING,
         AND: [],
     };
-    if (typeof search === 'string' && search.trim()) {
+    if (typeof search === "string" && search.trim()) {
         const trimmedSearch = search.trim();
         if (Array.isArray(where.AND)) {
             where.AND.push({
                 OR: [
-                    { claimingUser: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
-                    { claimingUser: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
-                    { claimingUser: { username: { contains: trimmedSearch, mode: 'insensitive' } } },
-                    { artistProfile: { artistName: { contains: trimmedSearch, mode: 'insensitive' } } },
+                    {
+                        claimingUser: {
+                            name: { contains: trimmedSearch, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        claimingUser: {
+                            email: { contains: trimmedSearch, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        claimingUser: {
+                            username: { contains: trimmedSearch, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        artistProfile: {
+                            artistName: { contains: trimmedSearch, mode: "insensitive" },
+                        },
+                    },
                 ],
             });
         }
     }
     const dateFilter = {};
-    if (typeof startDate === 'string' && startDate) {
+    if (typeof startDate === "string" && startDate) {
         try {
             const startOfDay = new Date(startDate);
             startOfDay.setUTCHours(0, 0, 0, 0);
@@ -1097,7 +1201,7 @@ const getArtistClaimRequests = async (req) => {
             console.error("Invalid start date format:", startDate);
         }
     }
-    if (typeof endDate === 'string' && endDate) {
+    if (typeof endDate === "string" && endDate) {
         try {
             const endOfDay = new Date(endDate);
             endOfDay.setUTCHours(23, 59, 59, 999);
@@ -1115,7 +1219,7 @@ const getArtistClaimRequests = async (req) => {
     const options = {
         where,
         select: prisma_selects_1.artistClaimRequestSelect,
-        orderBy: { submittedAt: 'desc' },
+        orderBy: { submittedAt: "desc" },
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.artistClaimRequest, req, options);
     return {
@@ -1130,9 +1234,10 @@ const getArtistClaimRequestDetail = async (claimId) => {
         select: prisma_selects_1.artistClaimRequestDetailsSelect,
     });
     if (!claimRequest) {
-        throw new Error('Artist claim request not found.');
+        throw new Error("Artist claim request not found.");
     }
-    if (claimRequest.artistProfile.user?.id || claimRequest.artistProfile.isVerified) {
+    if (claimRequest.artistProfile.user?.id ||
+        claimRequest.artistProfile.isVerified) {
         if (claimRequest.status === client_1.ClaimStatus.PENDING) {
             console.warn(`Claim request ${claimId} is pending but target profile ${claimRequest.artistProfile.id} seems already claimed/verified.`);
         }
@@ -1148,26 +1253,29 @@ const approveArtistClaim = async (claimId, adminUserId) => {
             status: true,
             claimingUserId: true,
             artistProfileId: true,
-            artistProfile: { select: { userId: true, isVerified: true, artistName: true } }
-        }
+            artistProfile: {
+                select: { userId: true, isVerified: true, artistName: true },
+            },
+        },
     });
     if (!claimRequest) {
-        throw new Error('Artist claim request not found.');
+        throw new Error("Artist claim request not found.");
     }
     if (claimRequest.status !== client_1.ClaimStatus.PENDING) {
         throw new Error(`Cannot approve claim request with status: ${claimRequest.status}`);
     }
-    if (claimRequest.artistProfile.userId || claimRequest.artistProfile.isVerified) {
+    if (claimRequest.artistProfile.userId ||
+        claimRequest.artistProfile.isVerified) {
         await db_1.default.artistClaimRequest.update({
             where: { id: claimId },
             data: {
                 status: client_1.ClaimStatus.REJECTED,
-                rejectionReason: 'Profile became unavailable before approval.',
+                rejectionReason: "Profile became unavailable before approval.",
                 reviewedAt: new Date(),
-                reviewedByAdminId: adminUserId
-            }
+                reviewedByAdminId: adminUserId,
+            },
         });
-        throw new Error('Target artist profile is no longer available for claiming.');
+        throw new Error("Target artist profile is no longer available for claiming.");
     }
     return db_1.default.$transaction(async (tx) => {
         const updatedClaim = await tx.artistClaimRequest.update({
@@ -1178,7 +1286,7 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                 reviewedByAdminId: adminUserId,
                 rejectionReason: null,
             },
-            select: { id: true, claimingUserId: true, artistProfileId: true }
+            select: { id: true, claimingUserId: true, artistProfileId: true },
         });
         const updatedProfile = await tx.artistProfile.update({
             where: { id: updatedClaim.artistProfileId },
@@ -1190,7 +1298,7 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                 verificationRequestedAt: null,
                 requestedLabelName: null,
             },
-            select: { id: true, artistName: true }
+            select: { id: true, artistName: true },
         });
         await tx.artistClaimRequest.updateMany({
             where: {
@@ -1200,10 +1308,10 @@ const approveArtistClaim = async (claimId, adminUserId) => {
             },
             data: {
                 status: client_1.ClaimStatus.REJECTED,
-                rejectionReason: 'Another claim for this artist was approved.',
+                rejectionReason: "Another claim for this artist was approved.",
                 reviewedAt: new Date(),
                 reviewedByAdminId: adminUserId,
-            }
+            },
         });
         await tx.artistClaimRequest.updateMany({
             where: {
@@ -1213,10 +1321,10 @@ const approveArtistClaim = async (claimId, adminUserId) => {
             },
             data: {
                 status: client_1.ClaimStatus.REJECTED,
-                rejectionReason: 'You have been approved for another artist claim.',
+                rejectionReason: "You have been approved for another artist claim.",
                 reviewedAt: new Date(),
                 reviewedByAdminId: adminUserId,
-            }
+            },
         });
         try {
             const notificationData = {
@@ -1227,16 +1335,25 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                     userId: updatedClaim.claimingUserId,
                     artistId: updatedClaim.artistProfileId,
                     senderId: adminUserId,
-                    isRead: false
+                    isRead: false,
                 },
-                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+                select: {
+                    id: true,
+                    type: true,
+                    message: true,
+                    recipientType: true,
+                    isRead: true,
+                    createdAt: true,
+                    artistId: true,
+                    senderId: true,
+                },
             };
             const notification = await tx.notification.create(notificationData);
             const io = (0, socket_1.getIO)();
             const targetSocketId = (0, socket_2.getUserSockets)().get(updatedClaim.claimingUserId);
             if (targetSocketId) {
                 console.log(`[Socket Emit] Sending CLAIM_REQUEST_APPROVED notification to user ${updatedClaim.claimingUserId} via socket ${targetSocketId}`);
-                io.to(targetSocketId).emit('notification', {
+                io.to(targetSocketId).emit("notification", {
                     id: notification.id,
                     type: notification.type,
                     message: notification.message,
@@ -1244,7 +1361,7 @@ const approveArtistClaim = async (claimId, adminUserId) => {
                     isRead: notification.isRead,
                     createdAt: notification.createdAt.toISOString(),
                     artistId: notification.artistId,
-                    senderId: notification.senderId
+                    senderId: notification.senderId,
                 });
             }
             else {
@@ -1270,17 +1387,17 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
             id: true,
             status: true,
             claimingUserId: true,
-            artistProfile: { select: { id: true, artistName: true } }
-        }
+            artistProfile: { select: { id: true, artistName: true } },
+        },
     });
     if (!claimRequest) {
-        throw new Error('Artist claim request not found.');
+        throw new Error("Artist claim request not found.");
     }
     if (claimRequest.status !== client_1.ClaimStatus.PENDING) {
         throw new Error(`Cannot reject claim request with status: ${claimRequest.status}`);
     }
-    if (!reason || reason.trim() === '') {
-        throw new Error('Rejection reason is required.');
+    if (!reason || reason.trim() === "") {
+        throw new Error("Rejection reason is required.");
     }
     const rejectedClaim = await db_1.default.artistClaimRequest.update({
         where: { id: claimId },
@@ -1290,7 +1407,7 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
             reviewedAt: new Date(),
             reviewedByAdminId: adminUserId,
         },
-        select: { id: true, claimingUserId: true, artistProfileId: true }
+        select: { id: true, claimingUserId: true, artistProfileId: true },
     });
     if (rejectedClaim && claimRequest) {
         try {
@@ -1302,15 +1419,24 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
                     userId: rejectedClaim.claimingUserId,
                     artistId: rejectedClaim.artistProfileId,
                     senderId: adminUserId,
-                    isRead: false
+                    isRead: false,
                 },
-                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+                select: {
+                    id: true,
+                    type: true,
+                    message: true,
+                    recipientType: true,
+                    isRead: true,
+                    createdAt: true,
+                    artistId: true,
+                    senderId: true,
+                },
             });
             const io = (0, socket_1.getIO)();
             const targetSocketId = (0, socket_2.getUserSockets)().get(rejectedClaim.claimingUserId);
             if (targetSocketId) {
                 console.log(`[Socket Emit] Sending CLAIM_REQUEST_REJECTED notification to user ${rejectedClaim.claimingUserId} via socket ${targetSocketId}`);
-                io.to(targetSocketId).emit('notification', {
+                io.to(targetSocketId).emit("notification", {
                     id: notification.id,
                     type: notification.type,
                     message: notification.message,
@@ -1319,7 +1445,7 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
                     createdAt: notification.createdAt.toISOString(),
                     artistId: notification.artistId,
                     senderId: notification.senderId,
-                    rejectionReason: reason.trim()
+                    rejectionReason: reason.trim(),
                 });
             }
             else {
@@ -1331,9 +1457,9 @@ const rejectArtistClaim = async (claimId, adminUserId, reason) => {
         }
     }
     return {
-        message: 'Artist claim request rejected successfully.',
+        message: "Artist claim request rejected successfully.",
         claimId: rejectedClaim.id,
-        userId: rejectedClaim.claimingUserId
+        userId: rejectedClaim.claimingUserId,
     };
 };
 exports.rejectArtistClaim = rejectArtistClaim;
@@ -1345,7 +1471,7 @@ async function convertMp3BufferToPcmF32(audioBuffer) {
         const decoded = decoder.decode(uint8ArrayBuffer);
         decoder.free();
         if (decoded.errors.length > 0) {
-            console.error('MP3 Decoding errors:', decoded.errors);
+            console.error("MP3 Decoding errors:", decoded.errors);
             return null;
         }
         if (decoded.channelData.length > 1) {
@@ -1361,77 +1487,191 @@ async function convertMp3BufferToPcmF32(audioBuffer) {
             return decoded.channelData[0];
         }
         else {
-            console.error('MP3 Decoding produced no channel data.');
+            console.error("MP3 Decoding produced no channel data.");
             return null;
         }
     }
     catch (error) {
-        console.error('Error during MP3 decoding or processing:', error);
+        console.error("Error during MP3 decoding or processing:", error);
         return null;
     }
 }
-async function determineGenresFromAudioAnalysis(tempo, mood, key, scale) {
+async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy, danceability, duration, title, artistName) {
     const genres = await db_1.default.genre.findMany();
-    const genreMap = new Map(genres.map(g => [g.name.toLowerCase(), g.id]));
+    const genreMap = new Map(genres.map((g) => [g.name.toLowerCase(), g.id]));
     const selectedGenres = [];
-    if (tempo !== null) {
-        if (tempo >= 70 && tempo < 85) {
-            addGenreIfExists('hip hop', genreMap, selectedGenres);
-            addGenreIfExists('r&b', genreMap, selectedGenres);
-            addGenreIfExists('soul', genreMap, selectedGenres);
+    const safeEnergy = typeof energy === "number" ? energy : null;
+    const isVietnameseSong = (title &&
+        title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null) ||
+        (artistName &&
+            artistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null);
+    const isRemix = title && title.toLowerCase().includes("remix");
+    const isHouseRemix = isRemix && title.toLowerCase().includes("house");
+    const isVietnameseIndie = isVietnameseSong &&
+        tempo !== null &&
+        tempo >= 110 &&
+        tempo <= 125 &&
+        ((key === "C" && scale === "major") || mood === "Melancholic") &&
+        !isRemix;
+    if (isVietnameseIndie) {
+        console.log("Vietnamese indie pattern detected");
+        const indieId = genreMap.get("indie") || genreMap.get("indie pop");
+        if (indieId) {
+            selectedGenres.push(indieId);
+            console.log("Added: Indie (primary)");
         }
-        else if (tempo >= 85 && tempo < 100) {
-            addGenreIfExists('pop', genreMap, selectedGenres);
-            addGenreIfExists('soul', genreMap, selectedGenres);
-            addGenreIfExists('r&b', genreMap, selectedGenres);
+        const popId = genreMap.get("pop");
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log("Added: Pop (secondary)");
         }
-        else if (tempo >= 100 && tempo < 120) {
-            addGenreIfExists('pop', genreMap, selectedGenres);
-            addGenreIfExists('rock', genreMap, selectedGenres);
+        if (safeEnergy !== null && safeEnergy > 0.5) {
+            const rockId = genreMap.get("alternative") || genreMap.get("rock");
+            if (rockId && !selectedGenres.includes(rockId)) {
+                selectedGenres.push(rockId);
+                console.log("Added: Alternative/Rock (energetic Vietnamese indie)");
+            }
         }
-        else if (tempo >= 120 && tempo < 140) {
-            addGenreIfExists('dance', genreMap, selectedGenres);
-            addGenreIfExists('pop', genreMap, selectedGenres);
-            addGenreIfExists('house', genreMap, selectedGenres);
-            addGenreIfExists('electronic', genreMap, selectedGenres);
+        else {
+            const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+            if (vPopId && !selectedGenres.includes(vPopId)) {
+                selectedGenres.push(vPopId);
+                console.log("Added: V-Pop");
+            }
         }
-        else if (tempo >= 140) {
-            addGenreIfExists('electronic', genreMap, selectedGenres);
-            addGenreIfExists('drum and bass', genreMap, selectedGenres);
-            addGenreIfExists('edm', genreMap, selectedGenres);
-            addGenreIfExists('techno', genreMap, selectedGenres);
+        return selectedGenres.slice(0, 3);
+    }
+    if (isVietnameseSong && isHouseRemix) {
+        console.log("Vietnamese house remix detected");
+        const houseId = genreMap.get("house") ||
+            genreMap.get("electronic") ||
+            genreMap.get("dance");
+        if (houseId) {
+            selectedGenres.push(houseId);
+            console.log("Added: House/Electronic (primary for house remix)");
+        }
+        const danceId = genreMap.get("dance");
+        if (danceId && !selectedGenres.includes(danceId)) {
+            selectedGenres.push(danceId);
+            console.log("Added: Dance (secondary for house remix)");
+        }
+        const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+        if (vPopId && !selectedGenres.includes(vPopId)) {
+            selectedGenres.push(vPopId);
+            console.log("Added: V-Pop (Vietnamese origin)");
+        }
+        return selectedGenres.slice(0, 3);
+    }
+    if (isVietnameseSong && isRemix) {
+        console.log("Vietnamese remix detected");
+        const danceId = genreMap.get("dance") || genreMap.get("electronic");
+        if (danceId) {
+            selectedGenres.push(danceId);
+            console.log("Added: Dance/Electronic (Vietnamese remix)");
+        }
+        const popId = genreMap.get("pop");
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log("Added: Pop (remix base)");
+        }
+        const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+        if (vPopId && !selectedGenres.includes(vPopId)) {
+            selectedGenres.push(vPopId);
+            console.log("Added: V-Pop (Vietnamese origin)");
+        }
+        return selectedGenres.slice(0, 3);
+    }
+    if (isVietnameseSong) {
+        console.log("Vietnamese song detected");
+        const vPopId = genreMap.get("v-pop") ||
+            genreMap.get("vietnamese pop") ||
+            genreMap.get("pop");
+        if (vPopId) {
+            selectedGenres.push(vPopId);
+            console.log("Added: Vietnamese Pop");
+        }
+        if (tempo !== null && tempo >= 120 && scale === "major") {
+            const popId = genreMap.get("pop");
+            if (popId && !selectedGenres.includes(popId)) {
+                selectedGenres.push(popId);
+                console.log("Added: Pop (upbeat)");
+            }
+        }
+        if (mood === "Melancholic" || mood === "Calm") {
+            const balladId = genreMap.get("ballad");
+            if (balladId && !selectedGenres.includes(balladId)) {
+                selectedGenres.push(balladId);
+                console.log("Added: Ballad");
+            }
+            const indieId = genreMap.get("indie");
+            if (indieId && !selectedGenres.includes(indieId)) {
+                selectedGenres.push(indieId);
+                console.log("Added: Indie (melancholic)");
+            }
         }
     }
-    if (mood) {
-        if (mood.toLowerCase().includes('energetic')) {
-            addGenreIfExists('rock', genreMap, selectedGenres);
-            addGenreIfExists('electronic', genreMap, selectedGenres);
-            addGenreIfExists('dance', genreMap, selectedGenres);
+    if (tempo !== null && tempo >= 125) {
+        if (safeEnergy !== null && safeEnergy > 0.7) {
+            const edm = genreMap.get("electronic") || genreMap.get("edm");
+            const dance = genreMap.get("dance");
+            if (edm && !selectedGenres.includes(edm)) {
+                selectedGenres.push(edm);
+                console.log("Added: Electronic");
+            }
+            if (dance && !selectedGenres.includes(dance)) {
+                selectedGenres.push(dance);
+                console.log("Added: Dance");
+            }
         }
-        else if (mood.toLowerCase().includes('calm')) {
-            addGenreIfExists('ambient', genreMap, selectedGenres);
-            addGenreIfExists('classical', genreMap, selectedGenres);
-            addGenreIfExists('jazz', genreMap, selectedGenres);
-        }
-        else if (mood.toLowerCase().includes('neutral')) {
-            addGenreIfExists('pop', genreMap, selectedGenres);
-            addGenreIfExists('indie', genreMap, selectedGenres);
+        if (scale === "major") {
+            const popId = genreMap.get("pop");
+            if (popId && !selectedGenres.includes(popId)) {
+                selectedGenres.push(popId);
+                console.log("Added: Pop (high tempo)");
+            }
         }
     }
-    if (key && scale) {
-        if (scale.toLowerCase().includes('minor')) {
-            addGenreIfExists('rock', genreMap, selectedGenres);
-            addGenreIfExists('indie', genreMap, selectedGenres);
-            addGenreIfExists('alternative', genreMap, selectedGenres);
+    if (mood === "Energetic") {
+        const popId = genreMap.get("pop");
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log("Added: Pop (energetic)");
         }
-        else if (scale.toLowerCase().includes('major')) {
-            addGenreIfExists('pop', genreMap, selectedGenres);
-            addGenreIfExists('country', genreMap, selectedGenres);
-            addGenreIfExists('folk', genreMap, selectedGenres);
+        if (safeEnergy !== null && safeEnergy > 0.65 && !isVietnameseSong) {
+            const rockId = genreMap.get("rock");
+            if (rockId && !selectedGenres.includes(rockId)) {
+                selectedGenres.push(rockId);
+                console.log("Added: Rock (non-Vietnamese)");
+            }
+        }
+    }
+    if (mood === "Calm" || mood === "Melancholic") {
+        const ambientId = genreMap.get("ambient");
+        if (ambientId && !selectedGenres.includes(ambientId)) {
+            selectedGenres.push(ambientId);
+            console.log("Added: Ambient");
+        }
+        if (mood === "Melancholic") {
+            const indieId = genreMap.get("indie");
+            if (indieId && !selectedGenres.includes(indieId)) {
+                selectedGenres.push(indieId);
+                console.log("Added: Indie (melancholic)");
+            }
+        }
+    }
+    if (scale === "minor" && !isVietnameseSong) {
+        const altId = genreMap.get("alternative");
+        if (altId && !selectedGenres.includes(altId)) {
+            selectedGenres.push(altId);
+            console.log("Added: Alternative (minor key)");
         }
     }
     if (selectedGenres.length === 0) {
-        addGenreIfExists('pop', genreMap, selectedGenres);
+        const popId = genreMap.get("pop");
+        if (popId) {
+            selectedGenres.push(popId);
+            console.log("Added: Pop (default)");
+        }
     }
     return selectedGenres.slice(0, 3);
 }
@@ -1449,7 +1689,7 @@ async function generateCoverArtwork(trackTitle, artistName, mood) {
         return imageUrl;
     }
     catch (error) {
-        console.error('Error generating cover artwork with DiceBear:', error);
+        console.error("Error generating cover artwork with DiceBear:", error);
         return `https://placehold.co/500x500/EEE/31343C?text=${encodeURIComponent(trackTitle.substring(0, 15))}`;
     }
 }
@@ -1463,7 +1703,7 @@ async function getOrCreateVerifiedArtistProfile(artistNameOrId) {
             if (!existingProfile.isVerified) {
                 return await db_1.default.artistProfile.update({
                     where: { id: existingProfile.id },
-                    data: { isVerified: true }
+                    data: { isVerified: true },
                 });
             }
             return existingProfile;
@@ -1474,7 +1714,7 @@ async function getOrCreateVerifiedArtistProfile(artistNameOrId) {
         where: {
             artistName: {
                 equals: nameToSearch,
-                mode: 'insensitive',
+                mode: "insensitive",
             },
         },
     });
@@ -1482,7 +1722,7 @@ async function getOrCreateVerifiedArtistProfile(artistNameOrId) {
         if (!artistProfile.isVerified) {
             artistProfile = await db_1.default.artistProfile.update({
                 where: { id: artistProfile.id },
-                data: { isVerified: true }
+                data: { isVerified: true },
             });
         }
         return artistProfile;
@@ -1505,7 +1745,7 @@ const processBulkUpload = async (files) => {
     for (const file of files) {
         try {
             console.log(`Processing file: ${file.originalname}`);
-            const audioUploadResult = await (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+            const audioUploadResult = await (0, upload_service_1.uploadFile)(file.buffer, "tracks", "auto");
             const audioUrl = audioUploadResult.secure_url;
             let duration = 0;
             let title = file.originalname.replace(/\.[^/.]+$/, "");
@@ -1521,7 +1761,7 @@ const processBulkUpload = async (files) => {
                 }
             }
             catch (metadataError) {
-                console.error('Error parsing basic audio metadata:', metadataError);
+                console.error("Error parsing basic audio metadata:", metadataError);
             }
             let tempo = null;
             let mood = null;
@@ -1534,75 +1774,272 @@ const processBulkUpload = async (files) => {
                 if (pcmF32) {
                     const essentia = new essentia_js_1.Essentia(essentia_js_1.EssentiaWASM);
                     const audioVector = essentia.arrayToVector(pcmF32);
+                    console.log("PCM length:", pcmF32.length);
+                    const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+                    const sampleRate = metadata.format.sampleRate || 44100;
                     try {
-                        const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-                        tempo = Math.round(tempoResult.bpm);
+                        const rhythmResult = essentia.RhythmExtractor2013(audioVector, sampleRate);
+                        let rawTempo = rhythmResult.bpm;
+                        console.log("RhythmExtractor2013 BPM:", rawTempo, "Confidence:", rhythmResult.confidence);
+                        let percivalTempo = null;
+                        if (rhythmResult.confidence < 3) {
+                            try {
+                                const percivalResult = essentia.PercivalBpmEstimator(audioVector);
+                                percivalTempo = percivalResult.bpm;
+                                console.log("PercivalBpmEstimator BPM:", percivalTempo);
+                                if (Math.abs(rawTempo - percivalTempo) < 10) {
+                                    rawTempo = (rawTempo + percivalTempo) / 2;
+                                    console.log("Averaged tempo from two estimators:", rawTempo);
+                                }
+                                else if (Math.abs(Math.round(percivalTempo) % 10) <
+                                    Math.abs(Math.round(rawTempo) % 10)) {
+                                    rawTempo = percivalTempo;
+                                    console.log("Using Percival tempo as it matches common BPM patterns better:", rawTempo);
+                                }
+                            }
+                            catch (percivalError) {
+                                console.error("Error estimating tempo with PercivalBpmEstimator:", percivalError);
+                            }
+                        }
+                        tempo = Math.round(rawTempo);
+                        if (tempo < 60 || tempo > 200) {
+                            console.warn(`Unusual tempo detected: ${tempo}. Applying sanity check.`);
+                            if (percivalTempo !== null &&
+                                percivalTempo >= 60 &&
+                                percivalTempo <= 200) {
+                                tempo = Math.round(percivalTempo);
+                                console.log("Using percival tempo as primary was out of expected range:", tempo);
+                            }
+                        }
+                        else if (percivalTempo !== null) {
+                            const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
+                            if (percentDiff > 0.08 && percentDiff < 0.12) {
+                                console.log(`Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(2)}`);
+                                if (percivalTempo > 110 &&
+                                    percivalTempo < 125 &&
+                                    percivalTempo > tempo) {
+                                    tempo = Math.round(percivalTempo);
+                                    console.log(`Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`);
+                                }
+                                else if (percivalTempo > 100 &&
+                                    percivalTempo < 115 &&
+                                    percivalTempo > tempo) {
+                                    tempo = Math.round(percivalTempo);
+                                    console.log(`Corrected BPM to ${tempo} - likely in 100-115 BPM range`);
+                                }
+                            }
+                        }
                     }
                     catch (tempoError) {
-                        console.error('Error estimating tempo:', tempoError);
+                        console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
+                        try {
+                            const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                            tempo = Math.round(tempoResult.bpm);
+                            console.log("PercivalBpmEstimator BPM:", tempoResult.bpm);
+                        }
+                        catch (fallbackError) {
+                            console.error("Error estimating tempo with PercivalBpmEstimator:", fallbackError);
+                        }
                     }
                     try {
                         const danceabilityResult = essentia.Danceability(audioVector);
                         danceability = danceabilityResult.danceability;
                     }
                     catch (danceabilityError) {
-                        console.error('Error estimating danceability:', danceabilityError);
+                        console.error("Error estimating danceability:", danceabilityError);
                     }
                     try {
                         const energyResult = essentia.Energy(audioVector);
-                        energy = energyResult.energy;
-                        if (typeof energy === 'number') {
-                            if (energy > 0.6) {
-                                mood = 'Energetic';
+                        const rawEnergy = energyResult.energy;
+                        const isVietnameseSong = title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
+                            derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
+                        const isRemix = title.toLowerCase().includes("remix");
+                        const isHouseRemix = isRemix && title.toLowerCase().includes("house");
+                        const isVietnameseIndie = isVietnameseSong &&
+                            tempo !== null &&
+                            tempo >= 110 &&
+                            tempo <= 125 &&
+                            !isRemix;
+                        if (isVietnameseIndie) {
+                            energy = Math.min(rawEnergy, 0.35);
+                            console.log(`Energy correction for Vietnamese indie song: ${rawEnergy} → ${energy} (indie pattern detected)`);
+                            mood = "Melancholic";
+                            console.log("Mood set to: Melancholic (Vietnamese indie pattern)");
+                        }
+                        else if (isVietnameseSong && isHouseRemix) {
+                            energy = Math.max(rawEnergy, 0.85);
+                            mood = "Energetic";
+                            console.log("Mood set to: Energetic (Vietnamese house remix detected)");
+                        }
+                        else if (isVietnameseSong && isRemix) {
+                            energy = Math.max(rawEnergy, 0.7);
+                            mood = "Energetic";
+                            console.log("Mood set to: Energetic (Vietnamese remix detected)");
+                        }
+                        else if (isVietnameseSong &&
+                            tempo !== null &&
+                            tempo < 110 &&
+                            scale !== null &&
+                            scale.toLowerCase() === "minor") {
+                            energy = Math.min(rawEnergy, 0.35);
+                            console.log(`Energy correction applied for Vietnamese ballad: ${rawEnergy} → ${energy} (slow tempo, minor key)`);
+                        }
+                        else if (isVietnameseSong && tempo !== null && tempo >= 130) {
+                            energy = Math.min(rawEnergy, 0.8);
+                            console.log(`Minor energy adjustment for upbeat Vietnamese song: ${rawEnergy} → ${energy} (higher tempo)`);
+                        }
+                        else if (tempo !== null &&
+                            tempo >= 90 &&
+                            tempo <= 120 &&
+                            key !== null &&
+                            key.toLowerCase().includes("e") &&
+                            scale !== null &&
+                            scale.toLowerCase() === "minor") {
+                            energy = Math.min(rawEnergy, 0.4);
+                            console.log(`Energy correction applied: ${rawEnergy} → ${energy} (ballad characteristics detected)`);
+                        }
+                        else {
+                            energy = rawEnergy;
+                            console.log(`Using original energy value: ${energy}`);
+                        }
+                        if (mood === null) {
+                            if (isVietnameseSong &&
+                                tempo !== null &&
+                                tempo >= 130 &&
+                                energy !== null &&
+                                energy > 0.5) {
+                                mood = "Energetic";
+                                console.log("Mood set to: Energetic (upbeat Vietnamese song)");
                             }
-                            else if (energy < 0.4) {
-                                mood = 'Calm';
+                            else if (isVietnameseSong &&
+                                key !== null &&
+                                scale !== null &&
+                                scale.toLowerCase() === "minor" &&
+                                tempo !== null &&
+                                tempo < 120) {
+                                mood = "Melancholic";
+                                console.log("Mood set to: Melancholic (Vietnamese song in minor key with slower tempo)");
                             }
-                            else {
-                                mood = 'Neutral';
+                            else if (energy !== null &&
+                                key !== null &&
+                                scale !== null &&
+                                scale.toLowerCase() === "minor" &&
+                                energy <= 0.4) {
+                                mood = "Melancholic";
+                                console.log("Mood set to: Melancholic (minor key + low energy)");
+                            }
+                            else if (energy !== null && energy <= 0.4) {
+                                mood = "Calm";
+                                console.log("Mood set to: Calm (based on low energy)");
+                            }
+                            else if (energy !== null && energy > 0.6) {
+                                mood = "Energetic";
+                                console.log("Mood set to: Energetic (based on high energy)");
+                            }
+                            else if (energy !== null) {
+                                mood = "Neutral";
+                                console.log("Mood set to: Neutral (medium energy)");
                             }
                         }
                     }
                     catch (energyError) {
-                        console.error('Error calculating energy/mood:', energyError);
+                        console.error("Error calculating energy:", energyError);
                     }
                     try {
                         const keyResult = essentia.KeyExtractor(audioVector);
-                        key = keyResult.key;
-                        scale = keyResult.scale;
+                        const rawKey = keyResult.key;
+                        const rawScale = keyResult.scale;
+                        console.log("Key estimation:", rawKey, rawScale, "Strength:", keyResult.strength);
+                        let correctedKey = rawKey;
+                        let correctedScale = rawScale;
+                        const keyCorrection = {
+                            A: { key: "A", possibleErrors: ["F", "C"] },
+                            F: { key: "F", possibleErrors: ["A", "D"] },
+                            Eb: { key: "Eb", possibleErrors: ["C", "G"] },
+                        };
+                        const isVietnameseSong = title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
+                            derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
+                        const isRemix = title.toLowerCase().includes("remix") ||
+                            title.toLowerCase().includes("edm");
+                        if (isVietnameseSong &&
+                            rawKey === "Eb" &&
+                            rawScale === "minor" &&
+                            tempo !== null &&
+                            tempo >= 110 &&
+                            tempo <= 125 &&
+                            !isRemix) {
+                            console.log("Detected Vietnamese indie song with Eb minor key - likely C Major confusion");
+                            correctedKey = "C";
+                            correctedScale = "major";
+                            console.log(`Corrected key from ${rawKey} ${rawScale} to ${correctedKey} ${correctedScale} (Vietnamese indie pattern)`);
+                        }
+                        else if (isVietnameseSong && isRemix) {
+                            console.log("Vietnamese remix detected - using raw key detection without correction");
+                        }
+                        else if (rawKey === "F" &&
+                            rawScale === "minor" &&
+                            tempo !== null &&
+                            tempo >= 100 &&
+                            tempo <= 115) {
+                            console.log("Detected potential F minor / A minor confusion in common BPM range (100-115)");
+                            correctedKey = "A";
+                            console.log(`Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`);
+                        }
+                        else if (keyResult.strength < 0.6 && keyCorrection[rawKey]) {
+                            console.log(`Low confidence key detection, checking for common errors for ${rawKey} ${rawScale}`);
+                            try {
+                                const shortSection = pcmF32.length > 30 * sampleRate
+                                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRate)
+                                    : pcmF32;
+                                const shortVector = essentia.arrayToVector(shortSection);
+                                const secondKeyResult = essentia.KeyExtractor(shortVector);
+                                console.log("Secondary key detection on shorter segment:", secondKeyResult.key, secondKeyResult.scale, "Strength:", secondKeyResult.strength);
+                                if (keyCorrection[rawKey].possibleErrors.includes(secondKeyResult.key) &&
+                                    secondKeyResult.strength > keyResult.strength) {
+                                    correctedKey = secondKeyResult.key;
+                                    correctedScale = secondKeyResult.scale;
+                                    console.log(`Corrected key from ${rawKey} to ${correctedKey} based on secondary analysis`);
+                                }
+                            }
+                            catch (secondaryKeyError) {
+                                console.error("Error in secondary key detection:", secondaryKeyError);
+                            }
+                        }
+                        key = correctedKey;
+                        scale = correctedScale;
                     }
                     catch (keyError) {
-                        console.error('Error estimating key/scale:', keyError);
+                        console.error("Error estimating key/scale:", keyError);
                     }
                 }
                 else {
-                    console.warn('Audio decoding failed, skipping all audio analysis.');
+                    console.warn("Audio decoding failed, skipping all audio analysis.");
                 }
             }
             catch (analysisError) {
-                console.error('Error during audio analysis pipeline:', analysisError);
+                console.error("Error during audio analysis pipeline:", analysisError);
             }
             const artistProfile = await getOrCreateVerifiedArtistProfile(derivedArtistName);
             const artistId = artistProfile.id;
             let genreIds = [];
             try {
-                genreIds = await determineGenresFromAudioAnalysis(tempo, mood, key, scale);
+                genreIds = await determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy, danceability, duration, title, derivedArtistName);
                 console.log(`Auto-determined genres for "${title}": ${genreIds.length} genres`);
             }
             catch (genreError) {
-                console.error('Error determining genres from audio analysis:', genreError);
+                console.error("Error determining genres from audio analysis:", genreError);
                 try {
                     const popGenre = await db_1.default.genre.findFirst({
                         where: {
-                            name: { equals: 'Pop', mode: 'insensitive' }
-                        }
+                            name: { equals: "Pop", mode: "insensitive" },
+                        },
                     });
                     if (popGenre) {
                         genreIds = [popGenre.id];
                     }
                     else {
                         const anyGenre = await db_1.default.genre.findFirst({
-                            orderBy: { createdAt: 'asc' }
+                            orderBy: { createdAt: "asc" },
                         });
                         if (anyGenre) {
                             genreIds = [anyGenre.id];
@@ -1610,7 +2047,7 @@ const processBulkUpload = async (files) => {
                     }
                 }
                 catch (fallbackGenreError) {
-                    console.error('Error finding fallback genre:', fallbackGenreError);
+                    console.error("Error finding fallback genre:", fallbackGenreError);
                 }
             }
             let coverUrl = null;
@@ -1619,7 +2056,7 @@ const processBulkUpload = async (files) => {
                 console.log(`Generated cover artwork for "${title}"`);
             }
             catch (coverError) {
-                console.error('Error generating cover artwork:', coverError);
+                console.error("Error generating cover artwork:", coverError);
             }
             const releaseDate = new Date();
             const trackData = {
@@ -1640,12 +2077,14 @@ const processBulkUpload = async (files) => {
             };
             if (genreIds.length > 0) {
                 trackData.genres = {
-                    create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } }))
+                    create: genreIds.map((genreId) => ({
+                        genre: { connect: { id: genreId } },
+                    })),
                 };
             }
             const newTrack = await db_1.default.track.create({
                 data: trackData,
-                select: prisma_selects_1.trackSelect
+                select: prisma_selects_1.trackSelect,
             });
             results.push({
                 trackId: newTrack.id,
@@ -1660,21 +2099,317 @@ const processBulkUpload = async (files) => {
                 key: newTrack.key,
                 scale: newTrack.scale,
                 genreIds: genreIds,
-                genres: newTrack.genres?.map(g => g.genre.name),
+                genres: newTrack.genres?.map((g) => g.genre.name),
                 fileName: file.originalname,
-                success: true
+                success: true,
             });
         }
         catch (error) {
             console.error(`Error processing file ${file.originalname}:`, error);
             results.push({
                 fileName: file.originalname,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                success: false
+                error: error instanceof Error ? error.message : "Unknown error",
+                success: false,
             });
         }
     }
     return results;
 };
 exports.processBulkUpload = processBulkUpload;
+const generateAndAssignAiPlaylistToUser = async (adminExecutingId, targetUserId) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    const targetUser = await db_1.default.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true, username: true, name: true },
+    });
+    if (!targetUser) {
+        throw new errors_1.HttpError(404, "Target user not found");
+    }
+    const targetUserDisplayName = targetUser.username || targetUser.name || targetUserId;
+    const listeningHistory = await db_1.default.history.findMany({
+        where: {
+            userId: targetUserId,
+            type: "PLAY",
+            trackId: { not: null },
+        },
+        take: 10,
+        select: { trackId: true },
+    });
+    const uniqueTracksInHistory = new Set(listeningHistory.map((h) => h.trackId))
+        .size;
+    const hasSufficientHistory = uniqueTracksInHistory > 3;
+    let playlistOptions = {};
+    let trackIdsToUse = undefined;
+    if (!hasSufficientHistory) {
+        console.log(`[AdminService] User ${targetUserId} has no/insufficient history. Generating from top tracks.`);
+        trackIdsToUse = await aiService.getTopPlayedTrackIds(10);
+        if (!trackIdsToUse || trackIdsToUse.length === 0) {
+            console.warn("[AdminService] No top tracks found to generate default playlist.");
+        }
+        playlistOptions = {
+            name: `Popular Mix for ${targetUserDisplayName}`,
+            description: "Discover popular tracks! An AI-curated playlist based on trending songs.",
+        };
+    }
+    else {
+        console.log(`[AdminService] User ${targetUserId} has history. Generating personalized AI mix.`);
+        playlistOptions = {
+            name: `Your AI Mix, ${targetUserDisplayName}`,
+            description: `A personalized playlist crafted by AI, just for you, ${targetUserDisplayName}! Based on your listening taste.`,
+            trackCount: 10,
+        };
+    }
+    try {
+        console.log(`[AdminService] Attempting to generate AI playlist for user ${targetUserId}`);
+        const newPlaylist = await aiService.createAIGeneratedPlaylist(targetUserId, {}, trackIdsToUse);
+        console.log(`[AdminService] Successfully generated AI playlist ${newPlaylist.id} for user ${targetUserId}`);
+        return newPlaylist;
+    }
+    catch (error) {
+        console.error(`[AdminService] Error generating AI playlist for user ${targetUserId}:`, error);
+        if (error instanceof Error) {
+            throw new errors_1.HttpError(500, `Failed to generate AI playlist: ${error.message}`);
+        }
+        throw new errors_1.HttpError(500, "An unexpected error occurred while generating the AI playlist.");
+    }
+};
+exports.generateAndAssignAiPlaylistToUser = generateAndAssignAiPlaylistToUser;
+const setAiPlaylistVisibilityForUser = async (adminExecutingId, playlistId, newVisibility) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    if (newVisibility !== client_1.PlaylistPrivacy.PUBLIC &&
+        newVisibility !== client_1.PlaylistPrivacy.PRIVATE) {
+        throw new errors_1.HttpError(400, "Invalid visibility value. Must be PUBLIC or PRIVATE.");
+    }
+    const playlist = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+    });
+    if (!playlist) {
+        throw new errors_1.HttpError(404, "Playlist not found");
+    }
+    if (!playlist.isAIGenerated) {
+        throw new errors_1.HttpError(403, "Forbidden: Cannot change visibility for non-AI generated playlists.");
+    }
+    if (!playlist.userId) {
+        throw new errors_1.HttpError(400, "Cannot change visibility for system-wide AI playlists not assigned to a specific user.");
+    }
+    const updatedPlaylist = await db_1.default.playlist.update({
+        where: { id: playlistId },
+        data: { privacy: newVisibility },
+    });
+    console.log(`[AdminService] Updated AI playlist ${playlistId} visibility to ${newVisibility} for user ${playlist.userId}`);
+    return updatedPlaylist;
+};
+exports.setAiPlaylistVisibilityForUser = setAiPlaylistVisibilityForUser;
+const getUserAiPlaylists = async (adminExecutingId, targetUserId, req) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    const targetUser = await db_1.default.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true },
+    });
+    if (!targetUser) {
+        throw new errors_1.HttpError(404, "Target user not found");
+    }
+    const where = {
+        userId: targetUserId,
+        isAIGenerated: true,
+    };
+    const { search, sortBy, sortOrder } = req.query;
+    if (search && typeof search === "string") {
+        where.OR = [
+            { name: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+        ];
+    }
+    let orderBy = { createdAt: "desc" };
+    const validSortFields = [
+        "name",
+        "createdAt",
+        "updatedAt",
+        "totalTracks",
+        "privacy",
+    ];
+    if (sortBy &&
+        typeof sortBy === "string" &&
+        validSortFields.includes(sortBy)) {
+        orderBy = { [sortBy]: sortOrder === "asc" ? "asc" : "desc" };
+    }
+    const playlistSelect = {
+        id: true,
+        name: true,
+        description: true,
+        coverUrl: true,
+        privacy: true,
+        type: true,
+        isAIGenerated: true,
+        totalTracks: true,
+        totalDuration: true,
+        createdAt: true,
+        updatedAt: true,
+        userId: true,
+        lastGeneratedAt: true,
+        tracks: {
+            take: 3,
+            orderBy: { trackOrder: "asc" },
+            select: {
+                track: {
+                    select: {
+                        id: true,
+                        title: true,
+                        coverUrl: true,
+                        artist: { select: { artistName: true } },
+                    },
+                },
+            },
+        },
+    };
+    const options = {
+        where,
+        select: playlistSelect,
+        orderBy,
+    };
+    const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, options);
+    if (result.data.length > 0) {
+        console.log(`[AdminService] Fetched ${result.data.length} AI playlists for user ${targetUserId}`);
+    }
+    return {
+        data: result.data,
+        pagination: result.pagination,
+    };
+};
+exports.getUserAiPlaylists = getUserAiPlaylists;
+const getUserListeningHistoryDetails = async (adminExecutingId, targetUserId, req) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    const targetUser = await db_1.default.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true },
+    });
+    if (!targetUser) {
+        throw new errors_1.HttpError(404, "Target user not found");
+    }
+    const { search, startDate, endDate, sortBy = "createdAt", sortOrder = "desc", } = req.query;
+    const whereClause = {
+        userId: targetUserId,
+        type: "PLAY",
+    };
+    if (search && typeof search === "string") {
+        whereClause.track = {
+            OR: [
+                { title: { contains: search, mode: "insensitive" } },
+                { artist: { artistName: { contains: search, mode: "insensitive" } } },
+                { album: { title: { contains: search, mode: "insensitive" } } },
+            ],
+        };
+    }
+    const dateFilter = {};
+    if (typeof startDate === "string" && startDate) {
+        try {
+            const startOfDay = new Date(startDate);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            dateFilter.gte = startOfDay;
+        }
+        catch (e) {
+            console.error("Invalid start date format:", startDate);
+        }
+    }
+    if (typeof endDate === "string" && endDate) {
+        try {
+            const endOfDay = new Date(endDate);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+            dateFilter.lte = endOfDay;
+        }
+        catch (e) {
+            console.error("Invalid end date format:", endDate);
+        }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+        whereClause.createdAt = dateFilter;
+    }
+    let orderBy = {
+        [sortBy]: sortOrder,
+    };
+    const historyQueryOptions = {
+        where: whereClause,
+        include: {
+            track: {
+                select: {
+                    id: true,
+                    title: true,
+                    coverUrl: true,
+                    duration: true,
+                    artist: { select: { artistName: true, id: true } },
+                    album: { select: { title: true, id: true } },
+                    tempo: true,
+                    mood: true,
+                    key: true,
+                    scale: true,
+                    danceability: true,
+                    energy: true,
+                },
+            },
+        },
+        orderBy,
+    };
+    const historyRecords = await db_1.default.history.findMany(historyQueryOptions);
+    console.log(`[AdminService DEBUG] getUserListeningHistoryDetails: Fetched ${historyRecords.length} history records for user ${targetUserId}.`);
+    historyRecords.forEach((record, index) => {
+        if (record.track) {
+            console.log(`[AdminService DEBUG] getUserListeningHistoryDetails: Record ${index + 1} - Track ID: ${record.track.id} - Audio Features from DB:`, {
+                title: record.track.title,
+                tempo: record.track.tempo,
+                mood: record.track.mood,
+                key: record.track.key,
+                scale: record.track.scale,
+                danceability: record.track.danceability,
+                energy: record.track.energy,
+            });
+        }
+        else {
+            console.log(`[AdminService DEBUG] getUserListeningHistoryDetails: Record ${index + 1} has no associated track.`);
+        }
+    });
+    const totalRecords = await db_1.default.history.count({
+        where: historyQueryOptions.where,
+    });
+    return {
+        data: historyRecords,
+        pagination: {
+            total: totalRecords,
+            pageSize: Object.keys(historyQueryOptions.include.track).length,
+            currentPage: 1,
+        },
+    };
+};
+exports.getUserListeningHistoryDetails = getUserListeningHistoryDetails;
 //# sourceMappingURL=admin.service.js.map

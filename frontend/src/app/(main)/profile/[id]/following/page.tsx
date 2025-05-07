@@ -1,16 +1,18 @@
-'use client';
+"use client";
 
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { api } from '@/utils/api';
-import { ArtistProfile, Track, User } from '@/types';
-import toast from 'react-hot-toast';
-import { Play, Pause } from '@/components/ui/Icons';
-import { useTrack } from '@/contexts/TrackContext';
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/utils/api";
+import { ArtistProfile, Track, User } from "@/types";
+import toast from "react-hot-toast";
+import { Play, Pause } from "@/components/ui/Icons";
+import { useTrack } from "@/contexts/TrackContext";
+import Image from "next/image";
+import Link from "next/link";
 
-type FollowingFilterType = 'all' | 'artists' | 'users';
+type FollowingFilterType = "all" | "artists" | "users";
 
-const DEFAULT_AVATAR = '/images/default-avatar.jpg';
+const DEFAULT_AVATAR = "/images/default-avatar.jpg";
 
 export default function UserProfilePage({
   params,
@@ -25,7 +27,7 @@ export default function UserProfilePage({
   const [artistTracksMap, setArtistTracksMap] = useState<
     Record<string, Track[]>
   >({});
-  const [activeFilter, setActiveFilter] = useState<FollowingFilterType>('all');
+  const [activeFilter, setActiveFilter] = useState<FollowingFilterType>("all");
 
   const {
     currentTrack,
@@ -38,9 +40,9 @@ export default function UserProfilePage({
   } = useTrack();
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('userToken');
+    const storedToken = localStorage.getItem("userToken");
     if (!storedToken) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
     setToken(storedToken);
@@ -53,16 +55,16 @@ export default function UserProfilePage({
 
         if (followingResponse) {
           const followingUser = followingResponse.filter(
-            (followingUser: any) => followingUser.type === 'USER'
+            (followingUser: any) => followingUser.type === "USER"
           );
           const followingArtists = followingResponse.filter(
-            (followingUser: any) => followingUser.type === 'ARTIST'
+            (followingUser: any) => followingUser.type === "ARTIST"
           );
           setFollowingUsers(followingUser);
           setFollowingArtists(followingArtists);
         }
       } catch (error) {
-        console.error('Failed to fetch user data:', error);
+        console.error("Failed to fetch user data:", error);
       }
     };
 
@@ -71,7 +73,7 @@ export default function UserProfilePage({
 
   const handleArtistPlay = async (
     artist: ArtistProfile,
-    queueTypeValue: 'topArtist' | 'followingArtist',
+    queueTypeValue: "topArtist" | "followingArtist",
     e: React.MouseEvent
   ) => {
     e.stopPropagation();
@@ -102,18 +104,18 @@ export default function UserProfilePage({
           playTrack(artistTracks[0]);
         }
       } else {
-        toast.error('No tracks available for this artist');
+        toast.error("No tracks available for this artist");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Failed to load artist tracks');
+      toast.error("Failed to load artist tracks");
     }
   };
 
   const getArtistTracks = async (artistId: string) => {
     try {
       if (!token) {
-        throw new Error('Token is null');
+        throw new Error("Token is null");
       }
       const data = await api.artists.getTrackByArtistId(artistId, token);
       return data.tracks.sort((a: any, b: any) => b.playCount - a.playCount);
@@ -125,7 +127,7 @@ export default function UserProfilePage({
 
   const isArtistPlaying = (
     artistId: string,
-    queueTypeValue: 'followingArtist'
+    queueTypeValue: "followingArtist"
   ) => {
     const artistTracks = artistTracksMap[artistId] || [];
     return (
@@ -137,16 +139,16 @@ export default function UserProfilePage({
   };
 
   const filterButtons: { label: string; value: FollowingFilterType }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Artists', value: 'artists' },
-    { label: 'Users', value: 'users' },
+    { label: "All", value: "all" },
+    { label: "Artists", value: "artists" },
+    { label: "Users", value: "users" },
   ];
 
   return (
-    <div className='px-4 md:px-6 py-6'>
-      <div className='flex flex-col gap-6'>
-        <h1 className='text-2xl font-bold'>Following</h1> 
-        
+    <div className="px-4 md:px-6 py-6">
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-bold">Following</h1>
+
         {/* Filter Bar - Copied and adapted from search page */}
         <div className="w-full border-b border-white/10">
           <div className="flex gap-8 px-0">
@@ -156,8 +158,8 @@ export default function UserProfilePage({
                 onClick={() => setActiveFilter(button.value)}
                 className={`py-2.5 text-sm font-medium transition-colors relative ${
                   activeFilter === button.value
-                    ? 'text-white'
-                    : 'text-white/70 hover:text-white'
+                    ? "text-white"
+                    : "text-white/70 hover:text-white"
                 }`}
               >
                 {button.label}
@@ -170,9 +172,9 @@ export default function UserProfilePage({
         </div>
 
         {/* Grid for content */}
-        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-4'>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-4">
           {/* Render Artists if filter is 'all' or 'artists' */}
-          {(activeFilter === 'all' || activeFilter === 'artists') && 
+          {(activeFilter === "all" || activeFilter === "artists") &&
             followingArtists.map((artist) => (
               <div
                 key={artist.id}
@@ -180,20 +182,25 @@ export default function UserProfilePage({
                 onClick={() => router.push(`/artist/profile/${artist.id}`)}
               >
                 <div className="relative w-full mb-4">
-                  <img
-                    src={artist.avatar || DEFAULT_AVATAR}
-                    alt={artist.artistName}
-                    className="w-full aspect-square object-cover rounded-full"
-                  />
+                  <Link href={`/artist/${artist.id}`}>
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4 flex-shrink-0">
+                      <Image
+                        src={artist.avatar || "/images/default-avatar.png"}
+                        alt={artist.artistName}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </Link>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleArtistPlay(artist, 'followingArtist', e);
+                      handleArtistPlay(artist, "followingArtist", e);
                     }}
                     className="absolute bottom-1 right-1 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center"
                     aria-label={`Play ${artist.artistName}`}
                   >
-                    {isArtistPlaying(artist.id, 'followingArtist') ? (
+                    {isArtistPlaying(artist.id, "followingArtist") ? (
                       <Pause className="w-5 h-5 text-white" />
                     ) : (
                       <Play className="w-5 h-5 text-white" />
@@ -210,7 +217,7 @@ export default function UserProfilePage({
             ))}
 
           {/* Render Users if filter is 'all' or 'users' */}
-          {(activeFilter === 'all' || activeFilter === 'users') && 
+          {(activeFilter === "all" || activeFilter === "users") &&
             followingUsers.map((user) => (
               <div
                 key={user.id}
@@ -218,11 +225,16 @@ export default function UserProfilePage({
                 onClick={() => router.push(`/profile/${user.id}`)}
               >
                 <div className="w-full mb-4">
-                  <img
-                    src={user.avatar || DEFAULT_AVATAR}
-                    alt={user.name}
-                    className="w-full aspect-square object-cover rounded-full"
-                  />
+                  <Link href={`/profile/${user.id}`}>
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4 flex-shrink-0">
+                      <Image
+                        src={user.avatar || "/images/default-avatar.png"}
+                        alt={user.name || user.username || "User"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </Link>
                 </div>
                 <div className="w-full text-left mt-1">
                   <h3 className="font-medium truncate text-white w-full">
@@ -233,19 +245,20 @@ export default function UserProfilePage({
               </div>
             ))}
         </div>
-        
+
         {/* Optional: Message for empty results based on filter */}
-        {(activeFilter === 'artists' && followingArtists.length === 0) && (
+        {activeFilter === "artists" && followingArtists.length === 0 && (
           <p className="text-white/60">You are not following any artists.</p>
         )}
-        {(activeFilter === 'users' && followingUsers.length === 0) && (
+        {activeFilter === "users" && followingUsers.length === 0 && (
           <p className="text-white/60">You are not following any users.</p>
         )}
-        {(activeFilter === 'all' && followingArtists.length === 0 && followingUsers.length === 0) && (
-          <p className="text-white/60">You are not following anyone yet.</p>
-        )}
-
+        {activeFilter === "all" &&
+          followingArtists.length === 0 &&
+          followingUsers.length === 0 && (
+            <p className="text-white/60">You are not following anyone yet.</p>
+          )}
       </div>
     </div>
-  )
+  );
 }

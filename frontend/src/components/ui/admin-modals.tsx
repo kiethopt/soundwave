@@ -13,6 +13,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger, // Added AlertDialogTrigger although might not be directly used here
+} from "@/components/ui/alert-dialog"; // Import AlertDialog components
+import {
   XIcon,
   Trash2,
   ShieldAlert,
@@ -1266,13 +1277,14 @@ export function DeactivateModal({
 
 // Confirm Delete Modal
 interface ConfirmDeleteModalProps {
-  item: { id: string; name?: string | null; email: string } | null;
+  item: { id: string; name?: string | null; email?: string | null } | null; // Made email optional
   count?: number;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (ids: string[]) => void;
   theme?: "light" | "dark";
   entityType?: string;
+  isLoading?: boolean; // Added isLoading prop
 }
 
 export function ConfirmDeleteModal({
@@ -1281,121 +1293,113 @@ export function ConfirmDeleteModal({
   isOpen,
   onClose,
   onConfirm,
-  theme = "light",
+  theme = "light", // Theme prop might be less relevant with AlertDialog's direct styling
   entityType = "item",
+  // Add new props for AlertDialog if needed, e.g., title, description can be part of props
+  // For now, we'll try to keep the existing logic for generating title/description
+  isLoading, // Added isLoading prop
 }: ConfirmDeleteModalProps) {
-  if (!isOpen || (!item && !count)) {
+  const itemName =
+    count && count > 1
+      ? `${count} ${entityType}s`
+      : item?.name || item?.email || entityType;
+
+  // No need for explicit handleConfirm if using AlertDialogAction's default behavior,
+  // but we might need to pass a function to AlertDialogAction's onClick
+  // Or, if we want to keep the existing onConfirm logic:
+  const handleConfirmAction = () => {
+    if (item) {
+      onConfirm([item.id]);
+    } else if (count && count > 0) {
+      // This logic is a bit convoluted, assuming parent passes correct selectedUserIds to onConfirm
+      // For bulk, AiUserManagementPage passes Array.from(selectedUserIds)
+      // For single, it passes [deletingUser.id]
+      // The ConfirmDeleteModal itself doesn't hold the list of IDs for bulk.
+      // The parent component (AiUserManagementPage) calls onConfirm with the actual IDs.
+      // So, this onConfirm([]) inside this component for bulk might be misleading.
+      // The parent component handles providing the correct IDs.
+      // We'll let the parent call `onConfirm` with the appropriate IDs.
+      // The `onConfirm` prop in this modal is more of a trigger.
+      onConfirm(item ? [item.id] : []); // Simplified, parent still controls the actual IDs for bulk.
+    }
+    // onClose(); // AlertDialogAction/Cancel typically handle closing.
+  };
+
+  if (!isOpen) {
     return null;
   }
 
-  const isBulkDelete = count !== undefined && count > 0;
-  const title = isBulkDelete
-    ? `Delete ${count} ${entityType}(s)`
-    : `Delete ${entityType}`;
-  const itemName = item?.name || item?.email;
-  const description = isBulkDelete
-    ? `Are you sure you want to delete the selected ${count} ${entityType}(s)? This action cannot be undone.`
-    : `Are you sure you want to delete the ${entityType} ${
-        itemName ? `"${itemName}"` : "this item"
-      }? This action cannot be undone.`;
-
-  const handleConfirm = () => {
-    if (isBulkDelete && count) {
-      onConfirm([]);
-    } else if (item) {
-      onConfirm([item.id]);
-    }
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className={`
-          sm:max-w-[400px] p-0 overflow-hidden
-          ${
-            theme === "dark"
-              ? "bg-gray-800 text-white border-gray-700"
-              : "bg-white"
-          }
-        `}
-      >
-        {/* ---------- Header ---------- */}
-        <div className="px-6 pt-6">
-          {/* Header with Trash icon and Close button aligned */}
-          <div className="flex items-center justify-between w-full">
-            {/* Trash icon */}
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-red-100">
-              <Trash2 className="w-7 h-7 text-red-600" strokeWidth={1.5} />
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      {/* AlertDialogTrigger could be used by parent, not directly here if isOpen controls it */}
+      {/* <AlertDialogTrigger asChild>
+        <Button variant="outline">Show Dialog</Button>
+      </AlertDialogTrigger> */}
+      <AlertDialogContent className={cn(theme === "dark" ? "dark" : "")}>
+        {" "}
+        {/* Apply dark theme if needed */}
+        <AlertDialogHeader>
+          <div className="flex flex-col items-center text-center">
+            {" "}
+            {/* Centering icon and title */}
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full dark:bg-red-900/30">
+              <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
-
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className={`
-                w-8 h-8 rounded-md flex items-center justify-center transition-colors
-                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
-              `}
-            >
-              <XIcon className="w-5 h-5" />
-            </button>
+            <AlertDialogTitle className="text-lg font-semibold">
+              {/* Dynamically set title based on single or bulk delete */}
+              {count && count > 1
+                ? `Delete ${count} ${entityType}s?`
+                : `Delete ${item?.name || item?.email || entityType}?`}
+            </AlertDialogTitle>
           </div>
-
-          {/* ---------- Title & Description ---------- */}
-          <DialogTitle
-            className={`
-              mt-4 text-lg font-bold text-left
-              ${theme === "dark" ? "text-white" : "text-gray-900"}
-            `}
-          >
-            {title}
-          </DialogTitle>
-          <p
-            className={`
-              mt-1 text-sm text-left
-              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
-            `}
-          >
-            {description}
-          </p>
-        </div>
-
-        {/* ---------- Actions ---------- */}
-        <div
-          className={`
-          mt-6 px-6 py-4 flex gap-3 border-t
-          ${
-            theme === "dark"
-              ? "border-gray-700 bg-gray-800"
-              : "border-gray-100 bg-gray-50"
-          }
-        `}
-        >
-          <Button
-            variant="outline"
-            className={`flex-1 text-center justify-center bg-white
-              ${
-                theme === "dark"
-                  ? "text-gray-900 hover:bg-gray-100 border-gray-300"
-                  : "hover:bg-gray-50 border-gray-300"
-              }`}
+        </AlertDialogHeader>
+        <AlertDialogDescription className="text-center text-sm text-muted-foreground px-4">
+          {/* Dynamically set description */}
+          Are you sure you want to delete{" "}
+          {count && count > 1
+            ? `these ${count} ${entityType}s`
+            : `this ${entityType} named "${
+                item?.name || item?.email || "item"
+              }"`}
+          ? This action cannot be undone.
+        </AlertDialogDescription>
+        <AlertDialogFooter className="mt-4 sm:justify-end space-x-2">
+          {" "}
+          {/* Added spacing and alignment */}
+          <AlertDialogCancel
             onClick={onClose}
+            disabled={isLoading}
+            className={cn(
+              "border border-border hover:bg-muted", // Standard outline style
+              theme === "dark" &&
+                "text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white" // Dark mode adjustments
+            )}
           >
             Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            className={`flex-1 text-center justify-center ${
-              theme === "dark" ? "bg-red-700 hover:bg-red-600" : ""
-            }`}
-            onClick={handleConfirm}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmAction}
+            disabled={isLoading}
+            className={cn(
+              // Destructive button base styles (red)
+              "bg-red-600 text-white hover:bg-red-700",
+              // Dark mode destructive styles (slightly brighter red)
+              "dark:bg-red-600 dark:hover:bg-red-700 dark:text-white",
+              // Disabled state
+              isLoading && "opacity-50 cursor-not-allowed"
+            )}
           >
-            Delete {isBulkDelete ? `${count} ${entityType}(s)` : entityType}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            {isLoading ? (
+              <React.Fragment>
+                <Spinner className="mr-2 h-4 w-4 animate-spin" /> Deleting...
+              </React.Fragment>
+            ) : (
+              "Delete"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -4907,21 +4911,30 @@ export function ReportDetailModal({
 
   const getStatusBadge = (status: ReportStatus) => {
     switch (status) {
-      case 'PENDING':
+      case "PENDING":
         return (
-          <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+          <Badge
+            variant="outline"
+            className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+          >
             Pending
           </Badge>
         );
-      case 'RESOLVED':
+      case "RESOLVED":
         return (
-          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-500 border-green-500/20"
+          >
             Resolved
           </Badge>
         );
-      case 'REJECTED':
+      case "REJECTED":
         return (
-          <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+          <Badge
+            variant="outline"
+            className="bg-red-500/10 text-red-500 border-red-500/20"
+          >
             Rejected
           </Badge>
         );
@@ -4932,27 +4945,39 @@ export function ReportDetailModal({
 
   const getReportTypeBadge = (type: ReportType) => {
     switch (type) {
-      case 'COPYRIGHT_VIOLATION':
+      case "COPYRIGHT_VIOLATION":
         return (
-          <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+          <Badge
+            variant="outline"
+            className="bg-red-500/10 text-red-500 border-red-500/20"
+          >
             Copyright
           </Badge>
         );
-      case 'INAPPROPRIATE_CONTENT':
+      case "INAPPROPRIATE_CONTENT":
         return (
-          <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">
+          <Badge
+            variant="outline"
+            className="bg-orange-500/10 text-orange-500 border-orange-500/20"
+          >
             Inappropriate
           </Badge>
         );
-      case 'AI_GENERATION_ISSUE':
+      case "AI_GENERATION_ISSUE":
         return (
-          <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20">
+          <Badge
+            variant="outline"
+            className="bg-purple-500/10 text-purple-500 border-purple-500/20"
+          >
             AI Issue
           </Badge>
         );
-      case 'OTHER':
+      case "OTHER":
         return (
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+          <Badge
+            variant="outline"
+            className="bg-blue-500/10 text-blue-500 border-blue-500/20"
+          >
             Other
           </Badge>
         );
@@ -4965,96 +4990,217 @@ export function ReportDetailModal({
     if (report.track) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.track.title}</span>
-          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Track by {report.track.artist.artistName}</span>
+          <span
+            className={`font-medium ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {report.track.title}
+          </span>
+          <span
+            className={`text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            Track by {report.track.artist.artistName}
+          </span>
         </div>
       );
     } else if (report.album) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.album.title}</span>
-          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Album by {report.album.artist.artistName}</span>
+          <span
+            className={`font-medium ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {report.album.title}
+          </span>
+          <span
+            className={`text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            Album by {report.album.artist.artistName}
+          </span>
         </div>
       );
     } else if (report.playlist) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{report.playlist.name}</span>
-          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
+          <span
+            className={`font-medium ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {report.playlist.name}
+          </span>
+          <span
+            className={`text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            Playlist by{" "}
+            {report.playlist.user.name || report.playlist.user.username}
+          </span>
         </div>
       );
     }
-    return <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>Unknown Entity</span>;
+    return (
+      <span className={theme === "dark" ? "text-white" : "text-gray-900"}>
+        Unknown Entity
+      </span>
+    );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`sm:max-w-[600px] ${
-        theme === "dark"
-          ? "bg-gray-800 border-gray-700 text-white"
-          : "bg-white"
-      }`}>
+      <DialogContent
+        className={`sm:max-w-[600px] ${
+          theme === "dark"
+            ? "bg-gray-800 border-gray-700 text-white"
+            : "bg-white"
+        }`}
+      >
         <DialogHeader>
           <DialogTitle className={theme === "dark" ? "text-white" : ""}>
             Report Details
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Type</h3>
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Type
+              </h3>
               <div>{getReportTypeBadge(report.type)}</div>
             </div>
             <div>
-              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Status</h3>
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Status
+              </h3>
               <div>{getStatusBadge(report.status)}</div>
             </div>
           </div>
 
           <div>
-            <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Description</h3>
-            <p className={`rounded-md p-3 text-sm ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+            <h3
+              className={`text-sm font-medium mb-1 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Description
+            </h3>
+            <p
+              className={`rounded-md p-3 text-sm ${
+                theme === "dark"
+                  ? "bg-gray-700 text-gray-200"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
               {report.description}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Reported By</h3>
-              <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
-                {report.reporter.name || report.reporter.username || report.reporter.email}
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Reported By
+              </h3>
+              <p
+                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
+              >
+                {report.reporter.name ||
+                  report.reporter.username ||
+                  report.reporter.email}
               </p>
             </div>
             <div>
-              <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Date Submitted</h3>
-              <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Date Submitted
+              </h3>
+              <p
+                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
+              >
                 {new Date(report.createdAt).toLocaleString()}
               </p>
             </div>
           </div>
 
-          {report.status !== 'PENDING' && (
+          {report.status !== "PENDING" && (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Resolved By</h3>
-                  <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
-                    {report.resolver?.name || report.resolver?.username || 'System'}
+                  <h3
+                    className={`text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Resolved By
+                  </h3>
+                  <p
+                    className={
+                      theme === "dark" ? "text-gray-200" : "text-gray-800"
+                    }
+                  >
+                    {report.resolver?.name ||
+                      report.resolver?.username ||
+                      "System"}
                   </p>
                 </div>
                 <div>
-                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Date Resolved</h3>
-                  <p className={theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}>
-                    {report.resolvedAt ? new Date(report.resolvedAt).toLocaleString() : 'N/A'}
+                  <h3
+                    className={`text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Date Resolved
+                  </h3>
+                  <p
+                    className={
+                      theme === "dark" ? "text-gray-200" : "text-gray-800"
+                    }
+                  >
+                    {report.resolvedAt
+                      ? new Date(report.resolvedAt).toLocaleString()
+                      : "N/A"}
                   </p>
                 </div>
               </div>
 
               {report.resolution && (
                 <div>
-                  <h3 className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Resolution</h3>
-                  <p className={`rounded-md p-3 text-sm ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+                  <h3
+                    className={`text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Resolution
+                  </h3>
+                  <p
+                    className={`rounded-md p-3 text-sm ${
+                      theme === "dark"
+                        ? "bg-gray-700 text-gray-200"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
                     {report.resolution}
                   </p>
                 </div>
@@ -5064,10 +5210,12 @@ export function ReportDetailModal({
         </div>
 
         <DialogFooter className="flex justify-end gap-2">
-          {report.status === 'PENDING' && onResolve && (
-            <Button 
+          {report.status === "PENDING" && onResolve && (
+            <Button
               onClick={() => onResolve(report)}
-              className={`${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              className={`${
+                theme === "dark" ? "bg-blue-600 hover:bg-blue-700" : ""
+              }`}
             >
               Resolve Now
             </Button>
@@ -5075,7 +5223,9 @@ export function ReportDetailModal({
           <Button
             variant="outline"
             onClick={onClose}
-            className={theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : ''}
+            className={
+              theme === "dark" ? "border-gray-600 hover:bg-gray-700" : ""
+            }
           >
             Close
           </Button>
@@ -5089,7 +5239,10 @@ interface ResolveReportModalProps {
   report: Report | null;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (reportId: string, data: { status: ReportStatus; resolution: string }) => Promise<void>;
+  onSubmit: (
+    reportId: string,
+    data: { status: ReportStatus; resolution: string }
+  ) => Promise<void>;
   theme?: "light" | "dark";
 }
 
@@ -5100,22 +5253,23 @@ export function ResolveReportModal({
   onSubmit,
   theme = "light",
 }: ResolveReportModalProps) {
-  const [resolution, setResolution] = useState('');
-  const [resolutionStatus, setResolutionStatus] = useState<ReportStatus>('RESOLVED');
+  const [resolution, setResolution] = useState("");
+  const [resolutionStatus, setResolutionStatus] =
+    useState<ReportStatus>("RESOLVED");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       // Reset form when modal opens
-      setResolution('');
-      setResolutionStatus('RESOLVED');
+      setResolution("");
+      setResolutionStatus("RESOLVED");
       setIsSubmitting(false);
     }
   }, [isOpen]);
 
   const handleSubmit = async () => {
     if (!report) return;
-    
+
     try {
       setIsSubmitting(true);
       await onSubmit(report.id, {
@@ -5124,7 +5278,7 @@ export function ResolveReportModal({
       });
       onClose();
     } catch (error) {
-      console.error('Error resolving report:', error);
+      console.error("Error resolving report:", error);
       // Error handling is done in the parent component
     } finally {
       setIsSubmitting(false);
@@ -5135,39 +5289,55 @@ export function ResolveReportModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`sm:max-w-[500px] ${
-        theme === "dark"
-          ? "bg-gray-800 border-gray-700 text-white"
-          : "bg-white"
-      }`}>
+      <DialogContent
+        className={`sm:max-w-[500px] ${
+          theme === "dark"
+            ? "bg-gray-800 border-gray-700 text-white"
+            : "bg-white"
+        }`}
+      >
         <DialogHeader>
           <DialogTitle className={theme === "dark" ? "text-white" : ""}>
             Resolve Report
           </DialogTitle>
-          <DialogDescription className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+          <DialogDescription
+            className={theme === "dark" ? "text-gray-400" : "text-gray-600"}
+          >
             Mark this report as resolved or rejected and provide a resolution.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <label 
-              htmlFor="resolution-status" 
-              className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+            <label
+              htmlFor="resolution-status"
+              className={`text-sm font-medium ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}
             >
               Resolution Status
             </label>
             <Select
               value={resolutionStatus}
-              onValueChange={(value) => setResolutionStatus(value as ReportStatus)}
+              onValueChange={(value) =>
+                setResolutionStatus(value as ReportStatus)
+              }
             >
-              <SelectTrigger 
-                id="resolution-status" 
-                className={theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-200' : ''}
+              <SelectTrigger
+                id="resolution-status"
+                className={
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : ""
+                }
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}>
+              <SelectContent
+                className={
+                  theme === "dark" ? "bg-gray-800 border-gray-700" : ""
+                }
+              >
                 <SelectItem value="RESOLVED">Resolved (Approve)</SelectItem>
                 <SelectItem value="REJECTED">Rejected (Deny)</SelectItem>
               </SelectContent>
@@ -5175,9 +5345,11 @@ export function ResolveReportModal({
           </div>
 
           <div className="grid gap-2">
-            <label 
-              htmlFor="resolution-note" 
-              className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+            <label
+              htmlFor="resolution-note"
+              className={`text-sm font-medium ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}
             >
               Resolution Note
             </label>
@@ -5187,26 +5359,31 @@ export function ResolveReportModal({
               onChange={(e) => setResolution(e.target.value)}
               placeholder="Explain how this report was addressed..."
               rows={4}
-              className={theme === 'dark' 
-                ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder:text-gray-500' 
-                : 'placeholder:text-gray-400'
+              className={
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-gray-200 placeholder:text-gray-500"
+                  : "placeholder:text-gray-400"
               }
             />
           </div>
 
-          {report.type === 'COPYRIGHT_VIOLATION' && resolutionStatus === 'RESOLVED' && (
-            <div className={`rounded-md p-3 text-sm border ${
-              theme === 'dark' 
-                ? 'bg-amber-950 border-amber-800 text-amber-300' 
-                : 'bg-amber-50 border-amber-200 text-amber-800'
-            }`}>
-              <p className="font-medium mb-1">Warning</p>
-              <p>
-                Approving a copyright violation report will automatically deactivate the
-                reported content, making it inaccessible to users.
-              </p>
-            </div>
-          )}
+          {report.type === "COPYRIGHT_VIOLATION" &&
+            resolutionStatus === "RESOLVED" && (
+              <div
+                className={`rounded-md p-3 text-sm border ${
+                  theme === "dark"
+                    ? "bg-amber-950 border-amber-800 text-amber-300"
+                    : "bg-amber-50 border-amber-200 text-amber-800"
+                }`}
+              >
+                <p className="font-medium mb-1">Warning</p>
+                <p>
+                  Approving a copyright violation report will automatically
+                  deactivate the reported content, making it inaccessible to
+                  users.
+                </p>
+              </div>
+            )}
         </div>
 
         <DialogFooter className="flex justify-end gap-2 pt-2">
@@ -5214,7 +5391,9 @@ export function ResolveReportModal({
             variant="outline"
             onClick={onClose}
             disabled={isSubmitting}
-            className={theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : ''}
+            className={
+              theme === "dark" ? "border-gray-600 hover:bg-gray-700" : ""
+            }
           >
             Cancel
           </Button>
@@ -5222,14 +5401,18 @@ export function ResolveReportModal({
             onClick={handleSubmit}
             disabled={isSubmitting || !resolution.trim()}
             className={
-              resolutionStatus === 'RESOLVED'
-                ? theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
-                : theme === 'dark' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+              resolutionStatus === "RESOLVED"
+                ? theme === "dark"
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-green-600 hover:bg-green-700 text-white"
+                : theme === "dark"
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-red-600 hover:bg-red-700 text-white"
             }
           >
             {isSubmitting ? (
-              'Processing...'
-            ) : resolutionStatus === 'RESOLVED' ? (
+              "Processing..."
+            ) : resolutionStatus === "RESOLVED" ? (
               <>
                 <Check className="mr-2 h-4 w-4" />
                 Approve

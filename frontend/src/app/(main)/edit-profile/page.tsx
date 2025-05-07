@@ -1,13 +1,11 @@
-'use client';
+"use client";
 
-import React, { Suspense, useEffect, useState } from 'react';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { api } from '@/utils/api';
-import { Label } from '@/components/ui/label';
-import { UserIcon } from '@/components/ui/Icons';
-import { Input } from '@/components/ui/input';
-import { useTheme } from '@/contexts/ThemeContext';
+import React, { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { api } from "@/utils/api";
+import { Label } from "@/components/ui/label";
+import { UserIcon } from "@/components/ui/Icons";
 
 function LoadingUI() {
   return (
@@ -18,15 +16,14 @@ function LoadingUI() {
 }
 
 function EditProfileContent() {
-  const [avatar, setAvatar] = useState('');
+  const [avatar, setAvatar] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const router = useRouter();
-  const { theme } = useTheme();
   const [userData, setUserData] = useState({
-    name: '',
-    email: '',
-    username: '',
-    password: '',
+    name: "",
+    email: "",
+    username: "",
+    password: "",
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,39 +42,41 @@ function EditProfileContent() {
 
   const handleSubmit = async () => {
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const formDataObj = new FormData();
-      formDataObj.append('email', userData.email);
-      formDataObj.append('username', userData.username);
-      formDataObj.append('name', userData.name);
-      formDataObj.append('password', userData.password);
+      formDataObj.append("email", userData.email);
+      formDataObj.append("username", userData.username);
+      formDataObj.append("name", userData.name);
+      formDataObj.append("password", userData.password);
 
       // Append avatar file if selected
       if (avatarFile) {
-        formDataObj.append('avatar', avatarFile);
+        formDataObj.append("avatar", avatarFile);
       }
 
       // Send API request
       const response = await api.user.editProfile(token, formDataObj);
-      console.log('Profile updated:', response);
+      console.log("Profile updated:", response);
 
       // Update local storage
-      localStorage.setItem('userData', JSON.stringify(response));
-      alert('Profile updated successfully');
+      localStorage.setItem("userData", JSON.stringify(response));
+      alert("Profile updated successfully");
     } catch (err) {
-      console.error('Failed to update profile:', err);
-      alert('Failed to update profile');
+      console.error("Failed to update profile:", err);
+      alert("Failed to update profile");
     }
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('userToken');
-      const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("userToken");
+      const storedUserData = JSON.parse(
+        localStorage.getItem("userData") || "{}"
+      );
       if (storedUserData) {
         setUserData({
           name: storedUserData.name,
@@ -85,11 +84,11 @@ function EditProfileContent() {
           username: storedUserData.username,
           password: storedUserData.password,
         });
-        setAvatar(storedUserData.avatar || '');
+        setAvatar(storedUserData.avatar || "");
       }
 
       if (!token || !storedUserData) {
-        router.push('/login');
+        router.push("/login");
       }
     }
   }, [router]);
@@ -104,7 +103,7 @@ function EditProfileContent() {
         {/* Avatar */}
         <div className="relative w-[200px] h-[200px] flex mx-auto justify-center group mt-4">
           <Image
-            src={avatar || '/images/default-avatar.jpg'}
+            src={avatar || "/images/default-avatar.jpg"}
             alt="Avatar"
             width={200}
             height={200}
@@ -112,7 +111,7 @@ function EditProfileContent() {
           />
           <div
             className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full text-white font-semibold cursor-pointer"
-            onClick={() => document.getElementById('avatarInput')?.click()}
+            onClick={() => document.getElementById("avatarInput")?.click()}
           >
             Change Avatar
           </div>
@@ -139,7 +138,12 @@ function EditProfileContent() {
             </Label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white/50" viewBox="0 0 20 20" fill="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-white/50"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
                   <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                   <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                 </svg>
@@ -148,7 +152,7 @@ function EditProfileContent() {
                 type="email"
                 id="email"
                 name="email"
-                value={userData.email || ''}
+                value={userData.email || ""}
                 className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white cursor-not-allowed opacity-70"
                 disabled
               />
@@ -171,7 +175,7 @@ function EditProfileContent() {
                 type="text"
                 id="username"
                 name="username"
-                value={userData.username || ''}
+                value={userData.username || ""}
                 className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white cursor-not-allowed opacity-70"
                 required
                 disabled
@@ -189,16 +193,25 @@ function EditProfileContent() {
             </Label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white/50" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-white/50"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </span>
               <input
                 type="text"
                 id="name"
                 name="name"
-                value={userData.name || ''}
-                onChange={(e) => 
+                value={userData.name || ""}
+                onChange={(e) =>
                   setUserData({ ...userData, name: e.target.value })
                 }
                 className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white focus:ring-1 focus:ring-white/30 focus:border-white/30 transition duration-150"

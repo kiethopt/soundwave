@@ -48,7 +48,6 @@ export default function UserProfilePage({
   >({});
   const { dominantColor } = useDominantColor(user?.avatar || DEFAULT_AVATAR);
   const [showAllTracks, setShowAllTracks] = useState(false);
-  const [showAllPlaylists, setShowAllPlaylists] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
     new Set()
@@ -154,13 +153,15 @@ export default function UserProfilePage({
 
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'userData') {
-        const updatedUser = JSON.parse(localStorage.getItem('userData') || '{}');
+      if (event.key === "userData") {
+        const updatedUser = JSON.parse(
+          localStorage.getItem("userData") || "{}"
+        );
         setUser((prev) => ({ ...prev, ...updatedUser }));
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   // Fetch logged-in user's playlists and favorite IDs
@@ -253,97 +254,6 @@ export default function UserProfilePage({
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
     };
   }, []); // Fetch only once when component mounts
-
-  // Function to handle Add/Remove Favorites
-  const handleToggleFavorite = async (
-    trackId: string,
-    isCurrentlyFavorite: boolean
-  ) => {
-    handleProtectedAction(async () => {
-      const token = localStorage.getItem("userToken");
-      if (!token) return;
-
-      // Optimistic UI update
-      setFavoriteTrackIds((prevIds) => {
-        const newIds = new Set(prevIds);
-        if (isCurrentlyFavorite) {
-          newIds.delete(trackId);
-        } else {
-          newIds.add(trackId);
-        }
-        return newIds;
-      });
-
-      try {
-        if (isCurrentlyFavorite) {
-          await api.tracks.unlike(trackId, token);
-          toast.success("Removed from Favorites");
-          window.dispatchEvent(
-            new CustomEvent("favorites-changed", {
-              detail: { action: "remove", trackId },
-            })
-          );
-        } else {
-          await api.tracks.like(trackId, token);
-          toast.success("Added to Favorites");
-          window.dispatchEvent(
-            new CustomEvent("favorites-changed", {
-              detail: { action: "add", trackId },
-            })
-          );
-        }
-      } catch (error: any) {
-        console.error("Error toggling favorite status:", error);
-        toast.error(error.message || "Failed to update favorites");
-        // Revert optimistic UI on error
-        setFavoriteTrackIds((prevIds) => {
-          const newIds = new Set(prevIds);
-          if (isCurrentlyFavorite) {
-            newIds.add(trackId);
-          } else {
-            newIds.delete(trackId);
-          }
-          return newIds;
-        });
-      }
-    });
-  };
-
-  // Function to handle Add to Playlist
-  const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
-    handleProtectedAction(async () => {
-      const token = localStorage.getItem("userToken");
-      if (!token) return;
-
-      try {
-        const response = await api.playlists.addTrack(
-          playlistId,
-          trackId,
-          token
-        );
-
-        if (response.success) {
-          toast.success("Added to playlist");
-          window.dispatchEvent(new CustomEvent("playlist-updated"));
-        } else if (response.code === "TRACK_ALREADY_IN_PLAYLIST") {
-          const playlist = playlists.find((p) => p.id === playlistId);
-          // Find track title from profileData.topTracks if available
-          const track = topTracks.find((t) => t.id === trackId);
-          setDuplicateInfo({
-            playlistName: playlist?.name || "this playlist",
-            trackTitle: track?.title,
-          });
-          setIsAlreadyExistsDialogOpen(true);
-        } else {
-          console.error("Error adding to playlist:", response);
-          toast.error(response.message || "Cannot add to playlist");
-        }
-      } catch (error: any) {
-        console.error("Error adding to playlist:", error);
-        toast.error(error.message || "Cannot add to playlist");
-      }
-    });
-  };
 
   const handleFollow = async () => {
     if (!token) {
@@ -536,9 +446,13 @@ export default function UserProfilePage({
               <div className="flex flex-col items-start justify-center flex-1 ml-4 llg:ml-8 gap-4">
                 <span className="text-sm font-semibold ">Profile</span>
                 <h1
-                  className={`text-4xl w-fit md:text-6xl font-bold capitalize ${isOwner ? 'cursor-pointer' : ''}`}
+                  className={`text-4xl w-fit md:text-6xl font-bold capitalize ${
+                    isOwner ? "cursor-pointer" : ""
+                  }`}
                   style={{ lineHeight: "1.1" }}
-                  onClick={isOwner ? () => setIsEditProfileModalOpen(true) : undefined}
+                  onClick={
+                    isOwner ? () => setIsEditProfileModalOpen(true) : undefined
+                  }
                 >
                   {user?.name || user?.username || "User"}
                 </h1>
@@ -650,9 +564,11 @@ export default function UserProfilePage({
                     }
                   >
                     <div className="relative">
-                      <img
-                        src={topArtist.avatar || "/images/default-avatar.jpg"}
+                      <Image
+                        src={topArtist.avatar || DEFAULT_AVATAR}
                         alt={topArtist.artistName}
+                        width={180}
+                        height={180}
                         className="w-full aspect-square object-cover rounded-full mb-4"
                       />
                       <button
@@ -742,9 +658,7 @@ export default function UserProfilePage({
                 <h2 className="text-2xl font-bold">Following artists</h2>
                 <button
                   className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                  onClick={() =>
-                    router.push(`/profile/${id}/following`)
-                  }
+                  onClick={() => router.push(`/profile/${id}/following`)}
                 >
                   See all
                   <Right className="w-3 h-3 inline-block ml-1" />
@@ -760,11 +674,11 @@ export default function UserProfilePage({
                     }
                   >
                     <div className="relative">
-                      <img
-                        src={
-                          followArtist.avatar || "/images/default-avatar.jpg"
-                        }
+                      <Image
+                        src={followArtist.avatar || DEFAULT_AVATAR}
                         alt={followArtist.artistName}
+                        width={180}
+                        height={180}
                         className="w-full aspect-square object-cover rounded-full mb-4"
                       />
                       <button

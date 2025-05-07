@@ -1,4 +1,4 @@
-import express from 'express';
+import express from "express";
 import {
   getAllUsers,
   getUserById,
@@ -25,18 +25,23 @@ import {
   approveArtistClaimRequest,
   rejectArtistClaimRequest,
   bulkUploadTracks,
-} from '../controllers/admin.controller';
-import * as genreController from '../controllers/genre.controller';
-import { authenticate, authorize } from '../middleware/auth.middleware';
-import { Role } from '@prisma/client';
-import { cacheMiddleware } from '../middleware/cache.middleware';
-import upload, { handleUploadError } from '../middleware/upload.middleware';
+  generateUserAiPlaylistHandler,
+  updateAiPlaylistVisibilityHandler,
+  getUserAiPlaylistsHandler,
+  getUserListeningHistoryHandler,
+  reanalyzeTrackHandler,
+} from "../controllers/admin.controller";
+import * as genreController from "../controllers/genre.controller";
+import { authenticate, authorize } from "../middleware/auth.middleware";
+import { Role } from "@prisma/client";
+import { cacheMiddleware } from "../middleware/cache.middleware";
+import upload, { handleUploadError } from "../middleware/upload.middleware";
 
 const router = express.Router();
 
 // Thống kê Dashboard
 router.get(
-  '/dashboard-stats',
+  "/dashboard-stats",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
@@ -45,47 +50,47 @@ router.get(
 
 // Cập nhật trạng thái cache
 router
-  .route('/system/cache')
+  .route("/system/cache")
   .get(authenticate, authorize([Role.ADMIN]), handleCacheStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleCacheStatus);
 
 // Cập nhật trạng thái bảo trì - REMOVED
 
 // Quản lý người dùng
-router.get('/users', authenticate, authorize([Role.ADMIN]), getAllUsers);
+router.get("/users", authenticate, authorize([Role.ADMIN]), getAllUsers);
 router.get(
-  '/users/:id',
+  "/users/:id",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
   getUserById
 );
 router.put(
-  '/users/:id',
+  "/users/:id",
   authenticate,
   authorize([Role.ADMIN]),
-  upload.single('avatar'),
+  upload.single("avatar"),
   updateUser
 );
 router.put(
-  '/artists/:id',
+  "/artists/:id",
   authenticate,
   authorize([Role.ADMIN]),
-  upload.single('avatar'),
+  upload.single("avatar"),
   updateArtist
 );
-router.delete('/users/:id', authenticate, authorize([Role.ADMIN]), deleteUser);
+router.delete("/users/:id", authenticate, authorize([Role.ADMIN]), deleteUser);
 router.delete(
-  '/artists/:id',
+  "/artists/:id",
   authenticate,
   authorize([Role.ADMIN]),
   deleteArtist
 );
 
 // Quản lý nghệ sĩ
-router.get('/artists', authenticate, authorize([Role.ADMIN]), getAllArtists);
+router.get("/artists", authenticate, authorize([Role.ADMIN]), getAllArtists);
 router.get(
-  '/artists/:id',
+  "/artists/:id",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
@@ -93,13 +98,13 @@ router.get(
 );
 
 router.get(
-  '/artist-requests',
+  "/artist-requests",
   authenticate,
   authorize([Role.ADMIN]),
   getAllArtistRequests
 );
 router.get(
-  '/artist-requests/:id',
+  "/artist-requests/:id",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
@@ -108,7 +113,7 @@ router.get(
 
 // Thêm route DELETE cho artist requests
 router.delete(
-  '/artist-requests/:id',
+  "/artist-requests/:id",
   authenticate,
   authorize([Role.ADMIN]),
   deleteArtistRequest // Tham chiếu đến controller function mới
@@ -116,22 +121,22 @@ router.delete(
 
 // Quản lý thể loại nhạc
 router.get(
-  '/genres',
+  "/genres",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
   genreController.getAllGenres
 );
-router.post('/genres', authenticate, authorize([Role.ADMIN]), createGenre);
+router.post("/genres", authenticate, authorize([Role.ADMIN]), createGenre);
 router.put(
-  '/genres/:id',
+  "/genres/:id",
   authenticate,
   authorize([Role.ADMIN]),
   upload.none(),
   updateGenre
 );
 router.delete(
-  '/genres/:id',
+  "/genres/:id",
   authenticate,
   authorize([Role.ADMIN]),
   deleteGenre
@@ -139,13 +144,13 @@ router.delete(
 
 // Duyệt yêu cầu trở thành Artist
 router.post(
-  '/artist-requests/approve',
+  "/artist-requests/approve",
   authenticate,
   authorize([Role.ADMIN]),
   approveArtistRequest
 );
 router.post(
-  '/artist-requests/reject',
+  "/artist-requests/reject",
   authenticate,
   authorize([Role.ADMIN]),
   rejectArtistRequest
@@ -153,13 +158,13 @@ router.post(
 
 // Cập nhật trạng thái model AI
 router
-  .route('/system/ai-model')
+  .route("/system/ai-model")
   .get(authenticate, authorize([Role.ADMIN]), handleAIModelStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleAIModelStatus);
 
 // Lấy trạng thái hệ thống
 router.get(
-  '/system-status',
+  "/system-status",
   authenticate,
   authorize([Role.ADMIN]),
   getSystemStatus
@@ -167,41 +172,80 @@ router.get(
 
 // --- Route for Bulk Track Upload ---
 router.post(
-  '/bulk-upload-tracks',
+  "/bulk-upload-tracks",
   authenticate,
   authorize([Role.ADMIN]),
-  upload.array('audioFiles', 50),
+  upload.array("audioFiles", 50),
   handleUploadError,
   bulkUploadTracks
 );
 
 // --- Artist Claim Request Routes ---
 router.get(
-  '/artist-claims',
+  "/artist-claims",
   authenticate,
   authorize([Role.ADMIN]),
   getAllArtistClaimRequests
 );
 router.get(
-  '/artist-claims/:id',
+  "/artist-claims/:id",
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
   getArtistClaimRequestDetail
 );
 router.post(
-  '/artist-claims/:id/approve',
+  "/artist-claims/:id/approve",
   authenticate,
   authorize([Role.ADMIN]),
   approveArtistClaimRequest
 );
 router.post(
-  '/artist-claims/:id/reject',
+  "/artist-claims/:id/reject",
   authenticate,
   authorize([Role.ADMIN]),
   rejectArtistClaimRequest
 );
 // Note: We might not need a specific DELETE for claims, rejecting usually suffices.
 // --- End Artist Claim Request Routes ---
+
+// --- User AI Playlist Management by Admin ---
+router.post(
+  "/users/:userId/ai-playlists",
+  authenticate,
+  authorize([Role.ADMIN]),
+  generateUserAiPlaylistHandler
+);
+
+router.put(
+  "/ai-playlists/:playlistId/visibility",
+  authenticate,
+  authorize([Role.ADMIN]),
+  updateAiPlaylistVisibilityHandler
+);
+
+router.get(
+  "/users/:userId/ai-playlists",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getUserAiPlaylistsHandler
+);
+
+router.get(
+  "/users/:userId/history",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getUserListeningHistoryHandler
+);
+// --- End User AI Playlist Management by Admin ---
+
+// --- Track Re-analysis by Admin ---
+router.post(
+  "/tracks/:trackId/reanalyze",
+  authenticate,
+  authorize([Role.ADMIN]),
+  reanalyzeTrackHandler
+);
+// --- End Track Re-analysis by Admin ---
 
 export default router;

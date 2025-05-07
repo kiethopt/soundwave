@@ -37,7 +37,7 @@ export function RecommendedTrackList({
 }: RecommendedTrackListProps) {
   const { theme } = useTheme();
   const router = useRouter();
-  const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
+  const { dialogOpen, setDialogOpen, handleProtectedAction, userData } = useAuth();
   const { playTrack, currentTrack, trackQueue, isPlaying, pauseTrack } =
     useTrack();
   const [isAlreadyExistsDialogOpen, setIsAlreadyExistsDialogOpen] =
@@ -46,9 +46,10 @@ export function RecommendedTrackList({
     playlistName: string;
     trackTitle?: string;
   } | null>(null);
-  const [tracksInPlaylist, setTracksInPlaylist] = useState<Set<string>>(
-    new Set()
-  );
+  const [error, setError] = useState<string | null>(null);
+  const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
+  const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] =
+    useState<Track | null>(null);
 
   const handleTrackPlay = (track: Track) => {
     handleProtectedAction(() => {
@@ -103,13 +104,6 @@ export function RecommendedTrackList({
 
       if (response.success) {
         toast.success("Added to playlist");
-
-        // Update the local tracksInPlaylist state to reflect the change
-        setTracksInPlaylist((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(trackId);
-          return newSet;
-        });
 
         // Dispatch playlist-updated event to refresh the playlist display
         window.dispatchEvent(new CustomEvent("playlist-updated"));

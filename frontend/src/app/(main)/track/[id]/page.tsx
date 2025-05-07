@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { Track, Playlist } from "@/types";
-import { ArrowLeft, Calendar, Music, Flag, Pause, Play } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Heart,
+  MoreHorizontal,
+  Share2,
+  Flag,
+} from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +23,11 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { AddSimple } from "@/components/ui/Icons";
+import { Spinner } from "@/components/ui/Spinner";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { toast } from "react-hot-toast";
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -34,16 +46,8 @@ export default function TrackDetailPage() {
   const { theme } = useTheme();
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
-  const {
-    currentTrack,
-    isPlaying,
-    playTrack,
-    pauseTrack,
-    queueType,
-    setQueueType,
-    trackQueue,
-    addToQueue,
-  } = useTrack();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, trackQueue } =
+    useTrack();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   const fetchTrackDetails = useCallback(async () => {
@@ -74,7 +78,7 @@ export default function TrackDetailPage() {
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
         if (!token) return;
 
         const response = await api.playlists.getAll(token);
@@ -83,7 +87,7 @@ export default function TrackDetailPage() {
         );
         setPlaylists(normalPlaylists);
       } catch (error) {
-        console.error('Error fetching playlists:', error);
+        console.error("Error fetching playlists:", error);
       }
     };
 
@@ -201,19 +205,15 @@ export default function TrackDetailPage() {
 
   useEffect(() => {
     if ((!track && !loading) || error || (track && !track.isActive)) {
-      router.push('/');
+      router.push("/");
     }
   }, [track, loading, error, router]);
 
   const handleTrackPlay = (track: Track) => {
     handleProtectedAction(() => {
-      if (currentTrack?.id === track.id && isPlaying && queueType === "track") {
+      if (currentTrack?.id === track.id && isPlaying) {
         pauseTrack();
       } else {
-        setQueueType("track");
-        if (track) {
-          trackQueue([track]);
-        }
         playTrack(track);
       }
     });
@@ -272,7 +272,7 @@ export default function TrackDetailPage() {
         <div className="flex flex-col items-center md:items-end md:flex-row gap-8">
           {/* Track Cover */}
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
-            <img
+            <Image
               src={track.coverUrl || "/images/default-track.jpg"}
               alt={track.title || "Track"}
               className="w-full aspect-square object-cover rounded-xl shadow-2xl"
@@ -392,7 +392,7 @@ export default function TrackDetailPage() {
 
         {/* Auth Dialog */}
         <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-        
+
         {/* Report Dialog */}
         {track && (
           <ReportDialog
@@ -412,5 +412,7 @@ function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = Math.floor(seconds % 60);
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
 }

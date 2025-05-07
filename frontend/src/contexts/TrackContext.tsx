@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   createContext,
@@ -8,17 +8,16 @@ import {
   useRef,
   useEffect,
   useCallback,
-} from 'react';
-import { Track } from '@/types';
-import { api } from '@/utils/api';
-import io, { Socket } from 'socket.io-client'; // Import Socket type
-
+} from "react";
+import { Track } from "@/types";
+import { api } from "@/utils/api";
+import { toast } from "react-hot-toast";
 
 // Helper function to get initial volume from localStorage
 const getInitialVolume = (): number => {
-  if (typeof window === 'undefined') return 1;
-  
-  const savedVolume = localStorage.getItem('userVolume');
+  if (typeof window === "undefined") return 1;
+
+  const savedVolume = localStorage.getItem("userVolume");
   if (savedVolume !== null) {
     const parsedVolume = parseFloat(savedVolume);
     if (!isNaN(parsedVolume) && parsedVolume >= 0 && parsedVolume <= 1) {
@@ -65,7 +64,7 @@ export const TrackContext = createContext<TrackContextType>({
   loop: false,
   shuffle: false,
   duration: 0,
-  queueType: 'track',
+  queueType: "track",
   showPlayer: false,
   setQueueType: () => {},
   playTrack: () => {},
@@ -94,9 +93,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [loop, setLoop] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [shuffle, setShuffle] = useState(false);
-  const [trackQueue, setTrackQueue] = useState<Track[]>([]); 
+  const [trackQueue, setTrackQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [queueType, setQueueType] = useState<string>('track');
+  const [queueType, setQueueType] = useState<string>("track");
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -109,7 +108,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   // Initialize audio and broadcast channel
   useEffect(() => {
     audioRef.current = new Audio();
-    broadcastChannel.current = new BroadcastChannel('musicPlayback');
+    broadcastChannel.current = new BroadcastChannel("musicPlayback");
     // Removed token setting as state wasn't used
 
     // Clean up function
@@ -131,32 +130,37 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
   const saveHistory = useCallback(
     async (trackId: string, duration: number, completed: boolean) => {
-      const currentToken = localStorage.getItem('userToken');
+      const currentToken = localStorage.getItem("userToken");
       if (!currentToken) return;
 
       try {
-        await api.history.savePlay(
-          currentToken,
-          { trackId, duration, completed }
-        );
+        await api.history.savePlay(currentToken, {
+          trackId,
+          duration,
+          completed,
+        });
       } catch (error) {
-        console.error('Failed to save play history:', error);
+        // console.error("Failed to save play history:", error); // Removed unused variable 'e'
+        // Do not show toast here, as it can be annoying for a background task
       }
     },
     []
   );
 
   // Add function to reorganize queue when a track is selected
-  const reorderQueueFromSelected = useCallback((tracks: Track[], selectedIndex: number) => {
-    if (selectedIndex < 0 || selectedIndex >= tracks.length) return tracks;
-    
-    // Split the array at the selected index
-    const firstPart = tracks.slice(0, selectedIndex);
-    const secondPart = tracks.slice(selectedIndex);
-    
-    // Combine the arrays so selected track comes first, followed by the rest in order
-    return [...secondPart, ...firstPart];
-  }, []);
+  const reorderQueueFromSelected = useCallback(
+    (tracks: Track[], selectedIndex: number) => {
+      if (selectedIndex < 0 || selectedIndex >= tracks.length) return tracks;
+
+      // Split the array at the selected index
+      const firstPart = tracks.slice(0, selectedIndex);
+      const secondPart = tracks.slice(selectedIndex);
+
+      // Combine the arrays so selected track comes first, followed by the rest in order
+      return [...secondPart, ...firstPart];
+    },
+    []
+  );
 
   const playTrack = useCallback(
     async (track: Track) => {
@@ -192,10 +196,10 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           console.log(
             `Audio URL missing for ${track.title}, fetching details...`
           );
-          const currentToken = localStorage.getItem('userToken');
+          const currentToken = localStorage.getItem("userToken");
           if (!currentToken) {
             console.error(
-              'Authentication token not found, cannot fetch track details.'
+              "Authentication token not found, cannot fetch track details."
             );
             setIsPlaying(false);
             return;
@@ -205,7 +209,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
             currentToken
           );
           if (signal.aborted) {
-            console.log('Track fetch aborted.');
+            console.log("Track fetch aborted.");
             return;
           }
           if (trackDetailResponse && trackDetailResponse.audioUrl) {
@@ -220,7 +224,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (broadcastChannel.current) {
-          broadcastChannel.current.postMessage({ type: 'play', tabId });
+          broadcastChannel.current.postMessage({ type: "play", tabId });
         }
 
         setShowPlayer(true);
@@ -231,8 +235,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
               await audioRef.current.play();
               setIsPlaying(true);
             } catch (error) {
-              if (error instanceof Error && error.name !== 'AbortError') {
-                console.error('Resume playback error:', error);
+              if (error instanceof Error && error.name !== "AbortError") {
+                console.error("Resume playback error:", error);
                 setIsPlaying(false);
               }
             }
@@ -242,8 +246,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
               await audioRef.current.play();
               setIsPlaying(true);
             } catch (error) {
-              if (error instanceof Error && error.name !== 'AbortError') {
-                console.error('Resume playback error:', error);
+              if (error instanceof Error && error.name !== "AbortError") {
+                console.error("Resume playback error:", error);
                 setIsPlaying(false);
               }
             }
@@ -270,8 +274,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
         await new Promise<void>((resolve, reject) => {
           const handleCanPlay = () => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
+            audioRef.current?.removeEventListener("canplay", handleCanPlay);
+            audioRef.current?.removeEventListener("error", handleError);
             const audioDuration = audioRef.current?.duration;
             if (audioDuration && !isNaN(audioDuration)) {
               setDuration(audioDuration);
@@ -282,20 +286,20 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           };
 
           const handleError = (e: Event) => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
-            console.error('Audio playback error:', audioRef.current?.error);
+            audioRef.current?.removeEventListener("canplay", handleCanPlay);
+            audioRef.current?.removeEventListener("error", handleError);
+            console.error("Audio playback error:", audioRef.current?.error);
             reject(
               new Error(
                 `Failed to load audio: ${
-                  audioRef.current?.error?.message || 'Unknown error'
+                  audioRef.current?.error?.message || "Unknown error"
                 }`
               )
             );
           };
 
-          audioRef.current?.addEventListener('canplay', handleCanPlay);
-          audioRef.current?.addEventListener('error', handleError);
+          audioRef.current?.addEventListener("canplay", handleCanPlay);
+          audioRef.current?.addEventListener("error", handleError);
 
           if (
             audioRef.current?.readyState &&
@@ -305,35 +309,60 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           }
 
           const timeoutId = setTimeout(() => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
-            reject(new Error('Audio load timed out after 15 seconds'));
+            audioRef.current?.removeEventListener("canplay", handleCanPlay);
+            audioRef.current?.removeEventListener("error", handleError);
+            reject(new Error("Audio load timed out after 15 seconds"));
           }, 15000);
 
           const clearAudioTimeout = () => clearTimeout(timeoutId);
-          audioRef.current?.addEventListener('canplay', clearAudioTimeout, {
+          audioRef.current?.addEventListener("canplay", clearAudioTimeout, {
             once: true,
           });
-          audioRef.current?.addEventListener('error', clearAudioTimeout, {
+          audioRef.current?.addEventListener("error", clearAudioTimeout, {
             once: true,
           });
         });
 
         if (signal.aborted) {
-          console.log('Playback aborted while waiting for audio to load.');
+          console.log("Playback aborted while waiting for audio to load.");
           setIsPlaying(false);
           return;
         }
 
         await audioRef.current.play();
         setIsPlaying(true);
+
+        // Call backend API to record the play event
+        const currentToken = localStorage.getItem("userToken");
+        if (currentToken) {
+          try {
+            console.log(
+              `[TrackContext DEBUG] Attempting to call api.tracks.recordPlay for track: ${trackToPlay.id}`
+            );
+            // Use trackToPlay.id which has the potentially fetched data
+            await api.tracks.recordPlay(trackToPlay.id, currentToken);
+            console.log(
+              `[TrackContext] Successfully notified backend about playing track: ${trackToPlay.id}`
+            );
+          } catch (apiError) {
+            console.error(
+              `[TrackContext] Failed to notify backend about playing track ${trackToPlay.id}:`,
+              apiError
+            );
+            // Decide how to handle this error - maybe log or show a subtle indicator
+          }
+        } else {
+          console.warn(
+            "[TrackContext] No token found, skipping backend play notification."
+          );
+        }
       } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          console.error('Error in playTrack:', error);
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Error in playTrack:", error);
           setIsPlaying(false);
           setCurrentTrack(null);
-        } else if (error instanceof Error && error.name === 'AbortError') {
-          console.log('playTrack aborted.');
+        } else if (error instanceof Error && error.name === "AbortError") {
+          console.log("playTrack aborted.");
         }
       } finally {
         if (currentPlayRequestRef.current?.signal === signal) {
@@ -341,7 +370,14 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    [currentTrack, isPlaying, saveHistory, tabId, trackQueueRef, reorderQueueFromSelected]
+    [
+      currentTrack,
+      isPlaying,
+      saveHistory,
+      tabId,
+      trackQueueRef,
+      reorderQueueFromSelected,
+    ]
   );
 
   const pauseTrack = useCallback(() => {
@@ -370,12 +406,12 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       audioRef.current.volume = newVolume;
     }
     setVolume(newVolume);
-    
+
     // Save volume to localStorage for persistence
     try {
-      localStorage.setItem('userVolume', newVolume.toString());
+      localStorage.setItem("userVolume", newVolume.toString());
     } catch (error) {
-      console.error('Failed to save volume to localStorage:', error);
+      console.error("Failed to save volume to localStorage:", error);
     }
   }, []);
 
@@ -434,8 +470,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         await playTrack(prevTrack);
       }
     } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error skipping to previous track:', error);
+      if (error instanceof Error && error.name !== "AbortError") {
+        console.error("Error skipping to previous track:", error);
       }
     }
   }, [currentIndex, playTrack]);
@@ -483,39 +519,39 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleBroadcastMessage = (event: MessageEvent) => {
-      if (event.data.type === 'play' && event.data.tabId !== tabId) {
+      if (event.data.type === "play" && event.data.tabId !== tabId) {
         // Nếu tab khác đã bắt đầu phát, tạm dừng tab hiện tại
         pauseTrack();
       }
     };
 
-    audio.addEventListener('loadedmetadata', handleMetadataLoaded);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener("loadedmetadata", handleMetadataLoaded);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
     broadcastChannel.current.addEventListener(
-      'message',
+      "message",
       handleBroadcastMessage
     );
 
     const handleBeforeUnload = () => {
       if (broadcastChannel.current) {
-        broadcastChannel.current.postMessage({ type: 'stop', tabId });
+        broadcastChannel.current.postMessage({ type: "stop", tabId });
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleMetadataLoaded);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener("loadedmetadata", handleMetadataLoaded);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
       if (broadcastChannel.current) {
         broadcastChannel.current.removeEventListener(
-          'message',
+          "message",
           handleBroadcastMessage
         );
       }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [
     loop,
@@ -546,27 +582,30 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Add new queue management functions
-  const addToQueue = useCallback((track: Track) => {
-    setQueue((prevQueue) => {
-      const isTrackInQueue = prevQueue.some((item) => item.id === track.id);
+  const addToQueue = useCallback(
+    (track: Track) => {
+      setQueue((prevQueue) => {
+        const isTrackInQueue = prevQueue.some((item) => item.id === track.id);
 
-      // Nếu queue rỗng, thêm và play luôn
-      if (prevQueue.length === 0) {
-        setTrackQueue([track]);
-        trackQueueRef.current = [track];
-        playTrack(track);
-        return [track];
-      }
+        // Nếu queue rỗng, thêm và play luôn
+        if (prevQueue.length === 0) {
+          setTrackQueue([track]);
+          trackQueueRef.current = [track];
+          playTrack(track);
+          return [track];
+        }
 
-      // Nếu chưa có trong queue, thêm vào cuối
-      if (!isTrackInQueue) {
-        const newQueue = [...prevQueue, track];
-        return newQueue;
-      }
+        // Nếu chưa có trong queue, thêm vào cuối
+        if (!isTrackInQueue) {
+          const newQueue = [...prevQueue, track];
+          return newQueue;
+        }
 
-      return prevQueue;
-    });
-  }, [playTrack]);
+        return prevQueue;
+      });
+    },
+    [playTrack]
+  );
 
   const removeFromQueue = useCallback(
     (index: number) => {
@@ -634,40 +673,33 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
   // WebSocket listener for TrackContext updates
   useEffect(() => {
-    // let socket: Socket | null = null; 
-
+    // let socket: Socket | null = null;
     // const connectSocket = () => {
-    //   socket = io(process.env.NEXT_PUBLIC_API_URL!); 
-
+    //   socket = io(process.env.NEXT_PUBLIC_API_URL!);
     //   console.log('[WebSocket] Attempting TrackContext connection...');
-
-    //   // --- Event Listeners --- 
+    //   // --- Event Listeners ---
     //   socket.on('connect', () => {
     //     console.log(`[WebSocket] TrackContext connected`);
     //   });
-
     //   socket.on('disconnect', (reason: string) => {
     //     console.log(`[WebSocket] TrackContext disconnected:`, reason);
     //   });
-
     //   socket.on('connect_error', (error: Error) => {
     //       console.error(`[WebSocket] TrackContext Connection Error:`, error);
     //   });
-
     //   socket.on('track:updated', (data: { track: Track }) => {
     //     const updatedTrack = data.track;
     //     console.log('[WebSocket] TrackContext received track:updated', updatedTrack);
-    //     setCurrentTrack(prevTrack => 
+    //     setCurrentTrack(prevTrack =>
     //       prevTrack?.id === updatedTrack.id ? { ...prevTrack, ...updatedTrack } : prevTrack
     //     );
-    //     setQueue(prevQueue => 
+    //     setQueue(prevQueue =>
     //       prevQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
     //     );
-    //      setTrackQueue(prevPlaybackQueue => 
+    //      setTrackQueue(prevPlaybackQueue =>
     //       prevPlaybackQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
     //     );
     //   });
-
     //   socket.on('track:deleted', (data: { trackId: string }) => {
     //     const deletedTrackId = data.trackId;
     //     console.log('[WebSocket] TrackContext received track:deleted', deletedTrackId);
@@ -683,7 +715,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //        setTrackQueue(nextQueue);
     //        setQueue(nextQueue);
     //        trackQueueRef.current = nextQueue;
-
     //        if (nextQueue.length > 0) {
     //           const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
     //            if (nextQueue[nextIndex]) {
@@ -697,7 +728,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //     } else {
     //         const nextQueue = queue.filter(t => t.id !== deletedTrackId);
     //         const nextPlaybackQueue = trackQueue.filter(t => t.id !== deletedTrackId);
-            
     //         setQueue(nextQueue);
     //         setTrackQueue(nextPlaybackQueue);
     //         trackQueueRef.current = nextPlaybackQueue;
@@ -707,11 +737,10 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //         }
     //     }
     //   });
-
     //   socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
     //     const { trackId, isActive } = data;
     //     console.log(`[WebSocket] TrackContext received track:visibilityChanged for ${trackId}: ${isActive}`);
-    //      if (!isActive) { 
+    //      if (!isActive) {
     //           let currentArtistId: string | null = null;
     //           try {
     //               const userDataString = localStorage.getItem('userData');
@@ -722,7 +751,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //           } catch (e) {
     //               console.error("Error parsing user data for visibility check:", e);
     //           }
-
     //            if (currentTrack?.id === trackId && currentTrack.artistId !== currentArtistId) {
     //               console.log('[WebSocket] Current track hidden and user is not owner, skipping next...');
     //                if (audioRef.current) {
@@ -735,7 +763,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //                setTrackQueue(nextQueue);
     //                setQueue(nextQueue);
     //                trackQueueRef.current = nextQueue;
-
     //                if (nextQueue.length > 0) {
     //                    const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
     //                    if (nextQueue[nextIndex]) {
@@ -749,8 +776,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //            } else {
     //                const nextQueue = queue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
     //                const nextPlaybackQueue = trackQueue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
-                    
-    //                if (nextQueue.length !== queue.length) { 
+    //                if (nextQueue.length !== queue.length) {
     //                   console.log('[WebSocket] Hidden track removed from queues (user not owner)');
     //                   setQueue(nextQueue);
     //                   setTrackQueue(nextPlaybackQueue);
@@ -762,25 +788,22 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //                }
     //            }
     //      } else {
-    //            setCurrentTrack(prevTrack => 
+    //            setCurrentTrack(prevTrack =>
     //               prevTrack?.id === trackId ? { ...prevTrack, isActive: true } : prevTrack
     //            );
-    //           setQueue(prevQueue => 
+    //           setQueue(prevQueue =>
     //               prevQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
     //           );
-    //           setTrackQueue(prevPlaybackQueue => 
+    //           setTrackQueue(prevPlaybackQueue =>
     //               prevPlaybackQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
     //           );
     //      }
     //   });
-
     // };
-
     // const timeoutId = setTimeout(connectSocket, process.env.NODE_ENV === 'development' ? 100 : 0);
-
     // return () => {
     //   clearTimeout(timeoutId);
-    //   if (socket) { 
+    //   if (socket) {
     //       console.log(`[WebSocket] TrackContext disconnecting...`);
     //       socket.off('connect');
     //       socket.off('disconnect');
@@ -791,7 +814,20 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     //       socket.disconnect();
     //   }
     // };
-  }, [currentTrack?.id, currentIndex, queue, trackQueue, setCurrentTrack, setQueue, setTrackQueue, setIsPlaying, setCurrentIndex, playTrack, pauseTrack, skipNext]); // Consider which dependencies are truly needed if socket logic is removed
+  }, [
+    currentTrack?.id,
+    currentIndex,
+    queue,
+    trackQueue,
+    setCurrentTrack,
+    setQueue,
+    setTrackQueue,
+    setIsPlaying,
+    setCurrentIndex,
+    playTrack,
+    pauseTrack,
+    skipNext,
+  ]); // Consider which dependencies are truly needed if socket logic is removed
 
   return (
     <TrackContext.Provider
@@ -832,7 +868,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 export const useTrack = () => {
   const context = useContext(TrackContext);
   if (context === undefined) {
-    throw new Error('useTrack must be used within a TrackProvider');
+    throw new Error("useTrack must be used within a TrackProvider");
   }
   return context;
 };

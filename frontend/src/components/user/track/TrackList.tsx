@@ -2,15 +2,7 @@ import { Track, Playlist } from "@/types";
 import { useTrack } from "@/contexts/TrackContext";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
-import { useTheme } from "@/contexts/ThemeContext";
-import {
-  MoreHorizontal,
-  Heart,
-  Share2,
-  ListMusic,
-  Trash2,
-  CalendarDays,
-} from "lucide-react";
+import { MoreHorizontal, Heart, Share2, ListMusic, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -35,16 +27,12 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 // Define the names of playlists to filter out
-const filteredPlaylistNames = new Set([
-  "Welcome Mix",
-  "Favorites",
-]);
+const filteredPlaylistNames = new Set(["Welcome Mix", "Favorites"]);
 
 interface TrackListProps {
   tracks: Track[];
   onRemove?: (trackId: string) => void;
   allowRemove?: boolean;
-  requiresAuth?: boolean;
   playlists: Playlist[];
   favoriteTrackIds: Set<string>;
   theme: "light" | "dark";
@@ -599,7 +587,6 @@ export function TrackList({
   tracks,
   onRemove,
   allowRemove = false,
-  requiresAuth = false,
   playlists,
   favoriteTrackIds,
   theme,

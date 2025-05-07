@@ -1,21 +1,28 @@
-import prisma from '../config/db';
-import { Prisma, Role, AlbumType, NotificationType, RecipientType, Track } from '@prisma/client';
-import { Request } from 'express';
-import { uploadFile } from './upload.service';
-import { paginate } from '../utils/handle-utils';
-import * as emailService from './email.service';
-import { client, setCache } from '../middleware/cache.middleware';
-import { trackSelect } from '../utils/prisma-selects';
-import { getIO, getUserSockets } from '../config/socket';
-import { getOrCreateArtistProfile } from './artist.service';
-import * as mm from 'music-metadata';
-import { Essentia, EssentiaWASM } from 'essentia.js';
-import { MPEGDecoder, MPEGDecodedAudio } from 'mpg123-decoder';
+import prisma from "../config/db";
+import {
+  Prisma,
+  Role,
+  AlbumType,
+  NotificationType,
+  RecipientType,
+  Track,
+} from "@prisma/client";
+import { Request } from "express";
+import { uploadFile } from "./upload.service";
+import { paginate } from "../utils/handle-utils";
+import * as emailService from "./email.service";
+import { client, setCache } from "../middleware/cache.middleware";
+import { trackSelect } from "../utils/prisma-selects";
+import { getIO, getUserSockets } from "../config/socket";
+import { getOrCreateArtistProfile } from "./artist.service";
+import * as mm from "music-metadata";
+import { Essentia, EssentiaWASM } from "essentia.js";
+import { MPEGDecoder, MPEGDecodedAudio } from "mpg123-decoder";
 // import { Audd } from 'audd.io'; // Comment out or remove Audd
-import * as acrcloudService from './acrcloud.service'; // Import the new ACRCloud service
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { tmpdir } from 'os';
+import * as acrcloudService from "./acrcloud.service"; // Import the new ACRCloud service
+import * as fs from "fs/promises";
+import * as path from "path";
+import { tmpdir } from "os";
 
 // Comment out or remove AudD specific initialization
 // const auddApiKey = process.env.AUDD_API_KEY;
@@ -28,46 +35,59 @@ import { tmpdir } from 'os';
 // }
 
 function normalizeString(str: string): string {
-  if (!str) return '';
-  
+  if (!str) return "";
+
   // Convert to lowercase
   let result = str.toLowerCase().trim();
-  
+
   // Remove diacritics (accents)
-  result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
+  result = result.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   // Remove special characters (keep only alphanumeric)
-  result = result.replace(/[^a-z0-9]/g, '');
-  
+  result = result.replace(/[^a-z0-9]/g, "");
+
   return result;
 }
 
 // Helper function to check copyright using AudD
 async function checkCopyrightWithACRCloud( // Renamed and modified for ACRCloud
-  audioBuffer: Buffer, 
-  originalFileName?: string, 
+  audioBuffer: Buffer,
+  originalFileName?: string,
   title?: string
-): Promise<{ isMatched: boolean, match?: acrcloudService.ACRCloudMusicEntry, error?: boolean, errorMessage?: string, errorCode?: number }> {
+): Promise<{
+  isMatched: boolean;
+  match?: acrcloudService.ACRCloudMusicEntry;
+  error?: boolean;
+  errorMessage?: string;
+  errorCode?: number;
+}> {
   // Using the new ACRCloud service directly
-  return acrcloudService.recognizeAudioWithACRCloud(audioBuffer, originalFileName, title);
+  return acrcloudService.recognizeAudioWithACRCloud(
+    audioBuffer,
+    originalFileName,
+    title
+  );
 }
 
 // Helper function to compare artist names for similarity
 // A more robust implementation that handles diacritics, case, and special characters
 function getArtistNameSimilarity(name1: string, name2: string): number {
   if (!name1 || !name2) return 0;
-  
+
   const normalized1 = normalizeString(name1);
   const normalized2 = normalizeString(name2);
-  
+
   // Exact match after normalization
   if (normalized1 === normalized2) return 1;
-  
+
   // Check for containment after normalization
   if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
-    return Math.min(normalized1.length, normalized2.length) / Math.max(normalized1.length, normalized2.length);
+    return (
+      Math.min(normalized1.length, normalized2.length) /
+      Math.max(normalized1.length, normalized2.length)
+    );
   }
-  
+
   if (normalized1.length <= 3 && normalized2.length <= 3) {
     // Count shared characters
     let matches = 0;
@@ -80,49 +100,60 @@ function getArtistNameSimilarity(name1: string, name2: string): number {
       return 0.8;
     }
   }
-  
+
   // More sophisticated similarity algorithm for longer names
   let matches = 0;
-  const longer = normalized1.length > normalized2.length ? normalized1 : normalized2;
-  const shorter = normalized1.length > normalized2.length ? normalized2 : normalized1;
-  
+  const longer =
+    normalized1.length > normalized2.length ? normalized1 : normalized2;
+  const shorter =
+    normalized1.length > normalized2.length ? normalized2 : normalized1;
+
   // Check for sequential matches
   let sequentialMatches = 0;
   let maxSequence = 0;
   for (let i = 0; i < shorter.length; i++) {
-    if (longer.includes(shorter.substring(i, i+2))) {
+    if (longer.includes(shorter.substring(i, i + 2))) {
       sequentialMatches++;
       maxSequence = Math.max(maxSequence, 2);
     }
   }
-  
+
   // Check for individual character matches
   for (let i = 0; i < shorter.length; i++) {
     if (longer.includes(shorter[i])) {
       matches++;
     }
   }
-  
+
   // Calculate final similarity based on matches and sequential matches
   const charSimilarity = matches / longer.length;
-  const sequenceSimilarity = sequentialMatches > 0 ? (sequentialMatches * maxSequence) / (longer.length * 2) : 0;
-  
+  const sequenceSimilarity =
+    sequentialMatches > 0
+      ? (sequentialMatches * maxSequence) / (longer.length * 2)
+      : 0;
+
   return Math.max(charSimilarity, sequenceSimilarity);
 }
 
 // Helper function to convert MP3 buffer to Float32Array PCM data
-async function convertMp3BufferToPcmF32(audioBuffer: Buffer): Promise<Float32Array | null> {
+async function convertMp3BufferToPcmF32(
+  audioBuffer: Buffer
+): Promise<Float32Array | null> {
   try {
     const decoder = new MPEGDecoder();
     await decoder.ready;
 
-    const uint8ArrayBuffer = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length);
+    const uint8ArrayBuffer = new Uint8Array(
+      audioBuffer.buffer,
+      audioBuffer.byteOffset,
+      audioBuffer.length
+    );
     const decoded: MPEGDecodedAudio = decoder.decode(uint8ArrayBuffer);
 
     decoder.free(); // Release resources
 
     if (decoded.errors.length > 0) {
-      console.error('MP3 Decoding errors:', decoded.errors);
+      console.error("MP3 Decoding errors:", decoded.errors);
       return null;
     }
 
@@ -137,12 +168,11 @@ async function convertMp3BufferToPcmF32(audioBuffer: Buffer): Promise<Float32Arr
     } else if (decoded.channelData.length === 1) {
       return decoded.channelData[0];
     } else {
-      console.error('MP3 Decoding produced no channel data.');
+      console.error("MP3 Decoding produced no channel data.");
       return null;
     }
-
   } catch (error) {
-    console.error('Error during MP3 decoding or processing:', error);
+    console.error("Error during MP3 decoding or processing:", error);
     return null;
   }
 }
@@ -167,12 +197,12 @@ export const deleteTrackById = async (id: string) => {
   });
 
   if (!track) {
-    throw new Error('Track not found');
+    throw new Error("Track not found");
   }
 
   // Emit WebSocket event before deletion
   const io = getIO();
-  io.emit('track:deleted', { trackId: id });
+  io.emit("track:deleted", { trackId: id });
 
   return prisma.$transaction(async (tx) => {
     // Delete the track itself
@@ -200,7 +230,7 @@ export const likeTrack = async (userId: string, trackId: string) => {
   });
 
   if (!track) {
-    throw new Error('Track not found or not active');
+    throw new Error("Track not found or not active");
   }
 
   const existingLike = await prisma.userLikeTrack.findUnique({
@@ -213,7 +243,7 @@ export const likeTrack = async (userId: string, trackId: string) => {
   });
 
   if (existingLike) {
-    throw new Error('Track already liked');
+    throw new Error("Track already liked");
   }
 
   await prisma.userLikeTrack.create({
@@ -227,7 +257,7 @@ export const likeTrack = async (userId: string, trackId: string) => {
   let favoritePlaylist = await prisma.playlist.findFirst({
     where: {
       userId,
-      type: 'FAVORITE',
+      type: "FAVORITE",
     },
   });
 
@@ -278,11 +308,11 @@ export const likeTrack = async (userId: string, trackId: string) => {
 
   // Emit WebSocket event to notify clients that the Favorites playlist was updated
   const io = getIO();
-  io.emit('playlist-updated');
+  io.emit("playlist-updated");
   // Also emit a personalized event for this user
-  io.to(`user-${userId}`).emit('favorites-updated', { action: 'add', trackId });
+  io.to(`user-${userId}`).emit("favorites-updated", { action: "add", trackId });
 
-  return { message: 'Track liked successfully' };
+  return { message: "Track liked successfully" };
 };
 
 // Unlike a track
@@ -297,22 +327,22 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
   });
 
   if (!existingLike) {
-    throw new Error('Track not liked');
+    throw new Error("Track not liked");
   }
 
   // First, find the Favorites playlist
   const favoritePlaylist = await prisma.playlist.findFirst({
     where: {
       userId,
-      type: 'FAVORITE',
+      type: "FAVORITE",
     },
     include: {
       _count: {
         select: {
-          tracks: true
-        }
-      }
-    }
+          tracks: true,
+        },
+      },
+    },
   });
 
   if (!favoritePlaylist) {
@@ -325,14 +355,14 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
         },
       },
     });
-    
-    return { message: 'Track unliked successfully' };
+
+    return { message: "Track unliked successfully" };
   }
 
   // Get track duration before deleting
   const track = await prisma.track.findUnique({
     where: { id: trackId },
-    select: { duration: true }
+    select: { duration: true },
   });
 
   // Delete the like
@@ -350,7 +380,7 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
     where: {
       playlist: {
         userId,
-        type: 'FAVORITE',
+        type: "FAVORITE",
       },
       trackId,
     },
@@ -378,20 +408,26 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
     // Delete the entire Favorites playlist since it's now empty
     await prisma.playlist.delete({
       where: {
-        id: favoritePlaylist.id
-      }
+        id: favoritePlaylist.id,
+      },
     });
-    
-    io.emit('playlist-updated');
-    io.to(`user-${userId}`).emit('favorites-updated', { action: 'deleted', playlistId: favoritePlaylist.id });
-    
-    return { message: 'Track unliked and empty Favorites playlist removed' };
+
+    io.emit("playlist-updated");
+    io.to(`user-${userId}`).emit("favorites-updated", {
+      action: "deleted",
+      playlistId: favoritePlaylist.id,
+    });
+
+    return { message: "Track unliked and empty Favorites playlist removed" };
   }
 
-  io.emit('playlist-updated');
-  io.to(`user-${userId}`).emit('favorites-updated', { action: 'remove', trackId });
+  io.emit("playlist-updated");
+  io.to(`user-${userId}`).emit("favorites-updated", {
+    action: "remove",
+    trackId,
+  });
 
-  return { message: 'Track unliked successfully' };
+  return { message: "Track unliked successfully" };
 };
 
 // Lấy tất cả tracks
@@ -405,16 +441,16 @@ export const getTracks = async (req: Request) => {
     whereClause.artistId = user.artistProfile.id;
   }
 
-  if (search && typeof search === 'string') {
+  if (search && typeof search === "string") {
     whereClause.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { artist: { artistName: { contains: search, mode: 'insensitive' } } },
-      { album: { title: { contains: search, mode: 'insensitive' } } },
+      { title: { contains: search, mode: "insensitive" } },
+      { artist: { artistName: { contains: search, mode: "insensitive" } } },
+      { album: { title: { contains: search, mode: "insensitive" } } },
       {
         genres: {
           every: {
             genre: {
-              name: { contains: search, mode: 'insensitive' },
+              name: { contains: search, mode: "insensitive" },
             },
           },
         },
@@ -423,7 +459,7 @@ export const getTracks = async (req: Request) => {
         featuredArtists: {
           some: {
             artistProfile: {
-              artistName: { contains: search, mode: 'insensitive' },
+              artistName: { contains: search, mode: "insensitive" },
             },
           },
         },
@@ -434,26 +470,26 @@ export const getTracks = async (req: Request) => {
   const orderByClause: Prisma.TrackOrderByWithRelationInput = {};
   if (
     sortBy &&
-    typeof sortBy === 'string' &&
-    (sortOrder === 'asc' || sortOrder === 'desc')
+    typeof sortBy === "string" &&
+    (sortOrder === "asc" || sortOrder === "desc")
   ) {
     if (
-      sortBy === 'title' ||
-      sortBy === 'duration' ||
-      sortBy === 'releaseDate' ||
-      sortBy === 'createdAt' ||
-      sortBy === 'isActive'
+      sortBy === "title" ||
+      sortBy === "duration" ||
+      sortBy === "releaseDate" ||
+      sortBy === "createdAt" ||
+      sortBy === "isActive"
     ) {
       orderByClause[sortBy] = sortOrder;
-    } else if (sortBy === 'album') {
+    } else if (sortBy === "album") {
       orderByClause.album = { title: sortOrder };
-    } else if (sortBy === 'artist') {
+    } else if (sortBy === "artist") {
       orderByClause.artist = { artistName: sortOrder };
     } else {
-      orderByClause.releaseDate = 'desc';
+      orderByClause.releaseDate = "desc";
     }
   } else {
-    orderByClause.releaseDate = 'desc';
+    orderByClause.releaseDate = "desc";
   }
 
   const result = await paginate<any>(prisma.track, req, {
@@ -486,12 +522,148 @@ export const getTracks = async (req: Request) => {
 interface CreateTrackData {
   title: string;
   releaseDate: string;
-  type: 'SINGLE';
+  type: "SINGLE";
   genreIds?: string[];
   featuredArtistIds?: string[];
   featuredArtistNames?: string[];
   labelId?: string;
 }
+
+// --- START: Refactored Audio Analysis Helper ---
+interface AudioAnalysisResult {
+  tempo: number | null;
+  mood: string | null;
+  key: string | null;
+  scale: string | null;
+  danceability: number | null;
+  energy: number | null;
+}
+
+async function analyzeAudioFeatures(
+  audioBuffer: Buffer
+): Promise<AudioAnalysisResult> {
+  let tempo = null,
+    mood = null,
+    key = null,
+    scale = null,
+    danceability = null,
+    energy = null;
+  try {
+    const pcmF32 = await convertMp3BufferToPcmF32(audioBuffer);
+    if (pcmF32) {
+      console.log(
+        "[Essentia DEBUG] PCM data obtained, proceeding with analysis."
+      );
+      const essentia = new Essentia(EssentiaWASM);
+      const audioVector = essentia.arrayToVector(pcmF32);
+
+      // Tempo
+      try {
+        const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+        console.log(
+          "[Essentia DEBUG] PercivalBpmEstimator result:",
+          tempoResult
+        );
+        tempo =
+          tempoResult && typeof tempoResult.bpm === "number"
+            ? Math.round(tempoResult.bpm)
+            : null;
+        console.log("[Essentia DEBUG] Tempo analysis result:", tempo);
+      } catch (tempoError) {
+        console.error("[Essentia ERROR] Estimating tempo failed:", tempoError);
+        tempo = null;
+      }
+
+      // Danceability
+      try {
+        const danceabilityResult = essentia.Danceability(audioVector);
+        console.log(
+          "[Essentia DEBUG] Danceability result:",
+          danceabilityResult
+        );
+        danceability =
+          danceabilityResult &&
+          typeof danceabilityResult.danceability === "number"
+            ? danceabilityResult.danceability
+            : null;
+        console.log(
+          "[Essentia DEBUG] Danceability analysis result:",
+          danceability
+        );
+      } catch (danceabilityError) {
+        console.error(
+          "[Essentia ERROR] Estimating danceability failed:",
+          danceabilityError
+        );
+        danceability = null;
+      }
+
+      // Energy & Mood
+      try {
+        const energyResult = essentia.Energy(audioVector);
+        console.log("[Essentia DEBUG] Energy result:", energyResult);
+        energy =
+          energyResult && typeof energyResult.energy === "number"
+            ? energyResult.energy
+            : null;
+        mood =
+          energy !== null
+            ? energy > 0.6
+              ? "Energetic"
+              : energy < 0.4
+              ? "Calm"
+              : "Neutral"
+            : null;
+        console.log("[Essentia DEBUG] Energy/Mood analysis result:", {
+          energy,
+          mood,
+        });
+      } catch (energyError) {
+        console.error(
+          "[Essentia ERROR] Calculating energy/mood failed:",
+          energyError
+        );
+        energy = null;
+        mood = null;
+      }
+
+      // Key & Scale
+      try {
+        const keyResult = essentia.KeyExtractor(audioVector);
+        console.log("[Essentia DEBUG] KeyExtractor result:", keyResult);
+        key =
+          keyResult && typeof keyResult.key === "string" ? keyResult.key : null;
+        scale =
+          keyResult && typeof keyResult.scale === "string"
+            ? keyResult.scale
+            : null;
+        console.log("[Essentia DEBUG] Key/Scale analysis result:", {
+          key,
+          scale,
+        });
+      } catch (keyError) {
+        console.error(
+          "[Essentia ERROR] Estimating key/scale failed:",
+          keyError
+        );
+        key = null;
+        scale = null;
+      }
+    } else {
+      console.warn(
+        "[Essentia DEBUG] Audio decoding failed (pcmF32 is null), skipping audio analysis."
+      );
+    }
+  } catch (analysisError) {
+    console.error(
+      "[Essentia ERROR] General error during audio analysis pipeline:",
+      analysisError
+    );
+  }
+
+  return { tempo, mood, key, scale, danceability, energy };
+}
+// --- END: Refactored Audio Analysis Helper ---
 
 export class TrackService {
   static async createTrack(
@@ -501,11 +673,26 @@ export class TrackService {
     coverFile?: Express.Multer.File,
     requestUser?: any
   ): Promise<Track> {
-    const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId } = data;
+    const {
+      title,
+      releaseDate,
+      type,
+      genreIds,
+      featuredArtistIds = [],
+      featuredArtistNames = [],
+      labelId,
+    } = data;
 
     const mainArtist = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
-      select: { id: true, labelId: true, artistName: true, avatar: true, isVerified: true, createdAt: true }
+      select: {
+        id: true,
+        labelId: true,
+        artistName: true,
+        avatar: true,
+        isVerified: true,
+        createdAt: true,
+      },
     });
     if (!mainArtist) {
       throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
@@ -518,108 +705,60 @@ export class TrackService {
     const finalLabelId = labelId || mainArtist.labelId;
 
     const [audioUploadResult, coverUploadResult] = await Promise.all([
-      uploadFile(audioFile.buffer, 'tracks', 'auto'),
-      coverFile ? uploadFile(coverFile.buffer, 'covers', 'image') : Promise.resolve(null),
+      uploadFile(audioFile.buffer, "tracks", "auto"),
+      coverFile
+        ? uploadFile(coverFile.buffer, "covers", "image")
+        : Promise.resolve(null),
     ]);
 
     let duration = 0;
-    let tempo = null;
-    let mood = null;
-    let key: string | null = null;
-    let scale: string | null = null;
-    let danceability: number | null = null;
-    let energy: number | null = null;
+    let audioFeatures: AudioAnalysisResult = {
+      tempo: null,
+      mood: null,
+      key: null,
+      scale: null,
+      danceability: null,
+      energy: null,
+    };
+
     try {
-      const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
+      // Lấy duration
+      const metadata = await mm.parseBuffer(
+        audioFile.buffer,
+        audioFile.mimetype
+      );
       duration = Math.round(metadata.format.duration || 0);
 
-      tempo = null;
-      mood = null;
-
-      try {
-        const pcmF32 = await convertMp3BufferToPcmF32(audioFile.buffer);
-
-        if (pcmF32) {
-          const essentia = new Essentia(EssentiaWASM);
-          const audioVector = essentia.arrayToVector(pcmF32)
-          
-          try {
-            const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-            tempo = Math.round(tempoResult.bpm);
-          } catch (tempoError) {
-            console.error('Error estimating tempo:', tempoError);
-            tempo = null;
-          }
-
-          try {
-            const danceabilityResult = essentia.Danceability(audioVector);
-            danceability = danceabilityResult.danceability;
-          } catch (danceabilityError) {
-            console.error('Error estimating danceability:', danceabilityError);
-            danceability = null;
-          }
-          
-          try {
-            const energyResult = essentia.Energy(audioVector);
-            energy = energyResult.energy;
-            
-            if (typeof energy === 'number') {
-              if (energy > 0.6) {
-                mood = 'Energetic';
-              } else if (energy < 0.4) {
-                mood = 'Calm';
-              } else {
-                mood = 'Neutral';
-              }
-            }
-          } catch (energyError) {
-            console.error('Error calculating energy/mood:', energyError);
-            mood = null;
-            energy = null;
-          }
-          
-          try {
-            const keyResult = essentia.KeyExtractor(audioVector);
-            key = keyResult.key;
-            scale = keyResult.scale;
-          } catch (keyError) {
-            console.error('Error estimating key/scale:', keyError);
-            key = null;
-            scale = null;
-          }
-          
-        } else {
-          console.warn('Audio decoding failed, skipping all audio analysis.');
-        }
-      } catch (analysisError) {
-          console.error('Error during audio analysis pipeline:', analysisError);
-          tempo = null;
-          mood = null;
-      }
-      
-    } catch (error) {
-      console.error('Error parsing basic audio metadata:', error);
-      tempo = null;
-      mood = null;
+      // Gọi hàm helper để phân tích audio
+      audioFeatures = await analyzeAudioFeatures(audioFile.buffer);
+    } catch (metadataError) {
+      console.error(
+        "[Metadata ERROR] Error parsing basic audio metadata:",
+        metadataError
+      );
+      // audioFeatures sẽ giữ giá trị null mặc định
     }
 
     const allFeaturedArtistIds = new Set<string>();
     if (featuredArtistIds.length > 0) {
       const existingArtists = await prisma.artistProfile.findMany({
         where: { id: { in: featuredArtistIds } },
-        select: { id: true }
+        select: { id: true },
       });
-      existingArtists.forEach(artist => allFeaturedArtistIds.add(artist.id));
+      existingArtists.forEach((artist) => allFeaturedArtistIds.add(artist.id));
     }
     if (featuredArtistNames.length > 0) {
       for (const name of featuredArtistNames) {
         try {
           const profile = await getOrCreateArtistProfile(name);
           if (profile.id !== artistProfileId) {
-             allFeaturedArtistIds.add(profile.id);
+            allFeaturedArtistIds.add(profile.id);
           }
         } catch (error) {
-          console.error(`Error finding or creating artist profile for "${name}":`, error);
+          console.error(
+            `Error finding or creating artist profile for "${name}":`,
+            error
+          );
         }
       }
     }
@@ -633,29 +772,34 @@ export class TrackService {
       coverUrl: coverUploadResult?.secure_url,
       artist: { connect: { id: artistProfileId } },
       label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
-      isActive: true, // Default to true, can be changed by releaseDate logic if needed
-      tempo: tempo,
-      mood: mood,
-      key: key,
-      scale: scale,
-      danceability: danceability,
-      energy: energy,
+      isActive: true,
+      // Gán kết quả từ helper
+      tempo: audioFeatures.tempo,
+      mood: audioFeatures.mood,
+      key: audioFeatures.key,
+      scale: audioFeatures.scale,
+      danceability: audioFeatures.danceability,
+      energy: audioFeatures.energy,
     };
     // Adjust isActive based on releaseDate
     if (new Date(releaseDate) > new Date()) {
-        trackData.isActive = false;
+      trackData.isActive = false;
     }
 
     if (genreIds && genreIds.length > 0) {
       trackData.genres = {
-        create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })),
+        create: genreIds.map((genreId) => ({
+          genre: { connect: { id: genreId } },
+        })),
       };
     }
 
     const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);
     if (featuredArtistIdsArray.length > 0) {
       trackData.featuredArtists = {
-        create: featuredArtistIdsArray.map((artistId) => ({ artistProfile: { connect: { id: artistId } } })),
+        create: featuredArtistIdsArray.map((artistId) => ({
+          artistProfile: { connect: { id: artistId } },
+        })),
       };
     }
 
@@ -663,7 +807,7 @@ export class TrackService {
       data: trackData,
       select: {
         ...trackSelect,
-        albumId: true
+        albumId: true,
       },
     });
 
@@ -671,7 +815,7 @@ export class TrackService {
       const followers = await prisma.userFollow.findMany({
         where: {
           followingArtistId: artistProfileId,
-          followingType: 'ARTIST',
+          followingType: "ARTIST",
         },
         select: { followerId: true },
       });
@@ -683,15 +827,16 @@ export class TrackService {
           select: { id: true, email: true },
         });
 
-        const notificationsData: Prisma.NotificationCreateManyInput[] = followerUsers.map((follower) => ({
-          type: NotificationType.NEW_TRACK,
-          message: `${artistName} just released a new track: ${title}`,
-          recipientType: RecipientType.USER,
-          userId: follower.id,
-          artistId: artistProfileId,
-          senderId: artistProfileId,
-          trackId: newTrack.id,
-        }));
+        const notificationsData: Prisma.NotificationCreateManyInput[] =
+          followerUsers.map((follower) => ({
+            type: NotificationType.NEW_TRACK,
+            message: `${artistName} just released a new track: ${title}`,
+            recipientType: RecipientType.USER,
+            userId: follower.id,
+            artistId: artistProfileId,
+            senderId: artistProfileId,
+            trackId: newTrack.id,
+          }));
 
         if (notificationsData.length > 0) {
           await prisma.notification.createMany({ data: notificationsData });
@@ -699,25 +844,25 @@ export class TrackService {
 
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
         const io = getIO();
-        const userSocketsMap = getUserSockets(); 
+        const userSocketsMap = getUserSockets();
 
         for (const user of followerUsers) {
           const targetSocketId = userSocketsMap.get(user.id);
           if (targetSocketId) {
-            io.to(targetSocketId).emit('notification', {
+            io.to(targetSocketId).emit("notification", {
               type: NotificationType.NEW_TRACK,
               message: `${artistName} just released a new track: ${newTrack.title}`,
               trackId: newTrack.id,
               sender: {
-                 id: artistProfileId,
-                 name: artistName,
-                 avatar: mainArtist.avatar
+                id: artistProfileId,
+                name: artistName,
+                avatar: mainArtist.avatar,
               },
               track: {
-                 id: newTrack.id,
-                 title: newTrack.title,
-                 coverUrl: newTrack.coverUrl
-              }
+                id: newTrack.id,
+                title: newTrack.title,
+                coverUrl: newTrack.coverUrl,
+              },
             });
           }
 
@@ -725,21 +870,27 @@ export class TrackService {
             const emailOptions = emailService.createNewReleaseEmail(
               user.email,
               artistName,
-              'track',
+              "track",
               newTrack.title,
               releaseLink,
               newTrack.coverUrl
             );
-            emailService.sendEmail(emailOptions).catch(emailError => {
-               console.error(`Failed to send new track email to ${user.email}:`, emailError);
+            emailService.sendEmail(emailOptions).catch((emailError) => {
+              console.error(
+                `Failed to send new track email to ${user.email}:`,
+                emailError
+              );
             });
           }
         }
       }
     };
 
-    sendNotifications().catch(notificationError => {
-      console.error("Error sending new track notifications:", notificationError);
+    sendNotifications().catch((notificationError) => {
+      console.error(
+        "Error sending new track notifications:",
+        notificationError
+      );
     });
 
     return newTrack;
@@ -747,198 +898,336 @@ export class TrackService {
 
   static async checkTrackCopyrightOnly(
     artistProfileId: string,
-    data: { 
-      title: string; 
-      releaseDate: string; 
-      declaredFeaturedArtistIds?: string[]; 
-      declaredFeaturedArtistNames?: string[]; 
-    }, 
+    data: {
+      title: string;
+      releaseDate: string;
+      declaredFeaturedArtistIds?: string[];
+      declaredFeaturedArtistNames?: string[];
+    },
     audioFile: Express.Multer.File,
-    requestUser?: any 
-  ): Promise<{ isSafeToUpload: boolean; message: string; copyrightDetails?: any }> {
-    const { title, declaredFeaturedArtistIds = [], declaredFeaturedArtistNames = [] } = data;
+    requestUser?: any
+  ): Promise<{
+    isSafeToUpload: boolean;
+    message: string;
+    copyrightDetails?: any;
+  }> {
+    const {
+      title,
+      declaredFeaturedArtistIds = [],
+      declaredFeaturedArtistNames = [],
+    } = data;
 
     const mainArtist = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
-      select: { id: true, artistName: true, isVerified: true, createdAt: true }
+      select: { id: true, artistName: true, isVerified: true, createdAt: true },
     });
 
     if (!mainArtist) {
-      throw new Error(`Artist profile with ID ${artistProfileId} not found for copyright check.`);
+      throw new Error(
+        `Artist profile with ID ${artistProfileId} not found for copyright check.`
+      );
     }
     const artistName = mainArtist.artistName;
 
-    console.log(`[CopyrightCheckOnly] Checking track "${title}" for artist "${artistName}" (ID: ${artistProfileId}) with ACRCloud`);
-    console.log(`[CopyrightCheckOnly] Declared featured IDs: ${declaredFeaturedArtistIds.join(', ') || 'None'}, Names: ${declaredFeaturedArtistNames.join(', ') || 'None'}`);
+    console.log(
+      `[CopyrightCheckOnly] Checking track "${title}" for artist "${artistName}" (ID: ${artistProfileId}) with ACRCloud`
+    );
+    console.log(
+      `[CopyrightCheckOnly] Declared featured IDs: ${
+        declaredFeaturedArtistIds.join(", ") || "None"
+      }, Names: ${declaredFeaturedArtistNames.join(", ") || "None"}`
+    );
 
     // Call the new ACRCloud check function
-    const copyrightCheckResult = await checkCopyrightWithACRCloud(audioFile.buffer, audioFile.originalname, title);
-    
+    const copyrightCheckResult = await checkCopyrightWithACRCloud(
+      audioFile.buffer,
+      audioFile.originalname,
+      title
+    );
+
     if (copyrightCheckResult.error) {
-        console.warn(`[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`);
-         return {
-            isSafeToUpload: false, // Treat ACRCloud error as potentially unsafe
-            message: copyrightCheckResult.errorMessage || "Copyright check service failed. Cannot confirm safety.",
-            copyrightDetails: { serviceError: true, details: { message: copyrightCheckResult.errorMessage, code: copyrightCheckResult.errorCode } }
-        };
+      console.warn(
+        `[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`
+      );
+      return {
+        isSafeToUpload: false, // Treat ACRCloud error as potentially unsafe
+        message:
+          copyrightCheckResult.errorMessage ||
+          "Copyright check service failed. Cannot confirm safety.",
+        copyrightDetails: {
+          serviceError: true,
+          details: {
+            message: copyrightCheckResult.errorMessage,
+            code: copyrightCheckResult.errorCode,
+          },
+        },
+      };
     }
-    
+
     if (copyrightCheckResult.isMatched && copyrightCheckResult.match) {
-        const match = copyrightCheckResult.match;
-        const isAdminUpload = requestUser && requestUser.role === Role.ADMIN && requestUser.id !== mainArtist.id; // Assuming requestUser has id for comparison
-        
-        // Extract matched artist name from ACRCloud response
-        // ACRCloud returns artists as an array of objects, e.g., [{ name: "Artist A" }, { name: "Artist B" }]
-        const matchedArtistNames = match.artists?.map(a => a.name).filter(Boolean).join(', ') || 'Unknown Artist';
-        const primaryMatchedArtist = match.artists?.[0]?.name || 'Unknown Artist'; // Take the first artist as primary for comparison
+      const match = copyrightCheckResult.match;
+      const isAdminUpload =
+        requestUser &&
+        requestUser.role === Role.ADMIN &&
+        requestUser.id !== mainArtist.id; // Assuming requestUser has id for comparison
 
-        if (!primaryMatchedArtist || primaryMatchedArtist === 'Unknown Artist') {
-             console.warn(`[CopyrightCheckOnly] ACRCloud matched song "${match.title}" but did not provide a primary artist name for track "${title}".`);
-              const error: any = new Error(`Copyright violation detected. The uploaded audio appears to match "${match.title}" but the original artist couldn't be determined by the check.`);
-              error.isCopyrightConflict = true;
-              error.copyrightDetails = match; // Send the full ACRCloud match object
-              throw error;
-        }
-        
-        // --- Optimized Artist Comparison Logic --- 
-        if (mainArtist.isVerified || isAdminUpload) {
-            // Compare uploader's name with the primary matched artist from ACRCloud
-            const uploaderSimilarity = getArtistNameSimilarity(primaryMatchedArtist, artistName);
-            const SIMILARITY_THRESHOLD = 0.7;
+      // Extract matched artist name from ACRCloud response
+      // ACRCloud returns artists as an array of objects, e.g., [{ name: "Artist A" }, { name: "Artist B" }]
+      const matchedArtistNames =
+        match.artists
+          ?.map((a) => a.name)
+          .filter(Boolean)
+          .join(", ") || "Unknown Artist";
+      const primaryMatchedArtist = match.artists?.[0]?.name || "Unknown Artist"; // Take the first artist as primary for comparison
 
-            console.log(`[CopyrightCheckOnly] Artist name comparison for "${title}": "${primaryMatchedArtist}" (ACRCloud) vs "${artistName}" (uploader: ${mainArtist.id})`);
-            console.log(`[CopyrightCheckOnly] Normalized comparison: "${normalizeString(primaryMatchedArtist)}" vs "${normalizeString(artistName)}"`);
-            console.log(`[CopyrightCheckOnly] Uploader Similarity score: ${uploaderSimilarity.toFixed(3)} (threshold: ${SIMILARITY_THRESHOLD})`);
+      if (!primaryMatchedArtist || primaryMatchedArtist === "Unknown Artist") {
+        console.warn(
+          `[CopyrightCheckOnly] ACRCloud matched song "${match.title}" but did not provide a primary artist name for track "${title}".`
+        );
+        const error: any = new Error(
+          `Copyright violation detected. The uploaded audio appears to match "${match.title}" but the original artist couldn't be determined by the check.`
+        );
+        error.isCopyrightConflict = true;
+        error.copyrightDetails = match; // Send the full ACRCloud match object
+        throw error;
+      }
 
-            if (uploaderSimilarity >= SIMILARITY_THRESHOLD) {
-                let allowUpload = true;
-                let blockingReason = "";
-                let canonicalArtistDisplay = primaryMatchedArtist;
-                let messageSuffix = ".";
+      // --- Optimized Artist Comparison Logic ---
+      if (mainArtist.isVerified || isAdminUpload) {
+        // Compare uploader's name with the primary matched artist from ACRCloud
+        const uploaderSimilarity = getArtistNameSimilarity(
+          primaryMatchedArtist,
+          artistName
+        );
+        const SIMILARITY_THRESHOLD = 0.7;
 
-                // --- New Logic for Featuring Artists (using matchedArtistNames for context) --- 
-                const normalizedAcrArtistString = normalizeString(matchedArtistNames); // Use the full string of matched artists for context
-                if (declaredFeaturedArtistNames.length > 0 || declaredFeaturedArtistIds.length > 0) {
-                  console.log(`[CopyrightCheckOnly] Has declared featured artists. Analyzing match "${matchedArtistNames}" further.`);
-                  
-                  // Check if the main uploader's name is part of the ACRCloud artist string
-                  if (normalizedAcrArtistString.includes(normalizeString(artistName))) {
-                    messageSuffix = ", which appears to be your content or a collaboration you are part of.";
-                    let allDeclaredFeaturedFound = declaredFeaturedArtistNames.length > 0;
-                    for (const declaredFeatName of declaredFeaturedArtistNames) {
-                      if (!normalizedAcrArtistString.includes(normalizeString(declaredFeatName))) {
-                        allDeclaredFeaturedFound = false;
-                        console.log(`[CopyrightCheckOnly] Declared featured artist "${declaredFeatName}" NOT found in ACRCloud match "${matchedArtistNames}".`);
-                        break;
-                      }
-                    }
-                    if (allDeclaredFeaturedFound && declaredFeaturedArtistNames.length > 0) {
-                       console.log(`[CopyrightCheckOnly] All declared featured artists found in ACRCloud match string.`);
-                    }
-                  } else {
-                     console.warn(`[CopyrightCheckOnly] Uploader "${artistName}" not directly in ACRCloud match "${matchedArtistNames}" despite high initial similarity and declared features.`);
+        console.log(
+          `[CopyrightCheckOnly] Artist name comparison for "${title}": "${primaryMatchedArtist}" (ACRCloud) vs "${artistName}" (uploader: ${mainArtist.id})`
+        );
+        console.log(
+          `[CopyrightCheckOnly] Normalized comparison: "${normalizeString(
+            primaryMatchedArtist
+          )}" vs "${normalizeString(artistName)}"`
+        );
+        console.log(
+          `[CopyrightCheckOnly] Uploader Similarity score: ${uploaderSimilarity.toFixed(
+            3
+          )} (threshold: ${SIMILARITY_THRESHOLD})`
+        );
+
+        if (uploaderSimilarity >= SIMILARITY_THRESHOLD) {
+          let allowUpload = true;
+          let blockingReason = "";
+          let canonicalArtistDisplay = primaryMatchedArtist;
+          let messageSuffix = ".";
+
+          // --- New Logic for Featuring Artists (using matchedArtistNames for context) ---
+          const normalizedAcrArtistString = normalizeString(matchedArtistNames); // Use the full string of matched artists for context
+          if (
+            declaredFeaturedArtistNames.length > 0 ||
+            declaredFeaturedArtistIds.length > 0
+          ) {
+            console.log(
+              `[CopyrightCheckOnly] Has declared featured artists. Analyzing match "${matchedArtistNames}" further.`
+            );
+
+            // Check if the main uploader's name is part of the ACRCloud artist string
+            if (
+              normalizedAcrArtistString.includes(normalizeString(artistName))
+            ) {
+              messageSuffix =
+                ", which appears to be your content or a collaboration you are part of.";
+              let allDeclaredFeaturedFound =
+                declaredFeaturedArtistNames.length > 0;
+              for (const declaredFeatName of declaredFeaturedArtistNames) {
+                if (
+                  !normalizedAcrArtistString.includes(
+                    normalizeString(declaredFeatName)
+                  )
+                ) {
+                  allDeclaredFeaturedFound = false;
+                  console.log(
+                    `[CopyrightCheckOnly] Declared featured artist "${declaredFeatName}" NOT found in ACRCloud match "${matchedArtistNames}".`
+                  );
+                  break;
+                }
+              }
+              if (
+                allDeclaredFeaturedFound &&
+                declaredFeaturedArtistNames.length > 0
+              ) {
+                console.log(
+                  `[CopyrightCheckOnly] All declared featured artists found in ACRCloud match string.`
+                );
+              }
+            } else {
+              console.warn(
+                `[CopyrightCheckOnly] Uploader "${artistName}" not directly in ACRCloud match "${matchedArtistNames}" despite high initial similarity and declared features.`
+              );
+            }
+          }
+          // --- End New Logic for Featuring Artists ---
+
+          if (mainArtist.isVerified && !isAdminUpload) {
+            console.log(
+              `[CopyrightCheckOnly] Performing canonical check for verified artist ${mainArtist.artistName} (track: "${title}")`
+            );
+
+            const matchArtistNameLower = primaryMatchedArtist.toLowerCase();
+
+            const potentiallySimilarArtists =
+              await prisma.artistProfile.findMany({
+                where: {
+                  id: { not: mainArtist.id },
+                  isVerified: true,
+                  OR: [
+                    {
+                      artistName: {
+                        equals: primaryMatchedArtist,
+                        mode: "insensitive",
+                      },
+                    },
+                    {
+                      artistName: {
+                        startsWith: matchArtistNameLower.split(" ")[0],
+                        mode: "insensitive",
+                      },
+                    },
+                    {
+                      artistName: {
+                        contains: matchArtistNameLower,
+                        mode: "insensitive",
+                      },
+                    },
+                  ],
+                },
+                select: {
+                  id: true,
+                  artistName: true,
+                  createdAt: true,
+                  isVerified: true,
+                },
+              });
+
+            console.log(
+              `[CopyrightCheckOnly] Found ${potentiallySimilarArtists.length} potentially similar verified artists for comparison with "${primaryMatchedArtist}" (track: "${title}").`
+            );
+
+            let canonicalArtist = mainArtist;
+            let highestSimilarity = uploaderSimilarity;
+
+            for (const otherArtist of potentiallySimilarArtists) {
+              const otherSimilarity = getArtistNameSimilarity(
+                primaryMatchedArtist,
+                otherArtist.artistName
+              );
+              console.log(
+                `[CopyrightCheckOnly] Comparing with potentially similar artist "${
+                  otherArtist.artistName
+                }" (ID: ${
+                  otherArtist.id
+                }). Similarity to ACRCloud match: ${otherSimilarity.toFixed(3)}`
+              );
+
+              if (otherSimilarity > highestSimilarity) {
+                highestSimilarity = otherSimilarity;
+                canonicalArtist = otherArtist;
+              } else if (
+                otherSimilarity === highestSimilarity &&
+                otherSimilarity > 0
+              ) {
+                const normAcr = normalizeString(primaryMatchedArtist);
+                const normUploader = normalizeString(
+                  canonicalArtist.artistName
+                );
+                const normOther = normalizeString(otherArtist.artistName);
+                if (normOther === normAcr && normUploader !== normAcr) {
+                  canonicalArtist = otherArtist;
+                } else if (normOther === normAcr && normUploader === normAcr) {
+                  if (
+                    new Date(otherArtist.createdAt) <
+                    new Date(canonicalArtist.createdAt)
+                  ) {
+                    canonicalArtist = otherArtist;
+                  }
+                } else if (normOther !== normAcr && normUploader !== normAcr) {
+                  if (
+                    new Date(otherArtist.createdAt) <
+                    new Date(canonicalArtist.createdAt)
+                  ) {
+                    canonicalArtist = otherArtist;
                   }
                 }
-                // --- End New Logic for Featuring Artists ---
-
-                if (mainArtist.isVerified && !isAdminUpload) {
-                    console.log(`[CopyrightCheckOnly] Performing canonical check for verified artist ${mainArtist.artistName} (track: "${title}")`);
-                    
-                    const matchArtistNameLower = primaryMatchedArtist.toLowerCase();
-                    
-                    const potentiallySimilarArtists = await prisma.artistProfile.findMany({
-                        where: {
-                            id: { not: mainArtist.id },
-                            isVerified: true,
-                            OR: [
-                                { artistName: { equals: primaryMatchedArtist, mode: 'insensitive' } },
-                                { artistName: { startsWith: matchArtistNameLower.split(' ')[0], mode: 'insensitive' } },
-                                { artistName: { contains: matchArtistNameLower, mode: 'insensitive' } }
-                            ]
-                        },
-                        select: { id: true, artistName: true, createdAt: true, isVerified: true }
-                    });
-                    
-                    console.log(`[CopyrightCheckOnly] Found ${potentiallySimilarArtists.length} potentially similar verified artists for comparison with "${primaryMatchedArtist}" (track: "${title}").`);
-
-                    let canonicalArtist = mainArtist; 
-                    let highestSimilarity = uploaderSimilarity;
-
-                    for (const otherArtist of potentiallySimilarArtists) {
-                        const otherSimilarity = getArtistNameSimilarity(primaryMatchedArtist, otherArtist.artistName);
-                        console.log(`[CopyrightCheckOnly] Comparing with potentially similar artist "${otherArtist.artistName}" (ID: ${otherArtist.id}). Similarity to ACRCloud match: ${otherSimilarity.toFixed(3)}`);
-                        
-                         if (otherSimilarity > highestSimilarity) {
-                            highestSimilarity = otherSimilarity;
-                            canonicalArtist = otherArtist;
-                        } else if (otherSimilarity === highestSimilarity && otherSimilarity > 0) { 
-                            const normAcr = normalizeString(primaryMatchedArtist);
-                            const normUploader = normalizeString(canonicalArtist.artistName);
-                            const normOther = normalizeString(otherArtist.artistName);
-                            if (normOther === normAcr && normUploader !== normAcr) {
-                                canonicalArtist = otherArtist;
-                            } else if (normOther === normAcr && normUploader === normAcr) {
-                                if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
-                                    canonicalArtist = otherArtist;
-                                }
-                            } else if (normOther !== normAcr && normUploader !== normAcr){
-                                 if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
-                                    canonicalArtist = otherArtist;
-                                }
-                            }
-                        }
-                    }
-                    canonicalArtistDisplay = canonicalArtist.artistName;
-
-                    if (canonicalArtist.id !== mainArtist.id) {
-                        allowUpload = false;
-                        blockingReason = `Upload blocked. While your artist name is similar, the song appears to more closely match verified artist "${canonicalArtist.artistName}".`;
-                        console.warn(`[CopyrightCheckOnly] Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Track "${title}" by "${primaryMatchedArtist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`);
-                    }
-                } 
-
-                if (allowUpload) {
-                    const uploadType = isAdminUpload ? "Admin checking for artist" : (mainArtist.isVerified ? "Verified artist checking own content" : "Unverified artist (edge case)");
-                    // Use matchedArtistNames (full string) for display, and primaryMatchedArtist for canonical reference if different
-                    console.log(`[CopyrightCheckOnly] ${uploadType} "${artistName}" - "${title}/${match.title}". Similarity score: ${uploaderSimilarity.toFixed(3)}`);
-                    return {
-                        isSafeToUpload: true,
-                        message: `Copyright check passed. The audio matches "${match.title}" by ${canonicalArtistDisplay}${messageSuffix}`,
-                        copyrightDetails: match 
-                    };
-                } else {
-                    const error: any = new Error(blockingReason);
-                    error.isCopyrightConflict = true;
-                    error.copyrightDetails = match;
-                    throw error; 
-                }
-            } else { 
-                // Similarity too low
-                let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${matchedArtistNames}".`;
-                errorMessage += ` Your artist name has a similarity score of ${(uploaderSimilarity * 100).toFixed(1)}% with the matched primary artist (${primaryMatchedArtist}). A higher similarity is required.`;
-                if (match.album?.name) errorMessage += ` (Album: ${match.album.name})`;
-                const error: any = new Error(errorMessage);
-                error.isCopyrightConflict = true;
-                error.copyrightDetails = match;
-                throw error;
+              }
             }
+            canonicalArtistDisplay = canonicalArtist.artistName;
+
+            if (canonicalArtist.id !== mainArtist.id) {
+              allowUpload = false;
+              blockingReason = `Upload blocked. While your artist name is similar, the song appears to more closely match verified artist "${canonicalArtist.artistName}".`;
+              console.warn(
+                `[CopyrightCheckOnly] Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Track "${title}" by "${primaryMatchedArtist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`
+              );
+            }
+          }
+
+          if (allowUpload) {
+            const uploadType = isAdminUpload
+              ? "Admin checking for artist"
+              : mainArtist.isVerified
+              ? "Verified artist checking own content"
+              : "Unverified artist (edge case)";
+            // Use matchedArtistNames (full string) for display, and primaryMatchedArtist for canonical reference if different
+            console.log(
+              `[CopyrightCheckOnly] ${uploadType} "${artistName}" - "${title}/${
+                match.title
+              }". Similarity score: ${uploaderSimilarity.toFixed(3)}`
+            );
+            return {
+              isSafeToUpload: true,
+              message: `Copyright check passed. The audio matches "${match.title}" by ${canonicalArtistDisplay}${messageSuffix}`,
+              copyrightDetails: match,
+            };
+          } else {
+            const error: any = new Error(blockingReason);
+            error.isCopyrightConflict = true;
+            error.copyrightDetails = match;
+            throw error;
+          }
         } else {
-             // Artist not verified (and not admin) - block based on match
-             let errorMessage = `Copyright violation detected. `;
-             errorMessage += `The uploaded audio appears to match "${match.title}" by ${matchedArtistNames}.`;
-             if (match.album?.name) errorMessage += ` (Album: ${match.album.name})`;
-             const error: any = new Error(errorMessage);
-             error.isCopyrightConflict = true;
-             error.copyrightDetails = match;
-             throw error;
+          // Similarity too low
+          let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${matchedArtistNames}".`;
+          errorMessage += ` Your artist name has a similarity score of ${(
+            uploaderSimilarity * 100
+          ).toFixed(
+            1
+          )}% with the matched primary artist (${primaryMatchedArtist}). A higher similarity is required.`;
+          if (match.album?.name)
+            errorMessage += ` (Album: ${match.album.name})`;
+          const error: any = new Error(errorMessage);
+          error.isCopyrightConflict = true;
+          error.copyrightDetails = match;
+          throw error;
         }
+      } else {
+        // Artist not verified (and not admin) - block based on match
+        let errorMessage = `Copyright violation detected. `;
+        errorMessage += `The uploaded audio appears to match "${match.title}" by ${matchedArtistNames}.`;
+        if (match.album?.name) errorMessage += ` (Album: ${match.album.name})`;
+        const error: any = new Error(errorMessage);
+        error.isCopyrightConflict = true;
+        error.copyrightDetails = match;
+        throw error;
+      }
     } else {
-        // No copyright match found by ACRCloud
-        console.log(`[CopyrightCheckOnly] No copyright match found by ACRCloud for track "${title}" by artist "${artistName}"`);
-        return {
-            isSafeToUpload: true,
-            message: "No copyright match found by detection service.",
-        };
+      // No copyright match found by ACRCloud
+      console.log(
+        `[CopyrightCheckOnly] No copyright match found by ACRCloud for track "${title}" by artist "${artistName}"`
+      );
+      return {
+        isSafeToUpload: true,
+        message: "No copyright match found by detection service.",
+      };
     }
   }
 
@@ -947,14 +1236,7 @@ export class TrackService {
 
 // Cập nhật track
 export const updateTrack = async (req: Request, id: string) => {
-  const {
-    title,
-    releaseDate,
-    type,
-    trackNumber,
-    albumId,
-    labelId,
-  } = req.body;
+  const { title, releaseDate, type, trackNumber, albumId, labelId } = req.body;
 
   const currentTrack = await prisma.track.findUnique({
     where: { id },
@@ -968,10 +1250,10 @@ export const updateTrack = async (req: Request, id: string) => {
     },
   });
 
-  if (!currentTrack) throw new Error('Track not found');
+  if (!currentTrack) throw new Error("Track not found");
 
   if (!canManageTrack(req.user, currentTrack.artistId)) {
-    throw new Error('You can only update your own tracks');
+    throw new Error("You can only update your own tracks");
   }
 
   const updateData: Prisma.TrackUpdateInput = {}; // Use Prisma type
@@ -983,53 +1265,66 @@ export const updateTrack = async (req: Request, id: string) => {
 
   // Handle Album update using connect/disconnect
   if (albumId !== undefined) {
-    if (albumId === null || albumId === '') {
+    if (albumId === null || albumId === "") {
       updateData.album = { disconnect: true };
-    } else if (typeof albumId === 'string') {
+    } else if (typeof albumId === "string") {
       // Optional: Validate album exists before connecting
-      const albumExists = await prisma.album.findUnique({ where: { id: albumId }, select: { id: true } });
-      if (!albumExists) throw new Error(`Invalid Album ID: ${albumId} does not exist`);
+      const albumExists = await prisma.album.findUnique({
+        where: { id: albumId },
+        select: { id: true },
+      });
+      if (!albumExists)
+        throw new Error(`Invalid Album ID: ${albumId} does not exist`);
       updateData.album = { connect: { id: albumId } };
     } else {
-      throw new Error(`Invalid albumId type: expected string or null, got ${typeof albumId}`);
+      throw new Error(
+        `Invalid albumId type: expected string or null, got ${typeof albumId}`
+      );
     }
   }
 
   // Handle labelId update using connect/disconnect
   if (labelId !== undefined) {
-    if (labelId === null || labelId === '') {
+    if (labelId === null || labelId === "") {
       updateData.label = { disconnect: true };
-    } else if (typeof labelId === 'string') {
-      const labelExists = await prisma.label.findUnique({ where: { id: labelId } });
-      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
+    } else if (typeof labelId === "string") {
+      const labelExists = await prisma.label.findUnique({
+        where: { id: labelId },
+      });
+      if (!labelExists)
+        throw new Error(`Invalid label ID: ${labelId} does not exist`);
       updateData.label = { connect: { id: labelId } };
     } else {
-      throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
+      throw new Error(
+        `Invalid labelId type: expected string or null, got ${typeof labelId}`
+      );
     }
   }
 
   // Handle cover file upload
   if (req.files && (req.files as any).coverFile) {
-      const coverFile = (req.files as any).coverFile[0];
-      const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
-      updateData.coverUrl = coverUpload.secure_url;
-  } else if (req.body.removeCover === 'true') { // Optional: Allow removing cover
-      updateData.coverUrl = null;
+    const coverFile = (req.files as any).coverFile[0];
+    const coverUpload = await uploadFile(coverFile.buffer, "covers", "image");
+    updateData.coverUrl = coverUpload.secure_url;
+  } else if (req.body.removeCover === "true") {
+    // Optional: Allow removing cover
+    updateData.coverUrl = null;
   }
 
   // Handle release date and isActive
   if (releaseDate !== undefined) {
-      const newReleaseDate = new Date(releaseDate);
-      if (isNaN(newReleaseDate.getTime())) {
-          throw new Error('Invalid release date format');
-      }
-      const now = new Date();
-      updateData.isActive = newReleaseDate <= now;
-      updateData.releaseDate = newReleaseDate;
+    const newReleaseDate = new Date(releaseDate);
+    if (isNaN(newReleaseDate.getTime())) {
+      throw new Error("Invalid release date format");
+    }
+    const now = new Date();
+    updateData.isActive = newReleaseDate <= now;
+    updateData.releaseDate = newReleaseDate;
   }
   // Note: Add logic here if you want to update isActive independently via a separate field in req.body
   if (req.body.isActive !== undefined) {
-      updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
+    updateData.isActive =
+      req.body.isActive === "true" || req.body.isActive === true;
   }
 
   // Handle Genres
@@ -1042,8 +1337,11 @@ export const updateTrack = async (req: Request, id: string) => {
       ? []
       : Array.isArray(genresInput)
       ? genresInput.map(String).filter(Boolean)
-      : typeof genresInput === 'string'
-      ? genresInput.split(',').map((g: string) => g.trim()).filter(Boolean)
+      : typeof genresInput === "string"
+      ? genresInput
+          .split(",")
+          .map((g: string) => g.trim())
+          .filter(Boolean)
       : [];
 
     if (genresArray.length > 0) {
@@ -1052,11 +1350,13 @@ export const updateTrack = async (req: Request, id: string) => {
         select: { id: true },
       });
       const validGenreIds = existingGenres.map((genre) => genre.id);
-      const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+      const invalidGenreIds = genresArray.filter(
+        (id) => !validGenreIds.includes(id)
+      );
       if (invalidGenreIds.length > 0) {
-        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(", ")}`);
       }
-      
+
       // Prepare data for creating new associations
       updateData.genres = {
         create: validGenreIds.map((genreId: string) => ({
@@ -1074,12 +1374,13 @@ export const updateTrack = async (req: Request, id: string) => {
     // Update the track itself (this handles connect/disconnect)
     await tx.track.update({
       where: { id },
-      data: updateData, 
+      data: updateData,
     });
 
-    // --- Update Album Track Counts --- 
-    const newAlbumId = (updateData.album as any)?.connect?.id ?? 
-                       (albumId === null || albumId === '' ? null : originalAlbumId); // Determine the new album ID after update
+    // --- Update Album Track Counts ---
+    const newAlbumId =
+      (updateData.album as any)?.connect?.id ??
+      (albumId === null || albumId === "" ? null : originalAlbumId); // Determine the new album ID after update
 
     // If the album assignment changed...
     if (originalAlbumId !== newAlbumId) {
@@ -1100,73 +1401,100 @@ export const updateTrack = async (req: Request, id: string) => {
     }
 
     // --- Update Featured Artists ---
-    const featuredArtistIdsFromBody = req.body.featuredArtistIds as string[] | undefined;
-    const featuredArtistNamesFromBody = req.body.featuredArtistNames as string[] | undefined;
+    const featuredArtistIdsFromBody = req.body.featuredArtistIds as
+      | string[]
+      | undefined;
+    const featuredArtistNamesFromBody = req.body.featuredArtistNames as
+      | string[]
+      | undefined;
 
     // Only update featured artists if at least one of the relevant fields is present in the request body.
     // Sending empty arrays for both means "remove all featured artists".
     // If neither key is present, featured artists are not modified.
-    if (featuredArtistIdsFromBody !== undefined || featuredArtistNamesFromBody !== undefined) {
-        await tx.trackArtist.deleteMany({ where: { trackId: id } });
+    if (
+      featuredArtistIdsFromBody !== undefined ||
+      featuredArtistNamesFromBody !== undefined
+    ) {
+      await tx.trackArtist.deleteMany({ where: { trackId: id } });
 
-        const resolvedFeaturedArtistIds = new Set<string>();
+      const resolvedFeaturedArtistIds = new Set<string>();
 
-        // Process IDs from featuredArtistIds[]
-        if (featuredArtistIdsFromBody && Array.isArray(featuredArtistIdsFromBody) && featuredArtistIdsFromBody.length > 0) {
-            const existingArtists = await tx.artistProfile.findMany({
-                where: { id: { in: featuredArtistIdsFromBody } },
-                select: { id: true },
-            });
-            const validArtistIds = new Set(existingArtists.map(a => a.id));
-            
-            featuredArtistIdsFromBody.forEach(artistId => {
-                if (validArtistIds.has(artistId) && artistId !== currentTrack.artistId) {
-                    resolvedFeaturedArtistIds.add(artistId);
-                } else if (!validArtistIds.has(artistId)) {
-                    console.warn(`[updateTrack] Invalid featured artist ID provided and skipped: ${artistId}`);
-                } else if (artistId === currentTrack.artistId) {
-                    console.warn(`[updateTrack] Main artist ID (${artistId}) cannot be a featured artist on their own track.`);
-                }
-            });
-        }
+      // Process IDs from featuredArtistIds[]
+      if (
+        featuredArtistIdsFromBody &&
+        Array.isArray(featuredArtistIdsFromBody) &&
+        featuredArtistIdsFromBody.length > 0
+      ) {
+        const existingArtists = await tx.artistProfile.findMany({
+          where: { id: { in: featuredArtistIdsFromBody } },
+          select: { id: true },
+        });
+        const validArtistIds = new Set(existingArtists.map((a) => a.id));
 
-        // Process names from featuredArtistNames[]
-        if (featuredArtistNamesFromBody && Array.isArray(featuredArtistNamesFromBody) && featuredArtistNamesFromBody.length > 0) {
-            for (const name of featuredArtistNamesFromBody) {
-                if (typeof name === 'string' && name.trim() !== '') {
-                    try {
-                        // Assuming getOrCreateArtistProfile can accept a transaction client (tx)
-                        const profile = await getOrCreateArtistProfile(name.trim(), tx); 
-                        if (profile.id !== currentTrack.artistId) {
-                            resolvedFeaturedArtistIds.add(profile.id);
-                        } else {
-                           console.warn(`[updateTrack] Main artist (${name}) cannot be a featured artist on their own track.`);
-                        }
-                    } catch (error) {
-                        console.error(`[updateTrack] Error processing featured artist name "${name}":`, error);
-                        // Depending on requirements, you might want to collect these errors and report them,
-                        // or re-throw to fail the transaction. For now, just logging.
-                    }
-                }
+        featuredArtistIdsFromBody.forEach((artistId) => {
+          if (
+            validArtistIds.has(artistId) &&
+            artistId !== currentTrack.artistId
+          ) {
+            resolvedFeaturedArtistIds.add(artistId);
+          } else if (!validArtistIds.has(artistId)) {
+            console.warn(
+              `[updateTrack] Invalid featured artist ID provided and skipped: ${artistId}`
+            );
+          } else if (artistId === currentTrack.artistId) {
+            console.warn(
+              `[updateTrack] Main artist ID (${artistId}) cannot be a featured artist on their own track.`
+            );
+          }
+        });
+      }
+
+      // Process names from featuredArtistNames[]
+      if (
+        featuredArtistNamesFromBody &&
+        Array.isArray(featuredArtistNamesFromBody) &&
+        featuredArtistNamesFromBody.length > 0
+      ) {
+        for (const name of featuredArtistNamesFromBody) {
+          if (typeof name === "string" && name.trim() !== "") {
+            try {
+              // Assuming getOrCreateArtistProfile can accept a transaction client (tx)
+              const profile = await getOrCreateArtistProfile(name.trim(), tx);
+              if (profile.id !== currentTrack.artistId) {
+                resolvedFeaturedArtistIds.add(profile.id);
+              } else {
+                console.warn(
+                  `[updateTrack] Main artist (${name}) cannot be a featured artist on their own track.`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `[updateTrack] Error processing featured artist name "${name}":`,
+                error
+              );
+              // Depending on requirements, you might want to collect these errors and report them,
+              // or re-throw to fail the transaction. For now, just logging.
             }
+          }
         }
+      }
 
-        const finalArtistIdsToLink = Array.from(resolvedFeaturedArtistIds);
-        if (finalArtistIdsToLink.length > 0) {
-            await tx.trackArtist.createMany({
-                data: finalArtistIdsToLink.map((artistId: string) => ({
-                    trackId: id,
-                    artistId: artistId,
-                })),
-                skipDuplicates: true, 
-            });
-        }
+      const finalArtistIdsToLink = Array.from(resolvedFeaturedArtistIds);
+      if (finalArtistIdsToLink.length > 0) {
+        await tx.trackArtist.createMany({
+          data: finalArtistIdsToLink.map((artistId: string) => ({
+            trackId: id,
+            artistId: artistId,
+          })),
+          skipDuplicates: true,
+        });
+      }
     }
 
     // Re-fetch the track within the transaction to get updated relations
     const finalUpdatedTrack = await tx.track.findUnique({
-        where: { id },
-        select: trackSelect,
+      where: { id },
+      select: trackSelect,
     });
     if (!finalUpdatedTrack) {
       throw new Error("Failed to re-fetch track after updating relations.");
@@ -1175,45 +1503,45 @@ export const updateTrack = async (req: Request, id: string) => {
   });
 
   const io = getIO();
-  io.emit('track:updated', { track: updatedTrack }); // Use the result of the transaction
+  io.emit("track:updated", { track: updatedTrack }); // Use the result of the transaction
 
-  return { message: 'Track updated successfully', track: updatedTrack };
+  return { message: "Track updated successfully", track: updatedTrack };
 };
 
 // Xóa track
 export const deleteTrack = async (req: Request, id: string) => {
   const user = req.user;
-  if (!user) throw new Error('Unauthorized: User not found');
+  if (!user) throw new Error("Unauthorized: User not found");
 
   const track = await prisma.track.findUnique({
     where: { id },
     select: { artistId: true },
   });
 
-  if (!track) throw new Error('Track not found');
+  if (!track) throw new Error("Track not found");
 
   if (!canManageTrack(user, track.artistId)) {
-    throw new Error('You can only delete your own tracks');
+    throw new Error("You can only delete your own tracks");
   }
 
   await deleteTrackById(id);
-  return { message: 'Track deleted successfully' };
+  return { message: "Track deleted successfully" };
 };
 
 // Toggle visibility
 export const toggleTrackVisibility = async (req: Request, id: string) => {
   const user = req.user;
-  if (!user) throw new Error('Unauthorized: User not found');
+  if (!user) throw new Error("Unauthorized: User not found");
 
   const track = await prisma.track.findUnique({
     where: { id },
     select: { artistId: true, isActive: true },
   });
 
-  if (!track) throw new Error('Track not found');
+  if (!track) throw new Error("Track not found");
 
   if (!canManageTrack(user, track.artistId)) {
-    throw new Error('You can only toggle visibility of your own tracks');
+    throw new Error("You can only toggle visibility of your own tracks");
   }
   const newIsActive = !track.isActive;
 
@@ -1222,12 +1550,17 @@ export const toggleTrackVisibility = async (req: Request, id: string) => {
     data: { isActive: newIsActive },
     select: trackSelect,
   });
-    // Emit WebSocket event
+  // Emit WebSocket event
   const io = getIO();
-  io.emit('track:visibilityChanged', { trackId: updatedTrack.id, isActive: newIsActive });
+  io.emit("track:visibilityChanged", {
+    trackId: updatedTrack.id,
+    isActive: newIsActive,
+  });
 
   return {
-    message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'} successfully`,
+    message: `Track ${
+      updatedTrack.isActive ? "activated" : "hidden"
+    } successfully`,
     track: updatedTrack,
   };
 };
@@ -1238,7 +1571,7 @@ export const searchTrack = async (req: Request) => {
   const offset = (Number(page) - 1) * Number(limit);
   const user = req.user;
 
-  if (!q) throw new Error('Query is required');
+  if (!q) throw new Error("Query is required");
 
   const searchQuery = String(q).trim();
 
@@ -1246,7 +1579,7 @@ export const searchTrack = async (req: Request) => {
     const existingHistory = await prisma.history.findFirst({
       where: {
         userId: user.id,
-        type: 'SEARCH',
+        type: "SEARCH",
         query: { equals: searchQuery, mode: Prisma.QueryMode.insensitive },
       },
     });
@@ -1259,7 +1592,7 @@ export const searchTrack = async (req: Request) => {
     } else {
       await prisma.history.create({
         data: {
-          type: 'SEARCH',
+          type: "SEARCH",
           query: searchQuery,
           userId: user.id,
         },
@@ -1271,14 +1604,14 @@ export const searchTrack = async (req: Request) => {
     { title: { contains: searchQuery, mode: Prisma.QueryMode.insensitive } },
     {
       artist: {
-        artistName: { contains: searchQuery, mode: 'insensitive' },
+        artistName: { contains: searchQuery, mode: "insensitive" },
       },
     },
     {
       featuredArtists: {
         some: {
           artistProfile: {
-            artistName: { contains: searchQuery, mode: 'insensitive' },
+            artistName: { contains: searchQuery, mode: "insensitive" },
           },
         },
       },
@@ -1286,7 +1619,7 @@ export const searchTrack = async (req: Request) => {
   ];
 
   let whereClause: any;
-  if (user && user.currentProfile === 'ARTIST' && user.artistProfile?.id) {
+  if (user && user.currentProfile === "ARTIST" && user.artistProfile?.id) {
     whereClause = {
       artistId: user.artistProfile.id,
       OR: searchConditions,
@@ -1307,7 +1640,7 @@ export const searchTrack = async (req: Request) => {
       skip: offset,
       take: Number(limit),
       select: trackSelect,
-      orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
     }),
     prisma.track.count({ where: whereClause }),
   ]);
@@ -1326,7 +1659,7 @@ export const searchTrack = async (req: Request) => {
 // Lấy tracks theo loại
 export const getTracksByType = async (req: Request, type: string) => {
   const cacheKey = req.originalUrl;
-  if (process.env.USE_REDIS_CACHE === 'true') {
+  if (process.env.USE_REDIS_CACHE === "true") {
     const cachedData = await client.get(cacheKey);
     if (cachedData) {
       console.log(`[Redis] Cache hit for key: ${cacheKey}`);
@@ -1341,7 +1674,7 @@ export const getTracksByType = async (req: Request, type: string) => {
   const offset = (page - 1) * limit;
 
   if (!Object.values(AlbumType).includes(type as AlbumType)) {
-    throw new Error('Invalid track type');
+    throw new Error("Invalid track type");
   }
 
   const whereClause: any = { type: type as AlbumType };
@@ -1358,7 +1691,7 @@ export const getTracksByType = async (req: Request, type: string) => {
   const tracks = await prisma.track.findMany({
     where: whereClause,
     select: trackSelect,
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     skip: offset,
     take: Number(limit),
   });
@@ -1382,13 +1715,15 @@ export const getTracksByType = async (req: Request, type: string) => {
 // Lấy tất cả tracks (ADMIN & ARTIST)
 export const getAllTracksAdminArtist = async (req: Request) => {
   const user = req.user;
-  if (!user) throw new Error('Unauthorized');
+  if (!user) throw new Error("Unauthorized");
 
   if (
     user.role !== Role.ADMIN &&
-    (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')
+    (!user.artistProfile?.isVerified || user.artistProfile?.role !== "ARTIST")
   ) {
-    throw new Error('Forbidden: Only admins or verified artists can access this resource');
+    throw new Error(
+      "Forbidden: Only admins or verified artists can access this resource"
+    );
   }
 
   const { search, status, genres } = req.query;
@@ -1400,17 +1735,17 @@ export const getAllTracksAdminArtist = async (req: Request) => {
 
   if (search) {
     whereClause.OR = [
-      { title: { contains: String(search), mode: 'insensitive' } },
+      { title: { contains: String(search), mode: "insensitive" } },
       {
         artist: {
-          artistName: { contains: String(search), mode: 'insensitive' },
+          artistName: { contains: String(search), mode: "insensitive" },
         },
       },
     ];
   }
 
   if (status) {
-    whereClause.isActive = status === 'true';
+    whereClause.isActive = status === "true";
   }
 
   if (genres) {
@@ -1428,10 +1763,10 @@ export const getAllTracksAdminArtist = async (req: Request) => {
   if (search) {
     conditions.push({
       OR: [
-        { title: { contains: String(search), mode: 'insensitive' } },
+        { title: { contains: String(search), mode: "insensitive" } },
         {
           artist: {
-            artistName: { contains: String(search), mode: 'insensitive' },
+            artistName: { contains: String(search), mode: "insensitive" },
           },
         },
       ],
@@ -1439,11 +1774,13 @@ export const getAllTracksAdminArtist = async (req: Request) => {
   }
 
   if (status) {
-    conditions.push({ isActive: status === 'true' });
+    conditions.push({ isActive: status === "true" });
   }
 
   if (genres) {
-    const genreIds = Array.isArray(genres) ? genres.map((g) => String(g)) : [String(genres)];
+    const genreIds = Array.isArray(genres)
+      ? genres.map((g) => String(g))
+      : [String(genres)];
     conditions.push({
       genres: {
         some: {
@@ -1456,19 +1793,28 @@ export const getAllTracksAdminArtist = async (req: Request) => {
   if (conditions.length > 0) whereClause.AND = conditions;
 
   // Determine sorting
-  let orderBy: Prisma.TrackOrderByWithRelationInput | Prisma.TrackOrderByWithRelationInput[] = { releaseDate: 'desc' }; // Default sort
+  let orderBy:
+    | Prisma.TrackOrderByWithRelationInput
+    | Prisma.TrackOrderByWithRelationInput[] = { releaseDate: "desc" }; // Default sort
   const { sortBy, sortOrder } = req.query;
-  const validSortFields = ['title', 'duration', 'playCount', 'isActive', 'releaseDate', 'trackNumber'];
+  const validSortFields = [
+    "title",
+    "duration",
+    "playCount",
+    "isActive",
+    "releaseDate",
+    "trackNumber",
+  ];
   if (sortBy && validSortFields.includes(String(sortBy))) {
-      const order = sortOrder === 'asc' ? 'asc' : 'desc';
-      orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }]; // Add secondary sort for stability
+    const order = sortOrder === "asc" ? "asc" : "desc";
+    orderBy = [{ [String(sortBy)]: order }, { id: "asc" }]; // Add secondary sort for stability
   }
 
   // Directly use paginate with the constructed whereClause and select
   const result = await paginate<any>(prisma.track, req, {
-      where: whereClause,
-      select: trackSelect, // Use the standard trackSelect
-      orderBy: orderBy,
+    where: whereClause,
+    select: trackSelect, // Use the standard trackSelect
+    orderBy: orderBy,
   });
 
   // Return the paginated result directly
@@ -1484,18 +1830,18 @@ export const getTrackById = async (req: Request, id: string) => {
     select: trackSelect,
   });
 
-  if (!track) throw new Error('Track not found');
+  if (!track) throw new Error("Track not found");
 
   if (user?.role === Role.ADMIN) return track;
 
   if (!track.isActive) {
     if (user?.artistProfile?.id === track.artistId) {
       if (!user.artistProfile.isVerified || !user.artistProfile.isActive) {
-        throw new Error('Your artist profile is not verified or inactive');
+        throw new Error("Your artist profile is not verified or inactive");
       }
       return track;
     }
-    throw new Error('You do not have permission to view this track');
+    throw new Error("You do not have permission to view this track");
   }
 
   return track;
@@ -1504,7 +1850,7 @@ export const getTrackById = async (req: Request, id: string) => {
 // Lấy tracks theo thể loại
 export const getTracksByGenre = async (req: Request, genreId: string) => {
   const cacheKey = req.originalUrl;
-  if (process.env.USE_REDIS_CACHE === 'true') {
+  if (process.env.USE_REDIS_CACHE === "true") {
     const cachedData = await client.get(cacheKey);
     if (cachedData) {
       console.log(`[Redis] Cache hit for key: ${cacheKey}`);
@@ -1520,7 +1866,7 @@ export const getTracksByGenre = async (req: Request, genreId: string) => {
     where: { id: genreId },
   });
 
-  if (!genre) throw new Error('Genre not found');
+  if (!genre) throw new Error("Genre not found");
 
   const whereClause: any = {
     genres: {
@@ -1550,7 +1896,7 @@ export const getTracksByGenre = async (req: Request, genreId: string) => {
         },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     skip: offset,
     take: Number(limit),
   });
@@ -1572,9 +1918,13 @@ export const getTracksByGenre = async (req: Request, genreId: string) => {
 };
 
 // Lấy tracks theo type và genre
-export const getTracksByTypeAndGenre = async (req: Request, type: string, genreId: string) => {
+export const getTracksByTypeAndGenre = async (
+  req: Request,
+  type: string,
+  genreId: string
+) => {
   const cacheKey = req.originalUrl;
-  if (process.env.USE_REDIS_CACHE === 'true') {
+  if (process.env.USE_REDIS_CACHE === "true") {
     const cachedData = await client.get(cacheKey);
     if (cachedData) {
       console.log(`[Redis] Cache hit for key: ${cacheKey}`);
@@ -1587,14 +1937,14 @@ export const getTracksByTypeAndGenre = async (req: Request, type: string, genreI
   const offset = (Number(page) - 1) * Number(limit);
 
   if (!Object.values(AlbumType).includes(type as AlbumType)) {
-    throw new Error('Invalid track type');
+    throw new Error("Invalid track type");
   }
 
   const genre = await prisma.genre.findUnique({
     where: { id: genreId },
   });
 
-  if (!genre) throw new Error('Genre not found');
+  if (!genre) throw new Error("Genre not found");
 
   const whereClause: any = {
     type: type as AlbumType,
@@ -1625,7 +1975,7 @@ export const getTracksByTypeAndGenre = async (req: Request, type: string, genreI
         },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     skip: offset,
     take: Number(limit),
   });
@@ -1649,7 +1999,7 @@ export const getTracksByTypeAndGenre = async (req: Request, type: string, genreI
 // Phát track
 export const playTrack = async (req: Request, trackId: string) => {
   const user = req.user;
-  if (!user) throw new Error('Unauthorized');
+  if (!user) throw new Error("Unauthorized");
 
   const track = await prisma.track.findFirst({
     where: {
@@ -1660,7 +2010,7 @@ export const playTrack = async (req: Request, trackId: string) => {
     select: trackSelect,
   });
 
-  if (!track) throw new Error('Track not found');
+  if (!track) throw new Error("Track not found");
 
   const lastMonth = new Date();
   lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -1685,13 +2035,26 @@ export const playTrack = async (req: Request, trackId: string) => {
     where: {
       userId: user.id,
       trackId: track.id,
-      type: 'PLAY', // Assuming 'PLAY' is the correct HistoryType enum value or string
+      type: "PLAY", // Assuming 'PLAY' is the correct HistoryType enum value or string
     },
     select: { id: true }, // Select only the ID for efficiency
   });
 
   if (existingHistoryRecord) {
     // Update existing record
+    const now = new Date();
+    const formattedTimestamp = now.toLocaleString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour12: false,
+    });
+    console.log(
+      `[TrackService] Updating existing History record ID: ${existingHistoryRecord.id} for user ${user.id}, track ${track.id} at ${formattedTimestamp}`
+    );
     await prisma.history.update({
       where: { id: existingHistoryRecord.id },
       data: {
@@ -1701,9 +2064,22 @@ export const playTrack = async (req: Request, trackId: string) => {
     });
   } else {
     // Create new record
+    const now = new Date();
+    const formattedTimestamp = now.toLocaleString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour12: false,
+    });
+    console.log(
+      `[TrackService] Creating NEW History record for user ${user.id}, track ${track.id} at ${formattedTimestamp}`
+    );
     await prisma.history.create({
       data: {
-        type: 'PLAY',
+        type: "PLAY",
         trackId: track.id,
         userId: user.id,
         duration: track.duration,
@@ -1719,7 +2095,7 @@ export const playTrack = async (req: Request, trackId: string) => {
     data: { playCount: { increment: 1 } },
   });
 
-  return { message: 'Track playback started', track };
+  return { message: "Play count updated", track };
 };
 
 // Check if track is liked
@@ -1735,3 +2111,71 @@ export const checkTrackLiked = async (userId: string, trackId: string) => {
 
   return { isLiked: !!like };
 };
+
+// --- START: New Re-analyze Service Function ---
+
+// Helper to download file buffer from URL (basic example)
+async function downloadAudioBuffer(url: string): Promise<Buffer> {
+  const https = await import("https"); // Dynamically import https
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, (response) => {
+        if (response.statusCode !== 200) {
+          return reject(
+            new Error(
+              `Failed to download audio: Status Code ${response.statusCode}`
+            )
+          );
+        }
+        const data: Buffer[] = [];
+        response.on("data", (chunk) => {
+          data.push(chunk);
+        });
+        response.on("end", () => {
+          resolve(Buffer.concat(data));
+        });
+      })
+      .on("error", (err) => {
+        reject(new Error(`Failed to download audio: ${err.message}`));
+      });
+  });
+}
+
+export const reanalyzeTrackAudioFeatures = async (
+  trackId: string
+): Promise<Track> => {
+  const track = await prisma.track.findUnique({
+    where: { id: trackId },
+    include: {
+      artist: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      album: true,
+    },
+  });
+
+  if (!track) {
+    throw new Error("Track not found");
+  }
+
+  const audioBuffer = await downloadAudioBuffer(track.audioUrl);
+  const analysis = await analyzeAudioFeatures(audioBuffer);
+
+  const updatedTrack = await prisma.track.update({
+    where: { id: trackId },
+    data: {
+      ...analysis,
+      albumId: track.album?.id || null,
+    },
+  });
+
+  return updatedTrack;
+};
+// --- END: New Re-analyze Service Function ---

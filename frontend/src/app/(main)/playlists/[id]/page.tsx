@@ -117,9 +117,7 @@ export default function PlaylistPage() {
     playlist?.name === "Welcome Mix" ||
     (playlist?.type === "SYSTEM" && playlist?.name === "Welcome Mix");
   const isSpecialPlaylist =
-    isFavoritePlaylist ||
-    isWelcomeMixPlaylist ||
-    playlist?.type === "SYSTEM";
+    isFavoritePlaylist || isWelcomeMixPlaylist || playlist?.type === "SYSTEM";
 
   // Check if this is a normal playlist (not special playlists or AI generated)
   const isNormalPlaylist =
@@ -651,6 +649,12 @@ export default function PlaylistPage() {
       });
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated && !loading && !error) {
+      router.push("/");
+    }
+  }, [isAuthenticated, loading, error, router]);
 
   if (loading) {
     return (

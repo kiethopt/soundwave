@@ -35,7 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Flag } from "lucide-react";
+import { Flag, Bot } from "lucide-react";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -145,7 +145,6 @@ export default function Sidebar({
     setError(null);
     setFavoritePlaylist(null);
     setWelcomeMixPlaylist(null);
-    setPlaylistAI(null);
     setPlaylists([]);
     setAllUserPlaylists([]);
 
@@ -183,17 +182,13 @@ export default function Sidebar({
         setWelcomeMixPlaylist(welcome);
         setPlaylistAI(ai);
 
-        const normal = fetchedPlaylists.filter(
+        const displayPlaylists = fetchedPlaylists.filter(
           (p: Playlist) =>
             p.type !== "FAVORITE" &&
-            p.name !== "Welcome Mix" &&
-            p.name !== "AI Playlist" &&
-            !p.name.includes("AI Playlist") &&
-            (p.type !== "SYSTEM" || !p.isAIGenerated) &&
-            p.type !== "SYSTEM" &&
-            !p.isAIGenerated
+            !(p.type === "SYSTEM" && p.name === "Welcome Mix") &&
+            p.name !== "Welcome Mix"
         );
-        setPlaylists(normal);
+        setPlaylists(displayPlaylists);
       } else {
         setError(response.message || "Could not load playlists");
       }
@@ -304,6 +299,8 @@ export default function Sidebar({
   };
 
   const isActive = (path: string) => pathname === path;
+  const isActiveIncludingSubpaths = (basePath: string) =>
+    pathname.startsWith(basePath);
 
   return (
     <>
@@ -572,43 +569,49 @@ export default function Sidebar({
                       )}
 
                       {/* Conditional rendering for 'Create playlist' prompt */}
-                      {!isCollapsed && (!isAuthenticated || (isAuthenticated && !loading && playlists.length === 0)) && (
-                        <div
-                          className={`p-4 rounded-lg mt-4 ${
-                            theme === "light" ? "bg-gray-100" : "bg-[#242424]"
-                          }`}
-                        >
-                          <h3
-                            className={`font-bold text-base ${
-                              theme === "light" ? "text-gray-900" : "text-white"
+                      {!isCollapsed &&
+                        (!isAuthenticated ||
+                          (isAuthenticated &&
+                            !loading &&
+                            playlists.length === 0)) && (
+                          <div
+                            className={`p-4 rounded-lg mt-4 ${
+                              theme === "light" ? "bg-gray-100" : "bg-[#242424]"
                             }`}
                           >
-                            Create your first playlist
-                          </h3>
-                          <p
-                            className={`text-sm mt-1 ${
-                              theme === "light"
-                                ? "text-gray-600"
-                                : "text-white/70"
-                            }`}
-                          >
-                            It's easy! We'll help you
-                          </p>
-                          <button
-                            onClick={handleCreateInstantPlaylist}
-                            disabled={isCreatingPlaylist}
-                            className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
-                              theme === "light"
-                                ? "bg-black text-white hover:bg-gray-800"
-                                : "bg-white text-black hover:bg-gray-200"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          >
-                            {isCreatingPlaylist
-                              ? "Creating..."
-                              : "Create playlist"}
-                          </button>
-                        </div>
-                      )}
+                            <h3
+                              className={`font-bold text-base ${
+                                theme === "light"
+                                  ? "text-gray-900"
+                                  : "text-white"
+                              }`}
+                            >
+                              Create your first playlist
+                            </h3>
+                            <p
+                              className={`text-sm mt-1 ${
+                                theme === "light"
+                                  ? "text-gray-600"
+                                  : "text-white/70"
+                              }`}
+                            >
+                              It's easy! We'll help you
+                            </p>
+                            <button
+                              onClick={handleCreateInstantPlaylist}
+                              disabled={isCreatingPlaylist}
+                              className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
+                                theme === "light"
+                                  ? "bg-black text-white hover:bg-gray-800"
+                                  : "bg-white text-black hover:bg-gray-200"
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {isCreatingPlaylist
+                                ? "Creating..."
+                                : "Create playlist"}
+                            </button>
+                          </div>
+                        )}
 
                       <div
                         className={`${
@@ -899,7 +902,7 @@ export default function Sidebar({
                   <Link
                     href="/admin/bulk-upload"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/bulk-upload")
+                      isActiveIncludingSubpaths("/admin/bulk-upload")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -913,18 +916,15 @@ export default function Sidebar({
                         <div className="min-w-[32px] flex justify-center">
                           <Requests className="w-5 h-5" />
                         </div>
-                        <span className="ml-3 font-medium text-sm">
-                          Upload
-                        </span>
+                        <span className="ml-3 font-medium text-sm">Upload</span>
                       </>
                     )}
                   </Link>
 
-                  {/* New Simple Artist Requests */}
                   <Link
                     href="/admin/artist-requests"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/artist-requests")
+                      isActiveIncludingSubpaths("/admin/artist-requests")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -951,37 +951,15 @@ export default function Sidebar({
                     </div>
                   )}
 
-                  {/* Old User Management */}
-                  {/* <Link
-                    href="/admin/users"
-                    className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith('/admin/users')
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {isCollapsed ? (
-                      <div className="w-full flex justify-center">
-                        <Users className="w-6 h-6" />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="min-w-[32px] flex justify-center">
-                          <Users className="w-5 h-5" />
-                        </div>
-                        <span className="ml-3 font-medium text-sm">Users</span>
-                      </>
-                    )}
-                  </Link> */}
-
-
                   <Link
                     href="/admin/users"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith('/admin/users')
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'text-gray-700 hover:bg-gray-100'
+                      isActiveIncludingSubpaths("/admin/users") &&
+                      !isActiveIncludingSubpaths("/admin/ai-management/users")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
+                    title="Manage all users"
                   >
                     {isCollapsed ? (
                       <div className="w-full flex justify-center">
@@ -998,9 +976,34 @@ export default function Sidebar({
                   </Link>
 
                   <Link
+                    href="/admin/ai-management/users"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      isActiveIncludingSubpaths("/admin/ai-management/users")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                    title="Manage AI-generated playlists for users"
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Bot className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Bot className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">
+                          AI User Playlists
+                        </span>
+                      </>
+                    )}
+                  </Link>
+
+                  <Link
                     href="/admin/artists"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/artists")
+                      isActiveIncludingSubpaths("/admin/artists")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -1024,7 +1027,7 @@ export default function Sidebar({
                   <Link
                     href="/admin/reports"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/reports")
+                      isActiveIncludingSubpaths("/admin/reports")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -1048,7 +1051,7 @@ export default function Sidebar({
                   <Link
                     href="/admin/genres"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/genres")
+                      isActiveIncludingSubpaths("/admin/genres")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -1067,33 +1070,10 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  {/* Old Labels Management */}
-                  {/* <Link
-                    href="/admin/labels"
-                    className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/labels")
-                        ? "bg-gray-200 text-gray-900"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {isCollapsed ? (
-                      <div className="w-full flex justify-center">
-                        <Tags className="w-6 h-6" />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="min-w-[32px] flex justify-center">
-                          <Tags className="w-5 h-5" />
-                        </div>
-                        <span className="ml-3 font-medium text-sm">Labels</span>
-                      </>
-                    )}
-                  </Link> */}
-
                   <Link
                     href="/admin/labels"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/labels")
+                      isActiveIncludingSubpaths("/admin/labels")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -1112,35 +1092,10 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  {/* Old Content Management */}
-                  {/* <Link
-                    href="/admin/content"
-                    className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/content")
-                        ? "bg-gray-200 text-gray-900"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {isCollapsed ? (
-                      <div className="w-full flex justify-center">
-                        <LayoutGrid className="w-6 h-6" />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="min-w-[32px] flex justify-center">
-                          <LayoutGrid className="w-5 h-5" />
-                        </div>
-                        <span className="ml-3 font-medium text-sm">
-                          Content
-                        </span>
-                      </>
-                    )}
-                  </Link> */}
-
                   <Link
                     href="/admin/content"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/content")
+                      isActiveIncludingSubpaths("/admin/content")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
@@ -1170,7 +1125,7 @@ export default function Sidebar({
                   <Link
                     href="/admin/system"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/system")
+                      isActiveIncludingSubpaths("/admin/system")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}

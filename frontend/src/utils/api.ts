@@ -1,6 +1,6 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Helper function giúp giảm bớt lặp code
 const fetchWithAuth = async (
@@ -18,7 +18,7 @@ const fetchWithAuth = async (
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${API_BASE}${url}`, {
+  const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,
     headers,
   });
@@ -167,13 +167,16 @@ export const api = {
       }),
 
     uploadGoogleAvatar: async (googleImageUrl: string) => {
-      const response = await fetch(`${API_BASE}/auth/upload-google-avatar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ googleImageUrl }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/auth/upload-google-avatar`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ googleImageUrl }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to upload Google avatar");
@@ -543,7 +546,7 @@ export const api = {
       );
     },
 
-    // --- Artist Claim Requests --- 
+    // --- Artist Claim Requests ---
     getArtistClaimRequests: async (
       token: string,
       page: number = 1,
@@ -590,11 +593,7 @@ export const api = {
         token
       ),
 
-    rejectArtistClaim: async (
-      claimId: string,
-      reason: string,
-      token: string
-    ) =>
+    rejectArtistClaim: async (claimId: string, reason: string, token: string) =>
       fetchWithAuth(
         `/api/admin/artist-claims/${claimId}/reject`,
         {
@@ -603,6 +602,96 @@ export const api = {
         },
         token
       ),
+
+    // --- User AI Playlist Management by Admin ---
+    generateUserAiPlaylist: async (userId: string, token: string) => {
+      return fetchWithAuth(
+        `/api/admin/users/${userId}/ai-playlists`,
+        { method: "POST" },
+        token
+      );
+    },
+
+    updateAiPlaylistVisibility: async (
+      playlistId: string,
+      visibility: "PUBLIC" | "PRIVATE", // Use string literal type here for simplicity if PlaylistPrivacy enum isn't easily available/imported
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/admin/ai-playlists/${playlistId}/visibility`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ visibility }),
+        },
+        token
+      );
+    },
+
+    getUserAiPlaylists: async (
+      userId: string,
+      token: string,
+      queryParams?: string // Pass URLSearchParams string e.g., "page=1&limit=10&sortBy=createdAt"
+    ) => {
+      const url = queryParams
+        ? `/api/admin/users/${userId}/ai-playlists?${queryParams}`
+        : `/api/admin/users/${userId}/ai-playlists`;
+      return fetchWithAuth(url, { method: "GET" }, token);
+    },
+
+    getUserListeningHistory: async (
+      userId: string,
+      token: string,
+      queryParams?: string // Pass URLSearchParams string e.g., "page=1&limit=10&sortBy=createdAt"
+    ) => {
+      const url = queryParams
+        ? `/api/admin/users/${userId}/history?${queryParams}`
+        : `/api/admin/users/${userId}/history`;
+      return fetchWithAuth(url, { method: "GET" }, token);
+    },
+    // --- End User AI Playlist Management ---
+
+    // Method to re-analyze track audio features by admin
+    async reanalyzeTrack(
+      trackId: string,
+      token: string
+    ): Promise<{ message: string; track: any }> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/admin/tracks/${trackId}/reanalyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status} ${
+          response.statusText || ""
+        }`.trim();
+        const clonedResponse = response.clone(); // Clone the response
+
+        try {
+          const errorBody = await response.json(); // Attempt to parse original response as JSON
+          errorMessage = errorBody.message || errorMessage;
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the raw text from the cloned response
+          try {
+            const errorText = await clonedResponse.text();
+            if (errorText) errorMessage = errorText; // Use text if available and not empty
+          } catch (textError) {
+            // Keep the previously formed errorMessage if text fails
+            console.error(
+              "[api.admin.reanalyzeTrack] Failed to read error response text:",
+              textError
+            );
+          }
+        }
+        throw new Error(errorMessage);
+      }
+      return response.json();
+    },
   },
 
   user: {
@@ -759,17 +848,25 @@ export const api = {
       fetchWithAuth("/api/user/claimable-artists", { method: "GET" }, token),
 
     submitArtistClaim: async (token: string, data: FormData) =>
-      fetchWithAuth("/api/user/artist-claims", {
-        method: "POST",
-        body: data,
-      }, token),
+      fetchWithAuth(
+        "/api/user/artist-claims",
+        {
+          method: "POST",
+          body: data,
+        },
+        token
+      ),
 
     getUserClaims: async (token: string) =>
       fetchWithAuth("/api/user/artist-claims", { method: "GET" }, token),
 
     // Thêm hàm mới để lấy discover genres
     getDiscoverGenres: async (token: string) => {
-      return fetchWithAuth(`/api/user/discover-genres`, { method: 'GET' }, token);
+      return fetchWithAuth(
+        `/api/user/discover-genres`,
+        { method: "GET" },
+        token
+      );
     },
   },
 
@@ -999,20 +1096,25 @@ export const api = {
     checkCopyright: async (formData: FormData, token: string) => {
       // This function specifically calls the new check-copyright endpoint
       try {
-        const response = await fetch(`${API_BASE}/api/tracks/check-copyright`, { 
-          method: "POST", 
-          body: formData, // Should contain audioFile, title, releaseDate
-          headers: {
-            Authorization: `Bearer ${token}`,
-            // Content-Type is handled automatically for FormData
-          },
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/api/tracks/check-copyright`,
+          {
+            method: "POST",
+            body: formData, // Should contain audioFile, title, releaseDate
+            headers: {
+              Authorization: `Bearer ${token}`,
+              // Content-Type is handled automatically for FormData
+            },
+          }
+        );
 
         const responseBody = await response.json();
 
         if (!response.ok) {
           // Throw error with response body for detailed handling
-          const error: any = new Error(responseBody.message || `HTTP error! status: ${response.status}`);
+          const error: any = new Error(
+            responseBody.message || `HTTP error! status: ${response.status}`
+          );
           error.responseBody = responseBody;
           error.statusCode = response.status;
           throw error;
@@ -1021,7 +1123,7 @@ export const api = {
         // On success, return the response which includes { isSafeToUpload, message, copyrightDetails? }
         return responseBody;
       } catch (error) {
-        console.error('Error checking track copyright:', error);
+        console.error("Error checking track copyright:", error);
         throw error; // Re-throw to be handled by the caller
       }
     },
@@ -1029,8 +1131,8 @@ export const api = {
     create: async (formData: FormData, token: string) => {
       // This calls the original /api/tracks POST endpoint for actual creation
       try {
-        const response = await fetch(`${API_BASE}/api/tracks`, { 
-          method: "POST", 
+        const response = await fetch(`${API_BASE_URL}/api/tracks`, {
+          method: "POST",
           body: formData, // Contains all track details + files
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1040,7 +1142,9 @@ export const api = {
         const responseBody = await response.json();
 
         if (!response.ok) {
-          const error: any = new Error(responseBody.message || `HTTP error! status: ${response.status}`);
+          const error: any = new Error(
+            responseBody.message || `HTTP error! status: ${response.status}`
+          );
           error.responseBody = responseBody;
           error.statusCode = response.status;
           throw error;
@@ -1101,6 +1205,14 @@ export const api = {
         },
         token
       ),
+
+    recordPlay: async (trackId: string, token: string) => {
+      return fetchWithAuth(
+        `/api/tracks/${trackId}/play`,
+        { method: "POST" }, // Assuming POST based on controller name, adjust if needed
+        token
+      );
+    },
   },
 
   history: {
@@ -1497,17 +1609,14 @@ export const api = {
     },
 
     createPersonalized: async (token: string, data: any) => {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/playlists/personalized`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/playlists/personalized`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to create personalized playlist");
@@ -1646,7 +1755,7 @@ export const api = {
 
   upload: {
     image: async (formData: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/upload/image`, {
+      const response = await fetch(`${API_BASE_URL}/upload/image`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1687,13 +1796,16 @@ export const api = {
   },
 
   reports: {
-    create: async (data: {
-      type: string;
-      description: string;
-      trackId?: string;
-      playlistId?: string;
-      albumId?: string;
-    }, token: string) => {
+    create: async (
+      data: {
+        type: string;
+        description: string;
+        trackId?: string;
+        playlistId?: string;
+        albumId?: string;
+      },
+      token: string
+    ) => {
       return fetchWithAuth(
         "/api/reports",
         {
@@ -1704,7 +1816,11 @@ export const api = {
       );
     },
 
-    getUserReports: async (token: string, page: number = 1, limit: number = 10) => {
+    getUserReports: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10
+    ) => {
       return fetchWithAuth(
         `/api/reports/my-reports?page=${page}&limit=${limit}`,
         { method: "GET" },
@@ -1713,11 +1829,7 @@ export const api = {
     },
 
     getReport: async (id: string, token: string) => {
-      return fetchWithAuth(
-        `/api/reports/${id}`,
-        { method: "GET" },
-        token
-      );
+      return fetchWithAuth(`/api/reports/${id}`, { method: "GET" }, token);
     },
 
     // Admin only
