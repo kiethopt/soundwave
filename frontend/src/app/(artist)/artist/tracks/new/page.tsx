@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label as UILabel } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import * as mm from 'music-metadata';
 
 // Define the type for selected artists (can have ID or just name)
 interface SelectedArtist {
@@ -37,6 +38,16 @@ interface CopyrightInfo {
   songLink?: string;
   isBlocking: boolean;
 }
+
+// Helper function for frontend name normalization
+const normalizeArtistNameForFrontend = (name: string | null | undefined): string => {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .trim()
+    .normalize('NFD') // Decompose combined characters
+    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritical marks
+};
 
 // Component to display copyright information
 const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo, theme: 'light' | 'dark' }) => {
@@ -181,13 +192,12 @@ export default function NewTrack() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
-  const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0); // Track last copyright check time
-  const COOLDOWN_PERIOD = 15000; // 15 seconds cooldown between checks
+  const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0);
+  const COOLDOWN_PERIOD = 15000;
 
   // Helper function to get current date and time in YYYY-MM-DDTHH:MM format
   const getCurrentDateTime = () => {
     const now = new Date();
-    // Adjust for local timezone
     const offset = now.getTimezoneOffset();
     const localNow = new Date(now.getTime() - (offset * 60 * 1000));
     return localNow.toISOString().slice(0, 16);
@@ -196,7 +206,7 @@ export default function NewTrack() {
   const [trackData, setTrackData] = useState({
     title: '',
     type: 'SINGLE',
-    releaseDate: getCurrentDateTime(), // Set current date and time as default
+    releaseDate: getCurrentDateTime(),
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -208,6 +218,7 @@ export default function NewTrack() {
   const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [copyrightInfo, setCopyrightInfo] = useState<CopyrightInfo | null>(null);
+  const [uploaderArtistName, setUploaderArtistName] = useState<string | null>(null);
 
   // State to store the artist's default label name
   const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
@@ -226,10 +237,9 @@ export default function NewTrack() {
         const [artistsResponse, genresResponse, profileResponse] = await Promise.all([
           api.artists.getAllArtistsProfile(token, 1, 500),
           api.genres.getAll(token, 1, 1000),
-          api.auth.getMe(token), // Fetch current user profile
+          api.auth.getMe(token),
         ]);
 
-        // Set available artists (excluding self if needed, though maybe allow for features)
         setAvailableArtists(
           artistsResponse.artists.map((artist: ArtistProfile) => ({
             id: artist.id,
@@ -252,6 +262,10 @@ export default function NewTrack() {
           setArtistLabelName(null);
         }
 
+        if (profileResponse?.artistProfile?.artistName) {
+          setUploaderArtistName(profileResponse.artistProfile.artistName);
+        }
+
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
         toast.error('Failed to load required data (artists, genres, or profile)');
@@ -259,7 +273,7 @@ export default function NewTrack() {
     };
 
     fetchData();
-  }, [router]); // Depend on router
+  }, [router]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -268,12 +282,72 @@ export default function NewTrack() {
     setTrackData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       if (e.target.name === 'audio') {
-        setAudioFile(e.target.files[0]);
-        // Clear any previous copyright detection
+        if (e.target.files.length === 0) {
+          return;
+        }
+        const file = e.target.files[0];
+        setAudioFile(file);
         setCopyrightInfo(null);
+        setFeaturedArtists([]);
+
+        if (file) {
+          try {
+            const buffer = await file.arrayBuffer();
+            const metadata = await mm.parseBuffer(Buffer.from(buffer), file.type);
+            console.log('Music Metadata:', metadata);
+
+            // Auto-fill title
+            if (metadata.common.title) {
+              setTrackData(prev => ({ ...prev, title: metadata.common.title || prev.title }));
+            }
+
+            // Auto-fill featured artists
+            const foundArtists: string[] = [];
+            if (metadata.common.artists) {
+              foundArtists.push(...metadata.common.artists);
+            } else if (metadata.common.artist) {
+              foundArtists.push(metadata.common.artist);
+            }
+            
+            if (foundArtists.length > 0) {
+              const newFeatured: SelectedArtist[] = [];
+              const currentFeaturedNames = new Set<string>();
+
+              for (const artistName of foundArtists) {
+                const normalizedArtistName = normalizeArtistNameForFrontend(artistName);
+                const normalizedUploaderName = normalizeArtistNameForFrontend(uploaderArtistName);
+
+                if (normalizedArtistName === normalizedUploaderName && normalizedArtistName !== '') {
+                  continue; // Skip if it's the main uploader
+                }
+
+                if (currentFeaturedNames.has(normalizedArtistName)) {
+                  continue; // Skip if already added
+                }
+
+                const existingArtist = availableArtists.find(
+                  (a) => a.name.toLowerCase() === normalizedArtistName
+                );
+
+                if (existingArtist) {
+                  newFeatured.push({ id: existingArtist.id, name: existingArtist.name });
+                } else {
+                  newFeatured.push({ name: artistName.trim() });
+                }
+                currentFeaturedNames.add(normalizedArtistName);
+              }
+              setFeaturedArtists(newFeatured);
+            }
+
+          } catch (metaError) {
+            console.error('Error parsing audio metadata:', metaError);
+            toast.error('Could not read metadata from audio file.');
+          }
+        }
+
       } else if (e.target.name === 'cover' && e.target.files.length > 0) {
         const file = e.target.files[0];
         setCoverFile(file);
@@ -355,19 +429,25 @@ export default function NewTrack() {
 
       if (result.copyrightDetails) {
           const details = result.copyrightDetails;
+          // Extract artist name(s) correctly
+          let artistString = 'Unknown Artist';
+          if (details.artists && details.artists.length > 0) {
+            artistString = details.artists.map((a: { name: string }) => a.name).join(', ');
+          }
+
           const newCopyrightInfo: CopyrightInfo = {
             title: details.title || 'Unknown Title',
-            artist: details.artist || 'Unknown Artist',
-            album: details.album,
+            artist: artistString,
+            album: details.album?.name,
             releaseDate: details.release_date,
             label: details.label,
             songLink: details.song_link,
             isBlocking: false,
           };
           setCopyrightInfo(newCopyrightInfo);
-          toast.success(result.message || 'Potential match found (non-blocking)'); 
+          toast.success(result.message || 'Potential match found (non-blocking)');
+
       } else {
-          // No match found
           toast.success(result.message || 'No copyright issues detected.');
       }
 
@@ -388,10 +468,16 @@ export default function NewTrack() {
       if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
           // Blocking copyright conflict
           const details = backendError.copyrightDetails;
+          // Extract artist name(s) correctly
+          let artistString = 'Unknown Artist';
+          if (details.artists && details.artists.length > 0) {
+            artistString = details.artists.map((a: { name: string }) => a.name).join(', ');
+          }
+
           const newCopyrightInfo: CopyrightInfo = {
             title: details.title || 'Unknown Title',
-            artist: details.artist || 'Unknown Artist',
-            album: details.album,
+            artist: artistString,
+            album: details.album?.name,
             releaseDate: details.release_date,
             label: details.label,
             songLink: details.song_link,
