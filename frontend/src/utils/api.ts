@@ -1763,4 +1763,22 @@ export const api = {
       );
     },
   },
+
+  // --- NEW SECTION for Generate API ---
+  generate: {
+    createPlaylistFromPrompt: async (
+      data: { prompt: string },
+      token: string
+    ) => {
+      return fetchWithAuth(
+        "/api/generate/playlist", // Matches the backend route
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+        token
+      );
+    },
+  },
+  // --- END NEW SECTION ---
 };

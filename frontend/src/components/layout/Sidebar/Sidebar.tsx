@@ -36,6 +36,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Flag } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { GenerateAIPlaylistModal } from "@/components/ui/user-modals";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -90,6 +97,7 @@ export default function Sidebar({
   const [userId, setUserId] = useState<string | null>(null);
   const { socket } = useSocket();
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+  const [isGenerateAIPlaylistModalOpen, setIsGenerateAIPlaylistModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -171,29 +179,20 @@ export default function Sidebar({
               p.name === "Welcome Mix" ||
               (p.type === "SYSTEM" && p.name === "Welcome Mix")
           ) || null;
-        const ai =
-          fetchedPlaylists.find(
-            (p: Playlist) =>
-              p.name === "AI Playlist" ||
-              p.name.includes("AI Playlist") ||
-              (p.type === "SYSTEM" && p.isAIGenerated)
-          ) || null;
-
+        
         setFavoritePlaylist(fav);
         setWelcomeMixPlaylist(welcome);
-        setPlaylistAI(ai);
 
-        const normal = fetchedPlaylists.filter(
+        const normalAndUserAIPlaylists = fetchedPlaylists.filter(
           (p: Playlist) =>
             p.type !== "FAVORITE" &&
+            !(p.name === "Welcome Mix" && p.type === "SYSTEM") &&
             p.name !== "Welcome Mix" &&
-            p.name !== "AI Playlist" &&
-            !p.name.includes("AI Playlist") &&
-            (p.type !== "SYSTEM" || !p.isAIGenerated) &&
-            p.type !== "SYSTEM" &&
-            !p.isAIGenerated
+            ( (p.isAIGenerated && p.type !== "SYSTEM") ||
+              (!p.isAIGenerated && p.type !== "SYSTEM") )
         );
-        setPlaylists(normal);
+        setPlaylists(normalAndUserAIPlaylists);
+
       } else {
         setError(response.message || "Could not load playlists");
       }
@@ -275,7 +274,7 @@ export default function Sidebar({
     }
 
     const playlistCount = allUserPlaylists.filter(
-      (p) => p.type !== "SYSTEM" && p.type !== "FAVORITE"
+      (p) => p.type !== "SYSTEM" && p.type !== "FAVORITE" && !p.isAIGenerated
     ).length;
     const newPlaylistName = `My Playlist #${playlistCount + 1}`;
 
@@ -301,6 +300,16 @@ export default function Sidebar({
     } finally {
       setIsCreatingPlaylist(false);
     }
+  };
+
+  const openGenerateAIPlaylistModal = () => {
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+    setIsGenerateAIPlaylistModalOpen(true);
+  };
+
+  const handlePlaylistCreated = () => {
+    fetchPlaylists();
   };
 
   const isActive = (path: string) => pathname === path;
@@ -356,7 +365,9 @@ export default function Sidebar({
               <div className="px-4 py-6">
                 <div
                   className={
-                    isCollapsed ? "flex justify-center" : "flex justify-start"
+                    isCollapsed
+                      ? "flex justify-center"
+                      : "flex justify-start"
                   }
                 >
                   <Image
@@ -418,23 +429,57 @@ export default function Sidebar({
                                 Your Library
                               </span>
                             </div>
-                            <button
-                              onClick={handleCreateInstantPlaylist}
-                              disabled={isCreatingPlaylist}
-                              className={`ml-auto p-1 rounded-md ${
-                                theme === "light"
-                                  ? "bg-gray-100 hover:bg-gray-200"
-                                  : "bg-neutral-800 hover:bg-white/10"
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                              <AddSimple
-                                className={`w-6 h-6 ${
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  disabled={isCreatingPlaylist}
+                                  className={`ml-auto p-1 rounded-md ${
+                                    theme === "light"
+                                      ? "bg-gray-100 hover:bg-gray-200"
+                                      : "bg-neutral-800 hover:bg-white/10"
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  <AddSimple
+                                    className={`w-6 h-6 ${
+                                      theme === "light"
+                                        ? "text-gray-600 group-hover:text-gray-900"
+                                        : "text-white/70 group-hover:text-white"
+                                    }`}
+                                  />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                className={`min-w-[180px] ${
                                   theme === "light"
-                                    ? "text-gray-600 group-hover:text-gray-900"
-                                    : "text-white/70 group-hover:text-white"
+                                    ? "bg-white border-gray-200"
+                                    : "bg-[#282828] border-neutral-700 text-white"
                                 }`}
-                              />
-                            </button>
+                                sideOffset={5}
+                                align="end"
+                              >
+                                <DropdownMenuItem
+                                  onClick={handleCreateInstantPlaylist}
+                                  disabled={isCreatingPlaylist}
+                                  className={`cursor-pointer ${
+                                    theme === "light"
+                                      ? "hover:bg-gray-100"
+                                      : "hover:bg-white/10"
+                                  }`}
+                                >
+                                  Create Playlist
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={openGenerateAIPlaylistModal}
+                                  className={`cursor-pointer ${
+                                    theme === "light"
+                                      ? "hover:bg-gray-100"
+                                      : "hover:bg-white/10"
+                                  }`}
+                                >
+                                  Create Playlist with AI
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </>
                         )}
                       </div>
@@ -448,10 +493,9 @@ export default function Sidebar({
                       }`}
                     >
                       {isCollapsed && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <button
-                              onClick={handleCreateInstantPlaylist}
                               disabled={isCreatingPlaylist}
                             >
                               <div
@@ -460,14 +504,50 @@ export default function Sidebar({
                                 <AddSimple className="w-6 h-6" />
                               </div>
                             </button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="right"
-                            className="bg-[#282828] border-none text-white"
+                          </DropdownMenuTrigger>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                               <div></div>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="right"
+                              className="bg-[#282828] border-none text-white"
+                            >
+                              <p>Add to library</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <DropdownMenuContent
+                            className={`min-w-[180px] ${
+                              theme === "light"
+                                ? "bg-white border-gray-200"
+                                : "bg-[#282828] border-neutral-700 text-white"
+                            }`}
+                            sideOffset={5}
+                            align="end"
                           >
-                            <p>Create playlist</p>
-                          </TooltipContent>
-                        </Tooltip>
+                            <DropdownMenuItem
+                              onClick={handleCreateInstantPlaylist}
+                              disabled={isCreatingPlaylist}
+                              className={`cursor-pointer ${
+                                theme === "light"
+                                  ? "hover:bg-gray-100"
+                                  : "hover:bg-white/10"
+                              }`}
+                            >
+                              Create Playlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={openGenerateAIPlaylistModal}
+                              className={`cursor-pointer ${
+                                theme === "light"
+                                  ? "hover:bg-gray-100"
+                                  : "hover:bg-white/10"
+                              }`}
+                            >
+                              Create Playlist with AI
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
 
                       {favoritePlaylist && favoritePlaylist.totalTracks > 0 && (
@@ -611,10 +691,9 @@ export default function Sidebar({
                       )}
 
                       <div
-                        className={`${
-                          isCollapsed
-                            ? "w-full flex flex-col items-center space-y-2"
-                            : ""
+                        className={`${isCollapsed
+                          ? "w-full flex flex-col items-center space-y-2"
+                          : ""
                         }`}
                       >
                         {playlists.map((playlist, index) => (
@@ -623,7 +702,7 @@ export default function Sidebar({
                             href={`/playlists/${playlist.id}`}
                             className={`flex ${
                               isCollapsed
-                                ? "items-center justify-center py-1"
+                                ? "items-center justify-center py-1 group"
                                 : `items-center px-3 py-2.5 ${
                                     index > 0 ? "mt-1" : ""
                                   } rounded-md ${
@@ -641,11 +720,11 @@ export default function Sidebar({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div
-                                    className={`p-1.5 rounded-lg ${
+                                    className={`relative p-1.5 rounded-lg ${
                                       isActive(`/playlists/${playlist.id}`)
                                         ? "bg-[#A57865]/30"
                                         : "bg-neutral-800"
-                                    } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
+                                    } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 group-hover:scale-105 group-hover:bg-[#333333]`}
                                   >
                                     <PlaylistIcon
                                       coverUrl={playlist.coverUrl}
@@ -655,6 +734,11 @@ export default function Sidebar({
                                       size={28}
                                       className="rounded object-cover"
                                     />
+                                    {playlist.isAIGenerated && (
+                                      <div className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5">
+                                        <Image src="/images/googleGemini_icon.png" width={12} height={12} alt="AI" className="rounded-full" />
+                                      </div>
+                                    )}
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent
@@ -667,12 +751,13 @@ export default function Sidebar({
                                   <p className="text-neutral-400 text-xs">
                                     Playlist • {playlist.totalTracks || 0}{" "}
                                     tracks
+                                    {playlist.isAIGenerated && " (AI)"}
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
                             ) : (
                               <div className="flex items-center w-full gap-2">
-                                <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
+                                <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1 relative">
                                   {playlist.coverUrl ? (
                                     <Image
                                       src={playlist.coverUrl}
@@ -690,6 +775,11 @@ export default function Sidebar({
                                         size={24}
                                       />
                                     </div>
+                                  )}
+                                  {playlist.isAIGenerated && (
+                                     <div className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
+                                         <Image src="/images/googleGemini_icon.png" width={14} height={14} alt="AI" className="rounded-full" />
+                                     </div>
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0 flex-1">
@@ -794,29 +884,6 @@ export default function Sidebar({
                         </>
                       )}
                     </Link>
-
-                    {/* Old Track Management */}
-                    {/* <Link
-                      href="/artist/tracks"
-                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                        pathname && pathname.startsWith("/artist/tracks")
-                          ? theme === "light"
-                            ? "bg-gray-200 text-gray-900"
-                            : "bg-white/10 text-white"
-                          : theme === "light"
-                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {isCollapsed ? (
-                        <Music className="w-6 h-6" />
-                      ) : (
-                        <>
-                          <Music className="w-6 h-6" />
-                          <span>Tracks</span>
-                        </>
-                      )}
-                    </Link> */}
 
                     <Link
                       href="/artist/tracks"
@@ -1219,6 +1286,19 @@ export default function Sidebar({
       </TooltipProvider>
 
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <GenerateAIPlaylistModal 
+        isOpen={isGenerateAIPlaylistModalOpen} 
+        onClose={() => setIsGenerateAIPlaylistModalOpen(false)}
+        onPlaylistCreated={handlePlaylistCreated}
+      />
     </>
   );
 }
+
+// Helper function to check if a playlist is user-created AI or normal
+const isUserPlaylist = (playlist: Playlist) => {
+  return playlist.type !== "FAVORITE" && 
+         playlist.type !== "SYSTEM" && // Excludes all system playlists
+         !(playlist.name === "Welcome Mix"); // Specifically exclude "Welcome Mix" if it's not SYSTEM
+};

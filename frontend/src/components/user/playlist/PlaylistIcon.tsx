@@ -30,11 +30,11 @@ export function PlaylistIcon({
     !isWelcomeMix &&
     !isSystemPlaylist;
 
-  // Chỉ hiển thị hình ảnh bìa cho playlist normal
-  const shouldShowCover = isNormalPlaylist && coverUrl;
+  // Check if there's a valid cover image URL
+  const hasValidCoverUrl = coverUrl && coverUrl.trim().length > 0;
 
-  // Hiển thị icon thích hợp dựa vào loại playlist
-  if (shouldShowCover) {
+  // If cover URL exists, display it regardless of playlist type
+  if (hasValidCoverUrl) {
     return (
       <div
         className={`relative overflow-hidden rounded-sm ${className}`}
@@ -51,7 +51,7 @@ export function PlaylistIcon({
     );
   }
 
-  // Nếu không hiển thị hình ảnh bìa, hiển thị icon phù hợp với loại playlist
+  // Favorite playlist without cover
   if (isFavorite) {
     return (
       <div
@@ -74,6 +74,7 @@ export function PlaylistIcon({
     );
   }
 
+  // AI-generated playlist without cover
   if (isAIGenerated) {
     return (
       <div
@@ -85,6 +86,6 @@ export function PlaylistIcon({
     );
   }
 
-  // Default icon cho các playlist khác
+  // Default icon for other playlists without covers
   return <Music className={className} style={{ width: size, height: size }} />;
 }
