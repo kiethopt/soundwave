@@ -4,16 +4,11 @@ import {
   AddSimple,
   Music,
   Album,
-  Users,
   XIcon,
   Requests,
-  Left,
-  Right,
-  Genres,
   LibraryOutline,
   LibraryFilled,
   HomeOutline,
-  Settings,
   ChartIcon,
   Tags,
   LayoutGrid,
@@ -35,10 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-<<<<<<< HEAD
 import { Flag, Bot } from "lucide-react";
-=======
-import { Flag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +38,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GenerateAIPlaylistModal } from "@/components/ui/user-modals";
->>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
+import {
+  Users,
+  Settings,
+  ChevronLeft as Left,
+  ChevronRight as Right,
+} from "lucide-react";
+import { Genres } from "@/components/ui/Icons";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -92,16 +90,12 @@ export default function Sidebar({
   const [favoritePlaylist, setFavoritePlaylist] = useState<Playlist | null>(
     null
   );
-  const [welcomeMixPlaylist, setWelcomeMixPlaylist] = useState<Playlist | null>(
-    null
-  );
-  const [playlistAI, setPlaylistAI] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { socket } = useSocket();
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
-  const [isGenerateAIPlaylistModalOpen, setIsGenerateAIPlaylistModalOpen] = useState(false);
+  const [isGenerateAIPlaylistModalOpen, setIsGenerateAIPlaylistModalOpen] =
+    useState(false);
 
   useEffect(() => {
     try {
@@ -154,9 +148,7 @@ export default function Sidebar({
 
   const fetchPlaylists = async () => {
     setLoading(true);
-    setError(null);
     setFavoritePlaylist(null);
-    setWelcomeMixPlaylist(null);
     setPlaylists([]);
     setAllUserPlaylists([]);
 
@@ -176,42 +168,25 @@ export default function Sidebar({
 
         const fav =
           fetchedPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
-        const welcome =
-          fetchedPlaylists.find(
-            (p: Playlist) =>
-              p.name === "Welcome Mix" ||
-              (p.type === "SYSTEM" && p.name === "Welcome Mix")
-          ) || null;
-        
-        setFavoritePlaylist(fav);
-        setWelcomeMixPlaylist(welcome);
 
-<<<<<<< HEAD
-        const displayPlaylists = fetchedPlaylists.filter(
-          (p: Playlist) =>
-            p.type !== "FAVORITE" &&
-            !(p.type === "SYSTEM" && p.name === "Welcome Mix") &&
-            p.name !== "Welcome Mix"
-        );
-        setPlaylists(displayPlaylists);
-=======
+        setFavoritePlaylist(fav);
+
         const normalAndUserAIPlaylists = fetchedPlaylists.filter(
           (p: Playlist) =>
             p.type !== "FAVORITE" &&
             !(p.name === "Welcome Mix" && p.type === "SYSTEM") &&
             p.name !== "Welcome Mix" &&
-            ( (p.isAIGenerated && p.type !== "SYSTEM") ||
-              (!p.isAIGenerated && p.type !== "SYSTEM") )
+            ((p.isAIGenerated && p.type !== "SYSTEM") ||
+              (!p.isAIGenerated && p.type !== "SYSTEM"))
         );
         setPlaylists(normalAndUserAIPlaylists);
-
->>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
       } else {
-        setError(response.message || "Could not load playlists");
+        console.error("Error fetching playlists:", response.message);
+        toast.error(response.message || "Could not load playlists");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching playlists:", err);
-      setError("Could not load playlists");
+      toast.error("Could not load playlists");
     } finally {
       setLoading(false);
     }
@@ -307,9 +282,15 @@ export default function Sidebar({
       } else {
         toast.error(response.message || "Failed to create playlist.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating playlist:", error);
-      toast.error("An error occurred while creating the playlist.");
+      if (error instanceof Error) {
+        toast.error(
+          error.message || "An error occurred while creating the playlist."
+        );
+      } else {
+        toast.error("An unknown error occurred while creating the playlist.");
+      }
     } finally {
       setIsCreatingPlaylist(false);
     }
@@ -380,9 +361,7 @@ export default function Sidebar({
               <div className="px-4 py-6">
                 <div
                   className={
-                    isCollapsed
-                      ? "flex justify-center"
-                      : "flex justify-start"
+                    isCollapsed ? "flex justify-center" : "flex justify-start"
                   }
                 >
                   <Image
@@ -510,9 +489,7 @@ export default function Sidebar({
                       {isCollapsed && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button
-                              disabled={isCreatingPlaylist}
-                            >
+                            <button disabled={isCreatingPlaylist}>
                               <div
                                 className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/70 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
                               >
@@ -522,7 +499,7 @@ export default function Sidebar({
                           </DropdownMenuTrigger>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                               <div></div>
+                              <div></div>
                             </TooltipTrigger>
                             <TooltipContent
                               side="right"
@@ -693,7 +670,7 @@ export default function Sidebar({
                                   : "text-white/70"
                               }`}
                             >
-                              It's easy! We'll help you
+                              It&apos;s easy! We&apos;ll help you
                             </p>
                             <button
                               onClick={handleCreateInstantPlaylist}
@@ -712,9 +689,10 @@ export default function Sidebar({
                         )}
 
                       <div
-                        className={`${isCollapsed
-                          ? "w-full flex flex-col items-center space-y-2"
-                          : ""
+                        className={`${
+                          isCollapsed
+                            ? "w-full flex flex-col items-center space-y-2"
+                            : ""
                         }`}
                       >
                         {playlists.map((playlist, index) => (
@@ -757,7 +735,13 @@ export default function Sidebar({
                                     />
                                     {playlist.isAIGenerated && (
                                       <div className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5">
-                                        <Image src="/images/googleGemini_icon.png" width={12} height={12} alt="AI" className="rounded-full" />
+                                        <Image
+                                          src="/images/googleGemini_icon.png"
+                                          width={12}
+                                          height={12}
+                                          alt="AI"
+                                          className="rounded-full"
+                                        />
                                       </div>
                                     )}
                                   </div>
@@ -798,9 +782,15 @@ export default function Sidebar({
                                     </div>
                                   )}
                                   {playlist.isAIGenerated && (
-                                     <div className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
-                                         <Image src="/images/googleGemini_icon.png" width={14} height={14} alt="AI" className="rounded-full" />
-                                     </div>
+                                    <div className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
+                                      <Image
+                                        src="/images/googleGemini_icon.png"
+                                        width={14}
+                                        height={14}
+                                        alt="AI"
+                                        className="rounded-full"
+                                      />
+                                    </div>
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0 flex-1">
@@ -1260,18 +1250,11 @@ export default function Sidebar({
 
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 
-      <GenerateAIPlaylistModal 
-        isOpen={isGenerateAIPlaylistModalOpen} 
+      <GenerateAIPlaylistModal
+        isOpen={isGenerateAIPlaylistModalOpen}
         onClose={() => setIsGenerateAIPlaylistModalOpen(false)}
         onPlaylistCreated={handlePlaylistCreated}
       />
     </>
   );
 }
-
-// Helper function to check if a playlist is user-created AI or normal
-const isUserPlaylist = (playlist: Playlist) => {
-  return playlist.type !== "FAVORITE" && 
-         playlist.type !== "SYSTEM" && // Excludes all system playlists
-         !(playlist.name === "Welcome Mix"); // Specifically exclude "Welcome Mix" if it's not SYSTEM
-};
