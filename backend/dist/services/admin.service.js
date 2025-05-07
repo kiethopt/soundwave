@@ -1500,6 +1500,7 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
     const genres = await db_1.default.genre.findMany();
     const genreMap = new Map(genres.map((g) => [g.name.toLowerCase(), g.id]));
     const selectedGenres = [];
+<<<<<<< HEAD
     const safeEnergy = typeof energy === "number" ? energy : null;
     const isVietnameseSong = (title &&
         title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null) ||
@@ -1537,11 +1538,45 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
             if (vPopId && !selectedGenres.includes(vPopId)) {
                 selectedGenres.push(vPopId);
                 console.log("Added: V-Pop");
+=======
+    const safeEnergy = typeof energy === 'number' ? energy : null;
+    const isVietnameseSong = (title && title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null) ||
+        (artistName && artistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null);
+    const isRemix = title && title.toLowerCase().includes('remix');
+    const isHouseRemix = isRemix && title.toLowerCase().includes('house');
+    const isVietnameseIndie = isVietnameseSong && tempo !== null && tempo >= 110 && tempo <= 125 &&
+        ((key === 'C' && scale === 'major') || mood === 'Melancholic') && !isRemix;
+    if (isVietnameseIndie) {
+        console.log('Vietnamese indie pattern detected');
+        const indieId = genreMap.get('indie') || genreMap.get('indie pop');
+        if (indieId) {
+            selectedGenres.push(indieId);
+            console.log('Added: Indie (primary)');
+        }
+        const popId = genreMap.get('pop');
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log('Added: Pop (secondary)');
+        }
+        if (safeEnergy !== null && safeEnergy > 0.5) {
+            const rockId = genreMap.get('alternative') || genreMap.get('rock');
+            if (rockId && !selectedGenres.includes(rockId)) {
+                selectedGenres.push(rockId);
+                console.log('Added: Alternative/Rock (energetic Vietnamese indie)');
+            }
+        }
+        else {
+            const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop');
+            if (vPopId && !selectedGenres.includes(vPopId)) {
+                selectedGenres.push(vPopId);
+                console.log('Added: V-Pop');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
             }
         }
         return selectedGenres.slice(0, 3);
     }
     if (isVietnameseSong && isHouseRemix) {
+<<<<<<< HEAD
         console.log("Vietnamese house remix detected");
         const houseId = genreMap.get("house") ||
             genreMap.get("electronic") ||
@@ -1559,10 +1594,28 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
         if (vPopId && !selectedGenres.includes(vPopId)) {
             selectedGenres.push(vPopId);
             console.log("Added: V-Pop (Vietnamese origin)");
+=======
+        console.log('Vietnamese house remix detected');
+        const houseId = genreMap.get('house') || genreMap.get('electronic') || genreMap.get('dance');
+        if (houseId) {
+            selectedGenres.push(houseId);
+            console.log('Added: House/Electronic (primary for house remix)');
+        }
+        const danceId = genreMap.get('dance');
+        if (danceId && !selectedGenres.includes(danceId)) {
+            selectedGenres.push(danceId);
+            console.log('Added: Dance (secondary for house remix)');
+        }
+        const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop');
+        if (vPopId && !selectedGenres.includes(vPopId)) {
+            selectedGenres.push(vPopId);
+            console.log('Added: V-Pop (Vietnamese origin)');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
         }
         return selectedGenres.slice(0, 3);
     }
     if (isVietnameseSong && isRemix) {
+<<<<<<< HEAD
         console.log("Vietnamese remix detected");
         const danceId = genreMap.get("dance") || genreMap.get("electronic");
         if (danceId) {
@@ -1578,10 +1631,28 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
         if (vPopId && !selectedGenres.includes(vPopId)) {
             selectedGenres.push(vPopId);
             console.log("Added: V-Pop (Vietnamese origin)");
+=======
+        console.log('Vietnamese remix detected');
+        const danceId = genreMap.get('dance') || genreMap.get('electronic');
+        if (danceId) {
+            selectedGenres.push(danceId);
+            console.log('Added: Dance/Electronic (Vietnamese remix)');
+        }
+        const popId = genreMap.get('pop');
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log('Added: Pop (remix base)');
+        }
+        const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop');
+        if (vPopId && !selectedGenres.includes(vPopId)) {
+            selectedGenres.push(vPopId);
+            console.log('Added: V-Pop (Vietnamese origin)');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
         }
         return selectedGenres.slice(0, 3);
     }
     if (isVietnameseSong) {
+<<<<<<< HEAD
         console.log("Vietnamese song detected");
         const vPopId = genreMap.get("v-pop") ||
             genreMap.get("vietnamese pop") ||
@@ -1607,11 +1678,37 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
             if (indieId && !selectedGenres.includes(indieId)) {
                 selectedGenres.push(indieId);
                 console.log("Added: Indie (melancholic)");
+=======
+        console.log('Vietnamese song detected');
+        const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop') || genreMap.get('pop');
+        if (vPopId) {
+            selectedGenres.push(vPopId);
+            console.log('Added: Vietnamese Pop');
+        }
+        if (tempo !== null && tempo >= 120 && scale === 'major') {
+            const popId = genreMap.get('pop');
+            if (popId && !selectedGenres.includes(popId)) {
+                selectedGenres.push(popId);
+                console.log('Added: Pop (upbeat)');
+            }
+        }
+        if (mood === 'Melancholic' || mood === 'Calm') {
+            const balladId = genreMap.get('ballad');
+            if (balladId && !selectedGenres.includes(balladId)) {
+                selectedGenres.push(balladId);
+                console.log('Added: Ballad');
+            }
+            const indieId = genreMap.get('indie');
+            if (indieId && !selectedGenres.includes(indieId)) {
+                selectedGenres.push(indieId);
+                console.log('Added: Indie (melancholic)');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
             }
         }
     }
     if (tempo !== null && tempo >= 125) {
         if (safeEnergy !== null && safeEnergy > 0.7) {
+<<<<<<< HEAD
             const edm = genreMap.get("electronic") || genreMap.get("edm");
             const dance = genreMap.get("dance");
             if (edm && !selectedGenres.includes(edm)) {
@@ -1671,6 +1768,67 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
         if (popId) {
             selectedGenres.push(popId);
             console.log("Added: Pop (default)");
+=======
+            const edm = genreMap.get('electronic') || genreMap.get('edm');
+            const dance = genreMap.get('dance');
+            if (edm && !selectedGenres.includes(edm)) {
+                selectedGenres.push(edm);
+                console.log('Added: Electronic');
+            }
+            if (dance && !selectedGenres.includes(dance)) {
+                selectedGenres.push(dance);
+                console.log('Added: Dance');
+            }
+        }
+        if (scale === 'major') {
+            const popId = genreMap.get('pop');
+            if (popId && !selectedGenres.includes(popId)) {
+                selectedGenres.push(popId);
+                console.log('Added: Pop (high tempo)');
+            }
+        }
+    }
+    if (mood === 'Energetic') {
+        const popId = genreMap.get('pop');
+        if (popId && !selectedGenres.includes(popId)) {
+            selectedGenres.push(popId);
+            console.log('Added: Pop (energetic)');
+        }
+        if (safeEnergy !== null && safeEnergy > 0.65 && !isVietnameseSong) {
+            const rockId = genreMap.get('rock');
+            if (rockId && !selectedGenres.includes(rockId)) {
+                selectedGenres.push(rockId);
+                console.log('Added: Rock (non-Vietnamese)');
+            }
+        }
+    }
+    if (mood === 'Calm' || mood === 'Melancholic') {
+        const ambientId = genreMap.get('ambient');
+        if (ambientId && !selectedGenres.includes(ambientId)) {
+            selectedGenres.push(ambientId);
+            console.log('Added: Ambient');
+        }
+        if (mood === 'Melancholic') {
+            const indieId = genreMap.get('indie');
+            if (indieId && !selectedGenres.includes(indieId)) {
+                selectedGenres.push(indieId);
+                console.log('Added: Indie (melancholic)');
+            }
+        }
+    }
+    if (scale === 'minor' && !isVietnameseSong) {
+        const altId = genreMap.get('alternative');
+        if (altId && !selectedGenres.includes(altId)) {
+            selectedGenres.push(altId);
+            console.log('Added: Alternative (minor key)');
+        }
+    }
+    if (selectedGenres.length === 0) {
+        const popId = genreMap.get('pop');
+        if (popId) {
+            selectedGenres.push(popId);
+            console.log('Added: Pop (default)');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
         }
     }
     return selectedGenres.slice(0, 3);
@@ -1774,18 +1932,27 @@ const processBulkUpload = async (files) => {
                 if (pcmF32) {
                     const essentia = new essentia_js_1.Essentia(essentia_js_1.EssentiaWASM);
                     const audioVector = essentia.arrayToVector(pcmF32);
+<<<<<<< HEAD
                     console.log("PCM length:", pcmF32.length);
+=======
+                    console.log('PCM length:', pcmF32.length);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                     const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
                     const sampleRate = metadata.format.sampleRate || 44100;
                     try {
                         const rhythmResult = essentia.RhythmExtractor2013(audioVector, sampleRate);
                         let rawTempo = rhythmResult.bpm;
+<<<<<<< HEAD
                         console.log("RhythmExtractor2013 BPM:", rawTempo, "Confidence:", rhythmResult.confidence);
+=======
+                        console.log('RhythmExtractor2013 BPM:', rawTempo, 'Confidence:', rhythmResult.confidence);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                         let percivalTempo = null;
                         if (rhythmResult.confidence < 3) {
                             try {
                                 const percivalResult = essentia.PercivalBpmEstimator(audioVector);
                                 percivalTempo = percivalResult.bpm;
+<<<<<<< HEAD
                                 console.log("PercivalBpmEstimator BPM:", percivalTempo);
                                 if (Math.abs(rawTempo - percivalTempo) < 10) {
                                     rawTempo = (rawTempo + percivalTempo) / 2;
@@ -1799,22 +1966,43 @@ const processBulkUpload = async (files) => {
                             }
                             catch (percivalError) {
                                 console.error("Error estimating tempo with PercivalBpmEstimator:", percivalError);
+=======
+                                console.log('PercivalBpmEstimator BPM:', percivalTempo);
+                                if (Math.abs(rawTempo - percivalTempo) < 10) {
+                                    rawTempo = (rawTempo + percivalTempo) / 2;
+                                    console.log('Averaged tempo from two estimators:', rawTempo);
+                                }
+                                else if (Math.abs(Math.round(percivalTempo) % 10) < Math.abs(Math.round(rawTempo) % 10)) {
+                                    rawTempo = percivalTempo;
+                                    console.log('Using Percival tempo as it matches common BPM patterns better:', rawTempo);
+                                }
+                            }
+                            catch (percivalError) {
+                                console.error('Error estimating tempo with PercivalBpmEstimator:', percivalError);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             }
                         }
                         tempo = Math.round(rawTempo);
                         if (tempo < 60 || tempo > 200) {
                             console.warn(`Unusual tempo detected: ${tempo}. Applying sanity check.`);
+<<<<<<< HEAD
                             if (percivalTempo !== null &&
                                 percivalTempo >= 60 &&
                                 percivalTempo <= 200) {
                                 tempo = Math.round(percivalTempo);
                                 console.log("Using percival tempo as primary was out of expected range:", tempo);
+=======
+                            if (percivalTempo !== null && percivalTempo >= 60 && percivalTempo <= 200) {
+                                tempo = Math.round(percivalTempo);
+                                console.log('Using percival tempo as primary was out of expected range:', tempo);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             }
                         }
                         else if (percivalTempo !== null) {
                             const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
                             if (percentDiff > 0.08 && percentDiff < 0.12) {
                                 console.log(`Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(2)}`);
+<<<<<<< HEAD
                                 if (percivalTempo > 110 &&
                                     percivalTempo < 125 &&
                                     percivalTempo > tempo) {
@@ -1824,6 +2012,13 @@ const processBulkUpload = async (files) => {
                                 else if (percivalTempo > 100 &&
                                     percivalTempo < 115 &&
                                     percivalTempo > tempo) {
+=======
+                                if ((percivalTempo > 110 && percivalTempo < 125) && percivalTempo > tempo) {
+                                    tempo = Math.round(percivalTempo);
+                                    console.log(`Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`);
+                                }
+                                else if ((percivalTempo > 100 && percivalTempo < 115) && percivalTempo > tempo) {
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                                     tempo = Math.round(percivalTempo);
                                     console.log(`Corrected BPM to ${tempo} - likely in 100-115 BPM range`);
                                 }
@@ -1831,6 +2026,7 @@ const processBulkUpload = async (files) => {
                         }
                     }
                     catch (tempoError) {
+<<<<<<< HEAD
                         console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
                         try {
                             const tempoResult = essentia.PercivalBpmEstimator(audioVector);
@@ -1839,6 +2035,16 @@ const processBulkUpload = async (files) => {
                         }
                         catch (fallbackError) {
                             console.error("Error estimating tempo with PercivalBpmEstimator:", fallbackError);
+=======
+                        console.error('Error estimating tempo with RhythmExtractor2013:', tempoError);
+                        try {
+                            const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                            tempo = Math.round(tempoResult.bpm);
+                            console.log('PercivalBpmEstimator BPM:', tempoResult.bpm);
+                        }
+                        catch (fallbackError) {
+                            console.error('Error estimating tempo with PercivalBpmEstimator:', fallbackError);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                         }
                     }
                     try {
@@ -1853,6 +2059,7 @@ const processBulkUpload = async (files) => {
                         const rawEnergy = energyResult.energy;
                         const isVietnameseSong = title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
                             derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
+<<<<<<< HEAD
                         const isRemix = title.toLowerCase().includes("remix");
                         const isHouseRemix = isRemix && title.toLowerCase().includes("house");
                         const isVietnameseIndie = isVietnameseSong &&
@@ -1881,6 +2088,30 @@ const processBulkUpload = async (files) => {
                             tempo < 110 &&
                             scale !== null &&
                             scale.toLowerCase() === "minor") {
+=======
+                        const isRemix = title.toLowerCase().includes('remix');
+                        const isHouseRemix = isRemix && title.toLowerCase().includes('house');
+                        const isVietnameseIndie = isVietnameseSong && tempo !== null &&
+                            tempo >= 110 && tempo <= 125 && !isRemix;
+                        if (isVietnameseIndie) {
+                            energy = Math.min(rawEnergy, 0.35);
+                            console.log(`Energy correction for Vietnamese indie song: ${rawEnergy} → ${energy} (indie pattern detected)`);
+                            mood = 'Melancholic';
+                            console.log('Mood set to: Melancholic (Vietnamese indie pattern)');
+                        }
+                        else if (isVietnameseSong && isHouseRemix) {
+                            energy = Math.max(rawEnergy, 0.85);
+                            mood = 'Energetic';
+                            console.log('Mood set to: Energetic (Vietnamese house remix detected)');
+                        }
+                        else if (isVietnameseSong && isRemix) {
+                            energy = Math.max(rawEnergy, 0.7);
+                            mood = 'Energetic';
+                            console.log('Mood set to: Energetic (Vietnamese remix detected)');
+                        }
+                        else if (isVietnameseSong && tempo !== null && tempo < 110 &&
+                            scale !== null && scale.toLowerCase() === 'minor') {
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             energy = Math.min(rawEnergy, 0.35);
                             console.log(`Energy correction applied for Vietnamese ballad: ${rawEnergy} → ${energy} (slow tempo, minor key)`);
                         }
@@ -1888,6 +2119,7 @@ const processBulkUpload = async (files) => {
                             energy = Math.min(rawEnergy, 0.8);
                             console.log(`Minor energy adjustment for upbeat Vietnamese song: ${rawEnergy} → ${energy} (higher tempo)`);
                         }
+<<<<<<< HEAD
                         else if (tempo !== null &&
                             tempo >= 90 &&
                             tempo <= 120 &&
@@ -1895,6 +2127,11 @@ const processBulkUpload = async (files) => {
                             key.toLowerCase().includes("e") &&
                             scale !== null &&
                             scale.toLowerCase() === "minor") {
+=======
+                        else if (tempo !== null && tempo >= 90 && tempo <= 120 &&
+                            key !== null && key.toLowerCase().includes('e') &&
+                            scale !== null && scale.toLowerCase() === 'minor') {
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             energy = Math.min(rawEnergy, 0.4);
                             console.log(`Energy correction applied: ${rawEnergy} → ${energy} (ballad characteristics detected)`);
                         }
@@ -1903,6 +2140,7 @@ const processBulkUpload = async (files) => {
                             console.log(`Using original energy value: ${energy}`);
                         }
                         if (mood === null) {
+<<<<<<< HEAD
                             if (isVietnameseSong &&
                                 tempo !== null &&
                                 tempo >= 130 &&
@@ -1939,16 +2177,48 @@ const processBulkUpload = async (files) => {
                             else if (energy !== null) {
                                 mood = "Neutral";
                                 console.log("Mood set to: Neutral (medium energy)");
+=======
+                            if (isVietnameseSong && tempo !== null && tempo >= 130 && energy !== null && energy > 0.5) {
+                                mood = 'Energetic';
+                                console.log('Mood set to: Energetic (upbeat Vietnamese song)');
+                            }
+                            else if (isVietnameseSong && key !== null && scale !== null &&
+                                scale.toLowerCase() === 'minor' && tempo !== null && tempo < 120) {
+                                mood = 'Melancholic';
+                                console.log('Mood set to: Melancholic (Vietnamese song in minor key with slower tempo)');
+                            }
+                            else if (energy !== null && key !== null && scale !== null &&
+                                scale.toLowerCase() === 'minor' && energy <= 0.4) {
+                                mood = 'Melancholic';
+                                console.log('Mood set to: Melancholic (minor key + low energy)');
+                            }
+                            else if (energy !== null && energy <= 0.4) {
+                                mood = 'Calm';
+                                console.log('Mood set to: Calm (based on low energy)');
+                            }
+                            else if (energy !== null && energy > 0.6) {
+                                mood = 'Energetic';
+                                console.log('Mood set to: Energetic (based on high energy)');
+                            }
+                            else if (energy !== null) {
+                                mood = 'Neutral';
+                                console.log('Mood set to: Neutral (medium energy)');
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             }
                         }
                     }
                     catch (energyError) {
+<<<<<<< HEAD
                         console.error("Error calculating energy:", energyError);
+=======
+                        console.error('Error calculating energy:', energyError);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                     }
                     try {
                         const keyResult = essentia.KeyExtractor(audioVector);
                         const rawKey = keyResult.key;
                         const rawScale = keyResult.scale;
+<<<<<<< HEAD
                         console.log("Key estimation:", rawKey, rawScale, "Strength:", keyResult.strength);
                         let correctedKey = rawKey;
                         let correctedScale = rawScale;
@@ -1983,6 +2253,32 @@ const processBulkUpload = async (files) => {
                             tempo <= 115) {
                             console.log("Detected potential F minor / A minor confusion in common BPM range (100-115)");
                             correctedKey = "A";
+=======
+                        console.log('Key estimation:', rawKey, rawScale, 'Strength:', keyResult.strength);
+                        let correctedKey = rawKey;
+                        let correctedScale = rawScale;
+                        const keyCorrection = {
+                            'A': { key: 'A', possibleErrors: ['F', 'C'] },
+                            'F': { key: 'F', possibleErrors: ['A', 'D'] },
+                            'Eb': { key: 'Eb', possibleErrors: ['C', 'G'] }
+                        };
+                        const isVietnameseSong = title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
+                            derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
+                        const isRemix = title.toLowerCase().includes('remix') || title.toLowerCase().includes('edm');
+                        if (isVietnameseSong && rawKey === 'Eb' && rawScale === 'minor' &&
+                            tempo !== null && tempo >= 110 && tempo <= 125 && !isRemix) {
+                            console.log('Detected Vietnamese indie song with Eb minor key - likely C Major confusion');
+                            correctedKey = 'C';
+                            correctedScale = 'major';
+                            console.log(`Corrected key from ${rawKey} ${rawScale} to ${correctedKey} ${correctedScale} (Vietnamese indie pattern)`);
+                        }
+                        else if (isVietnameseSong && isRemix) {
+                            console.log('Vietnamese remix detected - using raw key detection without correction');
+                        }
+                        else if (rawKey === 'F' && rawScale === 'minor' && tempo !== null && tempo >= 100 && tempo <= 115) {
+                            console.log('Detected potential F minor / A minor confusion in common BPM range (100-115)');
+                            correctedKey = 'A';
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             console.log(`Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`);
                         }
                         else if (keyResult.strength < 0.6 && keyCorrection[rawKey]) {
@@ -1993,7 +2289,11 @@ const processBulkUpload = async (files) => {
                                     : pcmF32;
                                 const shortVector = essentia.arrayToVector(shortSection);
                                 const secondKeyResult = essentia.KeyExtractor(shortVector);
+<<<<<<< HEAD
                                 console.log("Secondary key detection on shorter segment:", secondKeyResult.key, secondKeyResult.scale, "Strength:", secondKeyResult.strength);
+=======
+                                console.log('Secondary key detection on shorter segment:', secondKeyResult.key, secondKeyResult.scale, 'Strength:', secondKeyResult.strength);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                                 if (keyCorrection[rawKey].possibleErrors.includes(secondKeyResult.key) &&
                                     secondKeyResult.strength > keyResult.strength) {
                                     correctedKey = secondKeyResult.key;
@@ -2002,7 +2302,11 @@ const processBulkUpload = async (files) => {
                                 }
                             }
                             catch (secondaryKeyError) {
+<<<<<<< HEAD
                                 console.error("Error in secondary key detection:", secondaryKeyError);
+=======
+                                console.error('Error in secondary key detection:', secondaryKeyError);
+>>>>>>> c407bd4df1d89bb33f2f0eae26f2c12825063122
                             }
                         }
                         key = correctedKey;

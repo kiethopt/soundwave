@@ -20,6 +20,7 @@ const notification_routes_1 = __importDefault(require("./routes/notification.rou
 const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const report_routes_1 = __importDefault(require("./routes/report.routes"));
+const generate_routes_1 = __importDefault(require("./routes/generate.routes"));
 const db_1 = __importDefault(require("./config/db"));
 const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
 const socket_1 = require("./config/socket");
@@ -54,6 +55,7 @@ app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/playlists', playlist_routes_1.default);
 app.use('/api/labels', label_routes_1.default);
 app.use('/api/reports', report_routes_1.default);
+app.use('/api/generate', generate_routes_1.default);
 const initializeApp = async () => {
     try {
         await db_1.default.$queryRaw `SELECT 1`;

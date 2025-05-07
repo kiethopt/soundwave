@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notification.routes';
 import playlistRoutes from './routes/playlist.routes';
 import labelRoutes from './routes/label.routes';
 import reportRoutes from './routes/report.routes';
+import generateRoutes from './routes/generate.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
 import { registerPlaylistCronJobs } from './prisma/extensions/playlist.extension';
@@ -61,6 +62,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/labels', labelRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/generate', generateRoutes);
 
 // Initialize database connection and extensions
 const initializeApp = async () => {
