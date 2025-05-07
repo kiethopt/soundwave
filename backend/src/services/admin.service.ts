@@ -1607,9 +1607,13 @@ async function determineGenresFromAudioAnalysis(
     (title && title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null) ||
     (artistName && artistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null);
 
+  // Check if the song is a remix
+  const isRemix = title && title.toLowerCase().includes('remix');
+  const isHouseRemix = isRemix && title.toLowerCase().includes('house');
+  
   // Vietnamese indie pattern detection
   const isVietnameseIndie = isVietnameseSong && tempo !== null && tempo >= 110 && tempo <= 125 &&
-    ((key === 'C' && scale === 'major') || mood === 'Melancholic');
+    ((key === 'C' && scale === 'major') || mood === 'Melancholic') && !isRemix; // Exclude remixes
   
   if (isVietnameseIndie) {
     console.log('Vietnamese indie pattern detected');
@@ -1638,6 +1642,56 @@ async function determineGenresFromAudioAnalysis(
         selectedGenres.push(vPopId);
         console.log('Added: V-Pop');
       }
+    }
+    
+    return selectedGenres.slice(0, 3);
+  }
+  
+  // Vietnamese house remix detection for genres
+  if (isVietnameseSong && isHouseRemix) {
+    console.log('Vietnamese house remix detected');
+    
+    const houseId = genreMap.get('house') || genreMap.get('electronic') || genreMap.get('dance');
+    if (houseId) {
+      selectedGenres.push(houseId);
+      console.log('Added: House/Electronic (primary for house remix)');
+    }
+    
+    const danceId = genreMap.get('dance');
+    if (danceId && !selectedGenres.includes(danceId)) {
+      selectedGenres.push(danceId);
+      console.log('Added: Dance (secondary for house remix)');
+    }
+    
+    const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop');
+    if (vPopId && !selectedGenres.includes(vPopId)) {
+      selectedGenres.push(vPopId);
+      console.log('Added: V-Pop (Vietnamese origin)');
+    }
+    
+    return selectedGenres.slice(0, 3);
+  }
+  
+  // Regular Vietnamese remix detection for genres
+  if (isVietnameseSong && isRemix) {
+    console.log('Vietnamese remix detected');
+    
+    const danceId = genreMap.get('dance') || genreMap.get('electronic');
+    if (danceId) {
+      selectedGenres.push(danceId);
+      console.log('Added: Dance/Electronic (Vietnamese remix)');
+    }
+    
+    const popId = genreMap.get('pop');
+    if (popId && !selectedGenres.includes(popId)) {
+      selectedGenres.push(popId);
+      console.log('Added: Pop (remix base)');
+    }
+    
+    const vPopId = genreMap.get('v-pop') || genreMap.get('vietnamese pop');
+    if (vPopId && !selectedGenres.includes(vPopId)) {
+      selectedGenres.push(vPopId);
+      console.log('Added: V-Pop (Vietnamese origin)');
     }
     
     return selectedGenres.slice(0, 3);
@@ -1988,10 +2042,14 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
               derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
             
+            // Check if the song is a remix
+            const isRemix = title.toLowerCase().includes('remix');
+            const isHouseRemix = isRemix && title.toLowerCase().includes('house');
+            
             // Vietnamese indie song detection based on tempo and energy patterns
             // Most Vietnamese indie songs in the 110-125 BPM range are misclassified
             const isVietnameseIndie = isVietnameseSong && tempo !== null && 
-              tempo >= 110 && tempo <= 125;
+              tempo >= 110 && tempo <= 125 && !isRemix; // Exclude remixes from indie pattern
             
             // Only apply energy correction for slower Vietnamese ballads
             // Fast-paced Vietnamese songs can still be energetic
@@ -2003,6 +2061,16 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               // Vietnamese indie songs are generally more melancholic/calm than detected
               mood = 'Melancholic';
               console.log('Mood set to: Melancholic (Vietnamese indie pattern)');
+            } else if (isVietnameseSong && isHouseRemix) {
+              // House remixes are almost always highly energetic, especially in Vietnamese music
+              energy = Math.max(rawEnergy, 0.85); // Very high energy for house remixes
+              mood = 'Energetic';
+              console.log('Mood set to: Energetic (Vietnamese house remix detected)');
+            } else if (isVietnameseSong && isRemix) {
+              // Vietnamese remixes should be classified as energetic
+              energy = Math.max(rawEnergy, 0.7); // Higher energy for regular remixes
+              mood = 'Energetic';
+              console.log('Mood set to: Energetic (Vietnamese remix detected)');
             } else if (isVietnameseSong && tempo !== null && tempo < 110 && 
                 scale !== null && (scale as string).toLowerCase() === 'minor') {
               // This is likely a Vietnamese ballad (slower tempo, minor key)
@@ -2078,13 +2146,21 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               title.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null ||
               derivedArtistName.match(/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i) !== null;
             
-            // Vietnamese indie key correction
+            // Check if song is a remix - remixes have different key profiles
+            const isRemix = title.toLowerCase().includes('remix') || title.toLowerCase().includes('edm');
+            
+            // Vietnamese indie key correction (skip for remixes as they intentionally change keys)
             if (isVietnameseSong && rawKey === 'Eb' && rawScale === 'minor' && 
-                tempo !== null && tempo >= 110 && tempo <= 125) {
+                tempo !== null && tempo >= 110 && tempo <= 125 && !isRemix) {
               console.log('Detected Vietnamese indie song with Eb minor key - likely C Major confusion');
               correctedKey = 'C';
               correctedScale = 'major';
               console.log(`Corrected key from ${rawKey} ${rawScale} to ${correctedKey} ${correctedScale} (Vietnamese indie pattern)`);
+            }
+            // For Vietnamese remixes, we generally trust the raw key/scale detection
+            else if (isVietnameseSong && isRemix) {
+              console.log('Vietnamese remix detected - using raw key detection without correction');
+              // No correction for remixes since they may have intentional key changes
             }
             // Special case for common A minor / F minor confusion with pop/rock songs
             else if (rawKey === 'F' && rawScale === 'minor' && tempo !== null && tempo >= 100 && tempo <= 115) {
