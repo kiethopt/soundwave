@@ -80,7 +80,7 @@ async function fetchAudioFeaturesFromAPI(audioBuffer: Buffer): Promise<ReccoBeat
     // Convert buffer to FormData
     const formData = new FormData();
     const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-    formData.append('audio', blob, 'track.mp3');
+    formData.append('audioFile', blob, 'track.mp3');
     
     const response = await axios.post('https://api.reccobeats.com/v1/analysis/audio-features', formData, {
       headers: {
@@ -658,95 +658,99 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       try {
         // First try to get features from ReccoBeats API
         apiFeatures = await fetchAudioFeaturesFromAPI(file.buffer);
-        
         if (apiFeatures) {
           console.log("Successfully fetched audio features from ReccoBeats API");
-          // Use tempo from API
-          tempo = apiFeatures.tempo || null;
+          // Store ReccoBeats features but don't set tempo yet
           danceability = apiFeatures.danceability || null;
           energy = apiFeatures.energy || null;
+        }
+        
+        // Always run Essentia analysis for tempo calculation regardless of ReccoBeats success
+        const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
+        
+        if (pcmF32) {
+          const essentia = new Essentia(EssentiaWASM);
+          const audioVector = essentia.arrayToVector(pcmF32);
           
-          // Still run Essentia analysis for key and scale which aren't provided by the API
-          const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
-          
-          if (pcmF32) {
-            const essentia = new Essentia(EssentiaWASM);
-            const audioVector = essentia.arrayToVector(pcmF32);
-            
-            // Key & Scale Estimation
+          // Always calculate tempo using Essentia
+          try {
+            const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+            const targetSampleRate = 44100;
+
             try {
-              const keyResult = essentia.KeyExtractor(audioVector);
-              key = keyResult.key;
-              scale = keyResult.scale;
-              console.log("Key estimation from Essentia:", key, scale, "Strength:", keyResult.strength);
-            } catch (keyError) {
-              console.error("Error estimating key/scale with Essentia:", keyError);
-            }
-          }
-        } else {
-          console.log("ReccoBeats API call failed, falling back to Essentia analysis");
-          // Fallback to Essentia if ReccoBeats API fails
-          const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
-
-          if (pcmF32) {
-            const essentia = new Essentia(EssentiaWASM);
-            const audioVector = essentia.arrayToVector(pcmF32);
-
-            // Use original tempo detection logic
-            try {
-              const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
-              const targetSampleRate = 44100;
-
+              const rhythmResult = essentia.RhythmExtractor2013(
+                audioVector,
+                targetSampleRate
+              );
+              let rawTempo = rhythmResult.bpm;
+              confidence = rhythmResult.confidence || null;
+              tempo = Math.round(rawTempo);
+              console.log("Tempo calculated from Essentia:", tempo, "BPM");
+            } catch (tempoError) {
+              console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
               try {
-                const rhythmResult = essentia.RhythmExtractor2013(
-                  audioVector,
-                  targetSampleRate
-                );
-                let rawTempo = rhythmResult.bpm;
-                confidence = rhythmResult.confidence || null;
-                tempo = Math.round(rawTempo);
-              } catch (tempoError) {
-                console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
-                try {
-                  const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-                  tempo = Math.round(tempoResult.bpm);
-                } catch (fallbackError) {
-                  console.error("Error estimating tempo with PercivalBpmEstimator fallback:", fallbackError);
-                  tempo = null;
-                }
+                const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                tempo = Math.round(tempoResult.bpm);
+                console.log("Tempo calculated from PercivalBpmEstimator fallback:", tempo, "BPM");
+              } catch (fallbackError) {
+                console.error("Error estimating tempo with PercivalBpmEstimator fallback:", fallbackError);
+                tempo = null;
               }
-            } catch (metadataError) {
-              console.error("Error getting sample rate from metadata:", metadataError);
             }
-
-            // Danceability Estimation
+          } catch (metadataError) {
+            console.error("Error getting sample rate from metadata:", metadataError);
+          }
+          
+          // Key & Scale Estimation always from Essentia
+          try {
+            const keyResult = essentia.KeyExtractor(audioVector);
+            key = keyResult.key;
+            scale = keyResult.scale;
+            console.log("Key estimation from Essentia:", key, scale);
+          } catch (keyError) {
+            console.error("Error estimating key/scale with Essentia:", keyError);
+          }
+          
+          // Only calculate danceability and energy with Essentia if not available from ReccoBeats
+          if (!apiFeatures || danceability === null) {
             try {
               const danceabilityResult = essentia.Danceability(audioVector);
               danceability = danceabilityResult.danceability;
+              console.log("Danceability from Essentia:", danceability);
             } catch (danceabilityError) {
               console.error("Error estimating danceability:", danceabilityError);
             }
-
-            // Energy Calculation
+          }
+          
+          if (!apiFeatures || energy === null) {
             try {
               const energyResult = essentia.Energy(audioVector);
               energy = energyResult.energy;
+              console.log("Energy from Essentia:", energy);
             } catch (energyError) {
               console.error("Error calculating energy:", energyError);
-            }
-
-            // Key & Scale Estimation
-            try {
-              const keyResult = essentia.KeyExtractor(audioVector);
-              key = keyResult.key;
-              scale = keyResult.scale;
-            } catch (keyError) {
-              console.error("Error estimating key/scale:", keyError);
             }
           }
         }
       } catch (analysisError) {
         console.error("Error during audio analysis pipeline:", analysisError);
+      }
+
+      // Determine mood from ReccoBeats API valence if available
+      if (apiFeatures && apiFeatures.valence !== null && apiFeatures.valence !== undefined) {
+        const valence = apiFeatures.valence;
+        if (valence > 0.8) {
+          mood = "Happy";
+        } else if (valence > 0.6) {
+          mood = "Energetic";
+        } else if (valence < 0.3) {
+          mood = "Melancholic";
+        } else if (valence < 0.4 && (apiFeatures.energy !== null && apiFeatures.energy < 0.4)) {
+          mood = "Calm";
+        } else {
+          mood = "Neutral";
+        }
+        console.log(`Mood determined from ReccoBeats API valence (${valence}): ${mood}`);
       }
 
       // 4. Get or Create VERIFIED Artist Profile
