@@ -381,6 +381,7 @@ export const getSystemPlaylists = async (req: Request) => {
       coverUrl: pt.track.coverUrl,
       artist: pt.track.artist,
       album: pt.track.album,
+      genres: pt.track.genres,
       createdAt: pt.track.createdAt.toISOString(),
     }));
 

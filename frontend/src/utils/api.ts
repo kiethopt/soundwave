@@ -1738,6 +1738,22 @@ export const api = {
         token
       );
     },
+
+    // --- NEW FUNCTION for Suggesting and Adding Tracks --- 
+    suggestAndAddTracksByPrompt: async (
+      playlistId: string,
+      prompt: string,
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/generate/playlist/${playlistId}/suggest-more`,
+        {
+          method: "POST",
+          body: JSON.stringify({ prompt }),
+        },
+        token
+      );
+    },
   },
 
   upload: {

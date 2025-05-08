@@ -834,6 +834,29 @@ const getUserProfile = async (id) => {
             avatar: true,
             role: true,
             isActive: true,
+            playlists: {
+                where: {
+                    privacy: 'PUBLIC',
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    coverUrl: true,
+                    type: true,
+                    totalTracks: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                take: 20,
+            },
         },
     });
     if (!user) {

@@ -17,6 +17,7 @@ export function usePlayHandler(results?: {
     queueType,
     setQueueType,
     trackQueue,
+    setQueueSourceId,
   } = useTrack();
 
   /**
@@ -42,48 +43,50 @@ export function usePlayHandler(results?: {
           trackQueue(results?.tracks || []);
           playTrack(item);
         }
-      } else if ("tracks" in item) {
-        // Album
-        if (item.tracks.length > 0) {
-          const isCurrentAlbumPlaying =
-            currentTrack &&
-            item.tracks.some((track: any) => track.id === currentTrack.id) &&
-            queueType === "album" &&
-            isPlaying;
-          if (isCurrentAlbumPlaying) {
-            pauseTrack();
-          } else {
-            setQueueType("album");
-            trackQueue(item.tracks);
-            playTrack(item.tracks[0]);
-          }
+      } else if (item.tracks && item.tracks.length > 0) { 
+        // Existing logic for Album or Playlist that already has tracks loaded
+        const itemType = item.artist ? 'album' : 'playlist'; // Simple check: albums have artists, playlists don't directly
+        const isCurrentItemPlaying =
+          currentTrack &&
+          item.tracks.some((track: any) => track.id === currentTrack.id) &&
+          queueType === itemType &&
+          isPlaying;
+
+        if (isCurrentItemPlaying) {
+          pauseTrack();
         } else {
-          toast.error("No tracks available for this album");
+          setQueueType(itemType);
+          trackQueue(item.tracks);
+          setQueueSourceId(item.id);
+          playTrack(item.tracks[0]);
         }
-      } else if ("playlist" in item) {
-        // Playlist
-        if (item.tracks.length > 0) {
-          const isCurrentPlaylistPlaying =
-            currentTrack &&
-            item.tracks.some((track: any) => track.id === currentTrack.id) &&
-            queueType === "playlist" &&
-            isPlaying;
-          if (isCurrentPlaylistPlaying) {
-            pauseTrack();
+        
+      // --- NEW CHECK FOR PLAYLIST OBJECT (without preloaded tracks) ---
+      } else if (item.id && (item.type === 'NORMAL' || item.type === 'SYSTEM' || item.type === 'FAVORITE') && !item.artistName) {
+        // Playlist - Fetch tracks if not present (e.g., from profile page)
+        console.log(`[PlayHandler] Detected playlist without tracks, fetching ID: ${item.id}`);
+        try {
+          const playlistDetails = await api.playlists.getById(item.id, token);
+          if (playlistDetails.success && playlistDetails.data?.tracks && playlistDetails.data.tracks.length > 0) {
+            const fetchedTracks = playlistDetails.data.tracks;
+            setQueueType("playlist"); // Set type correctly
+            trackQueue(fetchedTracks);
+            setQueueSourceId(item.id);
+            playTrack(fetchedTracks[0]);
           } else {
-            setQueueType("playlist");
-            trackQueue(item.tracks);
-            playTrack(item.tracks[0]);
+            toast.error("Could not load tracks for this playlist or it's empty.");
           }
-        } else {
-          toast.error("No tracks available for this playlist");
+        } catch (fetchError) {
+          console.error(`Error fetching playlist ${item.id}:`, fetchError);
+          toast.error("Failed to load playlist tracks.");
         }
-      }      
-      else {
-        // Artist
+      // --- END NEW PLAYLIST CHECK ---
+
+      } else if (item.artistName) { // Check for artistName to identify Artist
+        // Artist logic (should remain the same)
         const isCurrentArtistPlaying =
           currentTrack &&
-          currentTrack.artist.id === item.id &&
+          currentTrack.artist?.id === item.id && // Ensure artist object exists on currentTrack
           queueType === "artist" &&
           isPlaying;
         if (isCurrentArtistPlaying) {
@@ -97,11 +100,16 @@ export function usePlayHandler(results?: {
             );
             setQueueType("artist");
             trackQueue(sortedTracks);
+            setQueueSourceId(item.id);
             playTrack(sortedTracks[0]);
           } else {
             toast.error("No tracks available for this artist");
           }
         }
+      } else {
+        // Fallback if type cannot be determined
+        console.warn("[PlayHandler] Could not determine item type:", item);
+        toast.error("Cannot play this item.");
       }
     } catch (error) {
       console.error("Error playing:", error);

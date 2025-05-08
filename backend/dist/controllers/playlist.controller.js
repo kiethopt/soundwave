@@ -149,6 +149,7 @@ const getPlaylists = async (req, res, next) => {
                     artist: pt.track.artist,
                     album: pt.track.album,
                     createdAt: pt.track.createdAt.toISOString(),
+                    genres: pt.track.genres,
                 }));
                 return {
                     ...playlist,
@@ -225,12 +226,25 @@ const getPlaylistById = async (req, res, next) => {
             playlist = await db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                            avatar: true,
+                        },
+                    },
                     tracks: {
                         include: {
                             track: {
                                 include: {
                                     artist: true,
                                     album: true,
+                                    genres: {
+                                        include: {
+                                            genre: true
+                                        }
+                                    }
                                 },
                             },
                         },
@@ -252,12 +266,25 @@ const getPlaylistById = async (req, res, next) => {
             playlist = await db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                            avatar: true,
+                        },
+                    },
                     tracks: {
                         include: {
                             track: {
                                 include: {
                                     artist: true,
                                     album: true,
+                                    genres: {
+                                        include: {
+                                            genre: true
+                                        }
+                                    }
                                 },
                             },
                         },
@@ -286,12 +313,25 @@ const getPlaylistById = async (req, res, next) => {
             playlist = await db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                            avatar: true,
+                        },
+                    },
                     tracks: {
                         include: {
                             track: {
                                 include: {
                                     artist: true,
                                     album: true,
+                                    genres: {
+                                        include: {
+                                            genre: true
+                                        }
+                                    }
                                 },
                             },
                         },
@@ -321,6 +361,7 @@ const getPlaylistById = async (req, res, next) => {
             artist: pt.track.artist,
             album: pt.track.album,
             createdAt: pt.track.createdAt.toISOString(),
+            genres: pt.track.genres,
         }));
         res.json({
             success: true,

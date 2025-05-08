@@ -1,4 +1,3 @@
-import { Request } from 'express';
 import prisma from '../config/db';
 import { FollowingType, HistoryType, Role, User, ClaimStatus, NotificationType, RecipientType } from '@prisma/client';
 import { uploadFile } from './upload.service';
@@ -7,7 +6,6 @@ import {
   searchTrackSelect,
   userSelect,
 } from '../utils/prisma-selects';
-import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import * as emailService from './email.service';
 import { getUserSockets, getIO } from '../config/socket';
@@ -950,6 +948,29 @@ export const getUserProfile = async (id: string) => {
       avatar: true,
       role: true,
       isActive: true,
+      playlists: {
+        where: {
+          privacy: 'PUBLIC',
+        },
+        select: {
+          id: true,
+          name: true,
+          coverUrl: true,
+          type: true,
+          totalTracks: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 20,
+      },
     },
   });
 

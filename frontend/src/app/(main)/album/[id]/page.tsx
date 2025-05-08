@@ -321,7 +321,7 @@ export default function AlbumDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className={`mt-4 ${
+                className={`mt-4 rounded-full ${
                   theme === 'light'
                     ? 'bg-white/90 border-gray-300 text-gray-800 hover:bg-gray-100 hover:text-gray-900'
                     : 'bg-neutral-700/90 border-neutral-600 text-white/90 hover:bg-neutral-600 hover:text-white'
@@ -329,7 +329,7 @@ export default function AlbumDetailPage() {
                 onClick={() => setIsReportDialogOpen(true)}
               >
                 <Flag className="mr-2 h-4 w-4" />
-                Report this album
+                Report
               </Button>
             </div>
           </div>

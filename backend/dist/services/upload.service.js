@@ -90,7 +90,7 @@ async function callReccoBeatsAPI(audioBuffer) {
 function deriveKeyAndScale(reccoFeatures) {
     const { energy, valence, tempo } = reccoFeatures;
     const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const scale = valence > 0.5 ? 'major' : 'minor';
+    const scale = (valence > 0.6 && energy > 0.4) ? 'major' : 'minor';
     const keyIndex = Math.floor((tempo * 0.4 + energy * 0.6) * 12) % 12;
     const key = keys[keyIndex];
     return { key, scale };
@@ -105,7 +105,7 @@ function deriveMood(energy, valence) {
     if (energy < 0.3 && valence < 0.3)
         return 'Melancholic';
     if (energy > valence) {
-        return energy > 0.5 ? 'Energetic' : 'Calm';
+        return energy > 0.6 ? 'Energetic' : (energy > 0.35 ? 'Moderate' : 'Calm');
     }
     else {
         return valence > 0.5 ? 'Happy' : 'Melancholic';

@@ -22,6 +22,9 @@ import Image from "next/image";
 import { EditProfileModal } from "@/components/user/profile/EditProfileModal";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
+import Link from "next/link";
+import { usePlayHandler } from "@/hooks/usePlayHandler";
 
 const DEFAULT_AVATAR = "/images/default-avatar.jpg";
 
@@ -49,6 +52,7 @@ export default function UserProfilePage({
   const { dominantColor } = useDominantColor(user?.avatar || DEFAULT_AVATAR);
   const [showAllTracks, setShowAllTracks] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
     new Set()
   );
@@ -69,7 +73,10 @@ export default function UserProfilePage({
     queueType,
     setQueueType,
     trackQueue,
+    queueSourceId,
   } = useTrack();
+
+  const handlePlay = usePlayHandler({ tracks: topTracks });
 
   useEffect(() => {
     const storedToken = localStorage.getItem("userToken");
@@ -94,6 +101,9 @@ export default function UserProfilePage({
 
         if (userResponse) {
           setUser(userResponse);
+          if (userResponse.playlists) {
+            setPublicPlaylists(userResponse.playlists);
+          }
         }
 
         if (followersResponse && followersResponse.followers) {
@@ -388,11 +398,11 @@ export default function UserProfilePage({
     setIsEditProfileModalOpen(true);
   };
 
-  if (user && user.avatar) {
-    console.log("Avatar exists:", user.avatar);
-  } else {
-    console.log("No avatar, using default");
-  }
+  // if (user && user.avatar) {
+  //   console.log("Avatar exists:", user.avatar);
+  // } else {
+  //   console.log("No avatar, using default");
+  // }
 
   return (
     <div
@@ -648,6 +658,71 @@ export default function UserProfilePage({
                   {showAllTracks ? "See less" : "See all"}
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* User's Public Playlists Section */}
+          {publicPlaylists.length > 0 && (
+            <div className="px-4 md:px-6 py-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Public Playlists</h2>
+                {/* Optional: Add a "See all" button if pagination is implemented later */}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-4">
+                {publicPlaylists.map((playlist) => (
+                  <Link key={playlist.id} href={`/playlists/${playlist.id}`} className="block group relative">
+                    <div
+                      className={`aspect-square rounded-lg mb-2 relative overflow-hidden ${
+                        theme === "light" ? "bg-gray-200" : "bg-neutral-800"
+                      }`}
+                    >
+                      {playlist.coverUrl ? (
+                        <Image
+                          src={playlist.coverUrl}
+                          alt={playlist.name}
+                          width={180}
+                          height={180}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <PlaylistIcon name={playlist.name} type={playlist.type} size={64} />
+                        </div>
+                      )}
+                      {/* Add Overlay and Play Button */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-end p-3 rounded-lg">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            // Call pauseTrack if this playlist is playing, otherwise handlePlay
+                            if (isPlaying && queueType === 'playlist' && queueSourceId === playlist.id) {
+                              pauseTrack();
+                            } else {
+                              handlePlay(playlist);
+                            }
+                          }}
+                          className="p-3 rounded-full bg-green-500 text-black hover:bg-green-400 transition-colors duration-300 ease-in-out" // Removed transform and scale classes
+                          aria-label={isPlaying && queueType === 'playlist' && queueSourceId === playlist.id ? `Pause ${playlist.name}` : `Play ${playlist.name}`} // Dynamic aria-label
+                        >
+                          {/* Conditional Icon */} 
+                          {isPlaying && queueType === 'playlist' && queueSourceId === playlist.id ? (
+                              <Pause className="w-6 h-6" fill="currentColor"/>
+                          ) : (
+                              <Play className="w-6 h-6" fill="currentColor"/>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <h3 className="font-medium truncate text-sm group-hover:underline">
+                      {playlist.name}
+                    </h3>
+                    <p className="text-xs text-white/70 truncate">
+                      By {playlist.user?.name || playlist.user?.username || user?.name || user?.username || "User"}
+                    </p>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
 

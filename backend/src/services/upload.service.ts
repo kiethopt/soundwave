@@ -185,8 +185,8 @@ function deriveKeyAndScale(reccoFeatures: ReccoBeatsResponse): { key: string | n
   // Các key phổ biến
   const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   
-  // Bài hát với valence cao (vui vẻ) thường ở major, ngược lại là minor
-  const scale = valence > 0.5 ? 'major' : 'minor';
+  // Bài hát với valence cao và energy nhất định thường ở major, ngược lại là minor
+  const scale = (valence > 0.6 && energy > 0.4) ? 'major' : 'minor';
   
   // Thuật toán đơn giản để xác định key dựa trên tempo và energy
   // Đây chỉ là một ví dụ, không phải phương pháp khoa học
@@ -214,7 +214,7 @@ function deriveMood(energy: number, valence: number): string {
   
   // Trường hợp còn lại, dựa trên giá trị cao hơn
   if (energy > valence) {
-    return energy > 0.5 ? 'Energetic' : 'Calm';
+    return energy > 0.6 ? 'Energetic' : (energy > 0.35 ? 'Moderate' : 'Calm');
   } else {
     return valence > 0.5 ? 'Happy' : 'Melancholic';
   }

@@ -22,9 +22,8 @@ import Image from "next/image";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useState } from "react";
 
-// Import DND Kit hook
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+// Import Pangea DnD
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 // Define the names of playlists to filter out
 const filteredPlaylistNames = new Set(["Welcome Mix", "Favorites"]);
@@ -37,10 +36,11 @@ interface TrackListProps {
   favoriteTrackIds: Set<string>;
   theme: "light" | "dark";
   isDraggable: boolean;
+  onDragEnd?: (result: any) => void;
 }
 
-// New component for a single draggable track row
-const SortableTrackRow = ({
+// TrackRow component that can be draggable or not
+const TrackRow = ({
   track,
   index,
   theme,
@@ -59,30 +59,22 @@ const SortableTrackRow = ({
   filteredPlaylistNames,
   router,
   isDraggable,
+  provided,
+  isDragging,
 }: any) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: track.id, disabled: !isDraggable });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div
+      ref={provided?.innerRef}
+      {...provided?.draggableProps}
+      {...provided?.dragHandleProps}
+      style={provided?.draggableProps.style}
+      className={`${isDragging ? "opacity-70" : ""}`}
+    >
       <div
-        {...(isDraggable ? listeners : {})}
-        className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_60px] gap-4 px-6 py-4 group ${
+        className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_1fr_40px_100px_60px] gap-4 px-6 py-4 group ${
           theme === "light" ? "hover:bg-gray-100" : "hover:bg-white/10"
         } ${isDraggable ? "cursor-grab" : "cursor-pointer"} ${
-          isDragging ? "shadow-lg" : ""
+          isDragging ? "bg-gray-100/80 dark:bg-white/5 shadow-md" : ""
         } transition-colors duration-150 ease-in-out items-center`}
       >
         <div
@@ -192,6 +184,15 @@ const SortableTrackRow = ({
             }}
           >
             {track.album?.title || track.title}
+          </span>
+        </div>
+
+        <div
+          className="flex items-center min-w-0 text-sm text-gray-500 dark:text-white/60 truncate"
+          title={track.genres?.map((g: any) => g.genre.name).join(', ') || 'No Genre'}
+        >
+          <span className="truncate">
+            {track.genres?.map((g: any) => g.genre.name).join(', ') || '-'}
           </span>
         </div>
 
@@ -591,6 +592,7 @@ export function TrackList({
   favoriteTrackIds,
   theme,
   isDraggable,
+  onDragEnd,
 }: TrackListProps) {
   const {
     playTrack,
@@ -718,38 +720,109 @@ export function TrackList({
     }
   };
 
+  // For non-draggable lists, just render the tracks directly
+  if (!isDraggable || !onDragEnd) {
+    return (
+      <>
+        <div className="rounded-b-xl overflow-hidden">
+          {tracks?.map((track, index) => {
+            const isCurrentTrack = currentTrack?.id === track.id;
+            const isCurrentlyPlaying = isCurrentTrack && isPlaying;
+            const isFavorite = favoriteTrackIds.has(track.id);
+
+            return (
+              <TrackRow
+                key={track.id}
+                track={track}
+                index={index}
+                theme={theme}
+                isCurrentTrack={isCurrentTrack}
+                isCurrentlyPlaying={isCurrentlyPlaying}
+                isFavorite={isFavorite}
+                handleTrackPlay={handleTrackPlay}
+                handleAddToQueue={handleAddToQueue}
+                handleAddToPlaylist={handleAddToPlaylist}
+                handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+                handleToggleFavorite={handleToggleFavorite}
+                formatDateAdded={formatDateAdded}
+                playlists={playlists}
+                allowRemove={allowRemove}
+                onRemove={onRemove}
+                filteredPlaylistNames={filteredPlaylistNames}
+                router={router}
+                isDraggable={false}
+              />
+            );
+          })}
+        </div>
+        {duplicateInfo && (
+          <AlreadyExistsDialog
+            open={isAlreadyExistsDialogOpen}
+            onOpenChange={setIsAlreadyExistsDialogOpen}
+            playlistName={duplicateInfo.playlistName}
+            trackTitle={duplicateInfo.trackTitle}
+          />
+        )}
+        <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      </>
+    );
+  }
+
+  // For draggable lists, use DragDropContext
   return (
     <>
       <div className="rounded-b-xl overflow-hidden">
-        {tracks?.map((track, index) => {
-          const isCurrentTrack = currentTrack?.id === track.id;
-          const isCurrentlyPlaying = isCurrentTrack && isPlaying;
-          const isFavorite = favoriteTrackIds.has(track.id);
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="track-list">
+            {(provided) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+              >
+                {tracks?.map((track, index) => {
+                  const isCurrentTrack = currentTrack?.id === track.id;
+                  const isCurrentlyPlaying = isCurrentTrack && isPlaying;
+                  const isFavorite = favoriteTrackIds.has(track.id);
 
-          return (
-            <SortableTrackRow
-              key={track.id}
-              track={track}
-              index={index}
-              theme={theme}
-              isCurrentTrack={isCurrentTrack}
-              isCurrentlyPlaying={isCurrentlyPlaying}
-              isFavorite={isFavorite}
-              handleTrackPlay={handleTrackPlay}
-              handleAddToQueue={handleAddToQueue}
-              handleAddToPlaylist={handleAddToPlaylist}
-              handleRemoveFromPlaylist={handleRemoveFromPlaylist}
-              handleToggleFavorite={handleToggleFavorite}
-              formatDateAdded={formatDateAdded}
-              playlists={playlists}
-              allowRemove={allowRemove}
-              onRemove={onRemove}
-              filteredPlaylistNames={filteredPlaylistNames}
-              router={router}
-              isDraggable={isDraggable}
-            />
-          );
-        })}
+                  return (
+                    <Draggable 
+                      key={track.id} 
+                      draggableId={track.id}
+                      index={index}
+                      isDragDisabled={!isDraggable}
+                    >
+                      {(provided, snapshot) => (
+                        <TrackRow
+                          track={track}
+                          index={index}
+                          theme={theme}
+                          isCurrentTrack={isCurrentTrack}
+                          isCurrentlyPlaying={isCurrentlyPlaying}
+                          isFavorite={isFavorite}
+                          handleTrackPlay={handleTrackPlay}
+                          handleAddToQueue={handleAddToQueue}
+                          handleAddToPlaylist={handleAddToPlaylist}
+                          handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+                          handleToggleFavorite={handleToggleFavorite}
+                          formatDateAdded={formatDateAdded}
+                          playlists={playlists}
+                          allowRemove={allowRemove}
+                          onRemove={onRemove}
+                          filteredPlaylistNames={filteredPlaylistNames}
+                          router={router}
+                          isDraggable={isDraggable}
+                          provided={provided}
+                          isDragging={snapshot.isDragging}
+                        />
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       </div>
       {duplicateInfo && (
         <AlreadyExistsDialog

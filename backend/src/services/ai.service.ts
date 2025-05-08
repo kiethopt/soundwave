@@ -5,7 +5,6 @@ import { Playlist } from "@prisma/client";
 import {
   PlaylistType,
   Prisma,
-  PrismaClient,
   PlaylistPrivacy,
 } from "@prisma/client";
 

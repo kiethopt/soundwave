@@ -274,6 +274,7 @@ const getSystemPlaylists = async (req) => {
             coverUrl: pt.track.coverUrl,
             artist: pt.track.artist,
             album: pt.track.album,
+            genres: pt.track.genres,
             createdAt: pt.track.createdAt.toISOString(),
         }));
         return {

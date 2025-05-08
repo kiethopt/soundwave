@@ -32,10 +32,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generatePlaylist = void 0;
+exports.suggestMoreTracks = exports.generatePlaylist = void 0;
 const generateService = __importStar(require("../services/generate.service"));
 const handle_utils_1 = require("../utils/handle-utils");
+const db_1 = __importDefault(require("../config/db"));
 const generatePlaylist = async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -73,4 +77,89 @@ const generatePlaylist = async (req, res) => {
     }
 };
 exports.generatePlaylist = generatePlaylist;
+const suggestMoreTracks = async (req, res) => {
+    try {
+        const { playlistId } = req.params;
+        const { prompt, numberOfTracks = 5 } = req.body;
+        if (!req.user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (!prompt || typeof prompt !== 'string') {
+            res.status(400).json({ message: 'Valid prompt is required for suggestions' });
+            return;
+        }
+        if (isNaN(parseInt(playlistId)) && typeof playlistId !== 'string') {
+            res.status(400).json({ message: 'Valid playlistId is required' });
+            return;
+        }
+        const numTracks = parseInt(String(numberOfTracks), 10);
+        if (isNaN(numTracks) || numTracks <= 0 || numTracks > 20) {
+            res.status(400).json({ message: 'numberOfTracks must be a positive integer between 1 and 20.' });
+            return;
+        }
+        console.log(`[Generate Controller] Received track suggestion request for playlist ${playlistId} from user ${req.user.id} with prompt: "${prompt}", count: ${numTracks}`);
+        const suggestedTrackIds = await generateService.suggestTracksForExistingPlaylist(playlistId, req.user.id, prompt, numTracks);
+        if (!suggestedTrackIds || suggestedTrackIds.length === 0) {
+            res.status(200).json({
+                message: 'AI could not find any new suitable tracks based on your prompt or the playlist is already optimal with current tracks.',
+                playlistId,
+                addedTracks: []
+            });
+            return;
+        }
+        const existingPlaylistTracks = await db_1.default.playlistTrack.findMany({
+            where: { playlistId },
+            orderBy: { trackOrder: 'desc' },
+            take: 1,
+        });
+        let currentMaxOrder = 0;
+        if (existingPlaylistTracks.length > 0) {
+            currentMaxOrder = existingPlaylistTracks[0].trackOrder;
+        }
+        const tracksToCreate = suggestedTrackIds.map((trackId, index) => ({
+            playlistId: playlistId,
+            trackId: trackId,
+            trackOrder: currentMaxOrder + 1 + index,
+        }));
+        await db_1.default.playlistTrack.createMany({
+            data: tracksToCreate,
+            skipDuplicates: true,
+        });
+        const tracksInPlaylist = await db_1.default.playlistTrack.findMany({
+            where: { playlistId: playlistId },
+            include: { track: { select: { duration: true } } }
+        });
+        const totalTracks = tracksInPlaylist.length;
+        const totalDuration = tracksInPlaylist.reduce((sum, pt) => sum + (pt.track?.duration || 0), 0);
+        await db_1.default.playlist.update({
+            where: { id: playlistId },
+            data: {
+                totalTracks: totalTracks,
+                totalDuration: totalDuration,
+                updatedAt: new Date(),
+            }
+        });
+        res.status(200).json({
+            success: true,
+            message: `Successfully added ${suggestedTrackIds.length} tracks to the playlist.`,
+            playlistId,
+            addedTracks: suggestedTrackIds
+        });
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            if (error.message.includes('AI features are currently unavailable')) {
+                res.status(503).json({ message: 'AI features are currently unavailable for suggestions. Please try again later.' });
+                return;
+            }
+            if (error.message.includes('safety reasons') || error.message.includes('Playlist not found')) {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Suggest more tracks for playlist');
+    }
+};
+exports.suggestMoreTracks = suggestMoreTracks;
 //# sourceMappingURL=generate.controller.js.map

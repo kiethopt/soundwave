@@ -4,10 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { Track, Playlist } from "@/types";
-import {
-  ArrowLeft,
-  Flag,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Music, Flag, Pause, Play } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,8 +34,16 @@ export default function TrackDetailPage() {
   const { theme } = useTheme();
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
-  const { currentTrack, isPlaying, playTrack, pauseTrack, trackQueue } =
-    useTrack();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    queueType,
+    setQueueType,
+    trackQueue,
+    addToQueue,
+  } = useTrack();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   const fetchTrackDetails = useCallback(async () => {
@@ -69,7 +74,7 @@ export default function TrackDetailPage() {
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        const token = localStorage.getItem("userToken");
+        const token = localStorage.getItem('userToken');
         if (!token) return;
 
         const response = await api.playlists.getAll(token);
@@ -78,7 +83,7 @@ export default function TrackDetailPage() {
         );
         setPlaylists(normalPlaylists);
       } catch (error) {
-        console.error("Error fetching playlists:", error);
+        console.error('Error fetching playlists:', error);
       }
     };
 
@@ -196,15 +201,19 @@ export default function TrackDetailPage() {
 
   useEffect(() => {
     if ((!track && !loading) || error || (track && !track.isActive)) {
-      router.push("/");
+      router.push('/');
     }
   }, [track, loading, error, router]);
 
   const handleTrackPlay = (track: Track) => {
     handleProtectedAction(() => {
-      if (currentTrack?.id === track.id && isPlaying) {
+      if (currentTrack?.id === track.id && isPlaying && queueType === "track") {
         pauseTrack();
       } else {
+        setQueueType("track");
+        if (track) {
+          trackQueue([track]);
+        }
         playTrack(track);
       }
     });
@@ -263,7 +272,7 @@ export default function TrackDetailPage() {
         <div className="flex flex-col items-center md:items-end md:flex-row gap-8">
           {/* Track Cover */}
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
-            <Image
+            <img
               src={track.coverUrl || "/images/default-track.jpg"}
               alt={track.title || "Track"}
               className="w-full aspect-square object-cover rounded-xl shadow-2xl"
@@ -312,7 +321,7 @@ export default function TrackDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className={`mt-4 ${
+                className={`mt-4 rounded-full ${
                   theme === "light"
                     ? "bg-white/90 border-gray-300 text-gray-800 hover:bg-gray-100 hover:text-gray-900"
                     : "bg-neutral-700/90 border-neutral-600 text-white/90 hover:bg-neutral-600 hover:text-white"
@@ -320,7 +329,7 @@ export default function TrackDetailPage() {
                 onClick={() => setIsReportDialogOpen(true)}
               >
                 <Flag className="mr-2 h-4 w-4" />
-                Report this track
+                Report
               </Button>
             </div>
           </div>
@@ -383,7 +392,7 @@ export default function TrackDetailPage() {
 
         {/* Auth Dialog */}
         <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-
+        
         {/* Report Dialog */}
         {track && (
           <ReportDialog
@@ -403,7 +412,5 @@ function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = Math.floor(seconds % 60);
-  return `${hours.toString().padStart(2, "0")}:${minutes
-    .toString()
-    .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }

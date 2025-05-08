@@ -143,6 +143,7 @@ export const getPlaylists = async (
           artist: pt.track.artist,
           album: pt.track.album,
           createdAt: pt.track.createdAt.toISOString(),
+          genres: pt.track.genres,
         }));
 
         return {
@@ -241,12 +242,25 @@ export const getPlaylistById = async (
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatar: true,
+            },
+          },
           tracks: {
             include: {
               track: {
                 include: {
                   artist: true,
                   album: true,
+                  genres: {
+                    include: {
+                      genre: true
+                    }
+                  }
                 },
               },
             },
@@ -271,12 +285,25 @@ export const getPlaylistById = async (
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatar: true,
+            },
+          },
           tracks: {
             include: {
               track: {
                 include: {
                   artist: true,
                   album: true,
+                  genres: {
+                    include: {
+                      genre: true
+                    }
+                  }
                 },
               },
             },
@@ -309,12 +336,25 @@ export const getPlaylistById = async (
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatar: true,
+            },
+          },
           tracks: {
             include: {
               track: {
                 include: {
                   artist: true,
                   album: true,
+                  genres: {
+                    include: {
+                      genre: true
+                    }
+                  }
                 },
               },
             },
@@ -349,6 +389,7 @@ export const getPlaylistById = async (
       artist: pt.track.artist,
       album: pt.track.album,
       createdAt: pt.track.createdAt.toISOString(),
+      genres: pt.track.genres,
     }));
 
     res.json({
