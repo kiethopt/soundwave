@@ -11,6 +11,7 @@ import {
   ArtistProfile,
   History, // Add History import
   PlaylistType,
+  Track,
 } from "@prisma/client";
 import { Request } from "express";
 import prisma from "../config/db";
@@ -2731,6 +2732,40 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         derivedArtistName
       );
       const artistId = artistProfile.id;
+
+      // Check for existing track
+      const existingTrack = await prisma.track.findUnique({
+        where: {
+          title_artistId: {
+            title: title,
+            artistId: artistId,
+          },
+        },
+        select: { id: true, title: true, artist: { select: { artistName: true } } },
+      });
+
+      if (existingTrack) {
+        console.log(`Duplicate track found: "${existingTrack.title}" by ${existingTrack.artist?.artistName} (ID: ${existingTrack.id}). Skipping creation for file: ${file.originalname}`);
+        results.push({
+          fileName: file.originalname,
+          title: title,
+          artistName: derivedArtistName,
+          error: `Duplicate: This track already exists (ID: ${existingTrack.id})`,
+          success: false,
+          trackId: existingTrack.id,
+          artistId: artistId,
+          duration: 0, 
+          audioUrl: '',
+          coverUrl: undefined,
+          tempo: null,
+          mood: null,
+          key: null,
+          scale: null,
+          genreIds: [],
+          genres: [],
+        });
+        continue;
+      }
 
       // 5. Auto-Determine genres based on analysis
       let genreIds: string[] = [];

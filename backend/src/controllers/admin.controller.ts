@@ -737,7 +737,7 @@ export const bulkUploadTracks = async (
     const results = await adminService.processBulkUpload(files);
     res.status(200).json({
       message: "Bulk upload process initiated.",
-      results,
+      createdTracks: results,
     });
   } catch (error) {
     handleError(res, error, "Bulk upload tracks");
