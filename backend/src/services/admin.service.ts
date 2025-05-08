@@ -43,6 +43,7 @@ import { getOrCreateArtistProfile } from "./artist.service";
 import { faker } from "@faker-js/faker";
 import * as aiService from "./ai.service"; // Assuming ai.service.ts exports its functions
 import { HttpError } from "../utils/errors"; // Assuming you have a custom error handler
+import axios from 'axios'; // Import axios for API requests
 
 // Define a list of valid models here
 const VALID_GEMINI_MODELS = [
@@ -56,6 +57,821 @@ const VALID_GEMINI_MODELS = [
 ];
 
 type User = PrismaUser;
+
+// ReccoBeats API response interface
+interface ReccoBeatsAudioFeatures {
+  acousticness: number;
+  danceability: number;
+  energy: number;
+  instrumentalness: number;
+  liveness: number;
+  loudness: number;
+  speechiness: number;
+  tempo: number;
+  valence: number;
+}
+
+// Function to fetch audio features from ReccoBeats API
+async function fetchAudioFeaturesFromAPI(audioBuffer: Buffer): Promise<ReccoBeatsAudioFeatures | null> {
+  try {
+    console.log('Fetching audio features from ReccoBeats API...');
+    
+    // Convert buffer to FormData
+    const formData = new FormData();
+    const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+    formData.append('audio', blob, 'track.mp3');
+    
+    const response = await axios.post('https://api.reccobeats.com/v1/analysis/audio-features', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    console.log('ReccoBeats API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching audio features from ReccoBeats API:', error);
+    return null;
+  }
+}
+
+// Modified function to determine genres using ReccoBeats API data
+async function determineGenresFromAudioAnalysis(
+  tempo: number | null,
+  mood: string | null,
+  key: string | null,
+  scale: string | null,
+  energy?: number | null,
+  danceability?: number | null,
+  duration?: number | null,
+  title?: string | null,
+  artistName?: string | null,
+  apiFeatures?: ReccoBeatsAudioFeatures | null
+): Promise<string[]> {
+  const genres = await prisma.genre.findMany();
+  const genreMap = new Map(genres.map((g) => [g.name.toLowerCase(), g.id]));
+  const selectedGenres: string[] = [];
+  
+  // Use API energy and danceability if available, otherwise use existing values
+  const safeEnergy = apiFeatures?.energy ?? (typeof energy === "number" ? energy : null);
+  const safeDanceability = apiFeatures?.danceability ?? (typeof danceability === "number" ? danceability : null);
+  const safeValence = apiFeatures?.valence ?? null;
+  
+  // Detect Vietnamese song via diacritics
+  const isVietnameseSong =
+    (title &&
+      title.match(
+        /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
+      ) !== null) ||
+    (artistName &&
+      artistName.match(
+        /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
+      ) !== null);
+
+  // Check if the song is a remix
+  const isRemix = title && title.toLowerCase().includes("remix");
+  const isHouseRemix = isRemix && title.toLowerCase().includes("house");
+
+  // Enhanced mood detection using ReccoBeats API
+  if (mood === null && apiFeatures) {
+    if (safeValence !== null) {
+      if (safeValence > 0.8) {
+        mood = "Happy";
+      } else if (safeValence > 0.6) {
+        mood = "Energetic";
+      } else if (safeValence < 0.3) {
+        mood = "Melancholic";
+      } else if (safeValence < 0.4 && safeEnergy !== null && safeEnergy < 0.4) {
+        mood = "Calm";
+      } else {
+        mood = "Neutral";
+      }
+      console.log(`Mood determined from ReccoBeats API: ${mood} (valence: ${safeValence})`);
+    }
+  }
+
+  // Vietnamese indie pattern detection
+  const isVietnameseIndie =
+    isVietnameseSong &&
+    tempo !== null &&
+    tempo >= 110 &&
+    tempo <= 125 &&
+    ((key === "C" && scale === "major") || mood === "Melancholic") &&
+    !isRemix; // Exclude remixes
+
+  if (isVietnameseIndie) {
+    console.log("Vietnamese indie pattern detected");
+
+    const indieId = genreMap.get("indie") || genreMap.get("indie pop");
+    if (indieId) {
+      selectedGenres.push(indieId);
+      console.log("Added: Indie (primary)");
+    }
+
+    const popId = genreMap.get("pop");
+    if (popId && !selectedGenres.includes(popId)) {
+      selectedGenres.push(popId);
+      console.log("Added: Pop (secondary)");
+    }
+
+    if (safeEnergy !== null && safeEnergy > 0.5) {
+      const rockId = genreMap.get("alternative") || genreMap.get("rock");
+      if (rockId && !selectedGenres.includes(rockId)) {
+        selectedGenres.push(rockId);
+        console.log("Added: Alternative/Rock (energetic Vietnamese indie)");
+      }
+    } else {
+      const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+      if (vPopId && !selectedGenres.includes(vPopId)) {
+        selectedGenres.push(vPopId);
+        console.log("Added: V-Pop");
+      }
+    }
+
+    return selectedGenres.slice(0, 3);
+  }
+
+  // Vietnamese house remix detection for genres
+  if (isVietnameseSong && isHouseRemix) {
+    console.log("Vietnamese house remix detected");
+
+    const houseId =
+      genreMap.get("house") ||
+      genreMap.get("electronic") ||
+      genreMap.get("dance");
+    if (houseId) {
+      selectedGenres.push(houseId);
+      console.log("Added: House/Electronic (primary for house remix)");
+    }
+
+    const danceId = genreMap.get("dance");
+    if (danceId && !selectedGenres.includes(danceId)) {
+      selectedGenres.push(danceId);
+      console.log("Added: Dance (secondary for house remix)");
+    }
+
+    const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+    if (vPopId && !selectedGenres.includes(vPopId)) {
+      selectedGenres.push(vPopId);
+      console.log("Added: V-Pop (Vietnamese origin)");
+    }
+
+    return selectedGenres.slice(0, 3);
+  }
+
+  // Enhanced genre detection with ReccoBeats API data
+  if (apiFeatures) {
+    // Additional genre detection using acousticness
+    if (apiFeatures.acousticness > 0.8) {
+      const acousticId = genreMap.get("acoustic");
+      if (acousticId && !selectedGenres.includes(acousticId)) {
+        selectedGenres.push(acousticId);
+        console.log("Added: Acoustic (high acousticness from API)");
+      }
+      
+      // If acoustic and low energy, likely folk or singer-songwriter
+      if (safeEnergy !== null && safeEnergy < 0.4) {
+        const folkId = genreMap.get("folk") || genreMap.get("singer-songwriter");
+        if (folkId && !selectedGenres.includes(folkId)) {
+          selectedGenres.push(folkId);
+          console.log("Added: Folk/Singer-Songwriter (acoustic with low energy)");
+        }
+      }
+    }
+    
+    // Instrumentalness detection
+    if (apiFeatures.instrumentalness > 0.7) {
+      const instrumentalId = genreMap.get("instrumental") || genreMap.get("ambient");
+      if (instrumentalId && !selectedGenres.includes(instrumentalId)) {
+        selectedGenres.push(instrumentalId);
+        console.log("Added: Instrumental/Ambient (high instrumentalness from API)");
+      }
+    }
+    
+    // Dance music detection from API
+    if (safeDanceability !== null && safeDanceability > 0.7) {
+      // High danceability + high energy = EDM/Dance
+      if (safeEnergy !== null && safeEnergy > 0.6) {
+        const danceId = genreMap.get("dance") || genreMap.get("edm");
+        if (danceId && !selectedGenres.includes(danceId)) {
+          selectedGenres.push(danceId);
+          console.log("Added: Dance/EDM (high danceability + high energy from API)");
+        }
+      } 
+      // High danceability + moderate energy = Pop
+      else if (safeEnergy !== null && safeEnergy > 0.4) {
+        const popId = genreMap.get("pop");
+        if (popId && !selectedGenres.includes(popId)) {
+          selectedGenres.push(popId);
+          console.log("Added: Pop (high danceability + moderate energy from API)");
+        }
+      }
+    }
+  }
+
+  // Continue with original genre detection logic for remaining patterns
+  // Regular Vietnamese remix detection for genres
+  if (isVietnameseSong && isRemix) {
+    console.log("Vietnamese remix detected");
+
+    const danceId = genreMap.get("dance") || genreMap.get("electronic");
+    if (danceId) {
+      selectedGenres.push(danceId);
+      console.log("Added: Dance/Electronic (Vietnamese remix)");
+    }
+
+    const popId = genreMap.get("pop");
+    if (popId && !selectedGenres.includes(popId)) {
+      selectedGenres.push(popId);
+      console.log("Added: Pop (remix base)");
+    }
+
+    const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+    if (vPopId && !selectedGenres.includes(vPopId)) {
+      selectedGenres.push(vPopId);
+      console.log("Added: V-Pop (Vietnamese origin)");
+    }
+
+    return selectedGenres.slice(0, 3);
+  }
+
+  // Regular Vietnamese song detection
+  if (isVietnameseSong) {
+    console.log("Vietnamese song detected");
+
+    // Handle F minor key specifically for Vietnamese songs (ballads/bolero)
+    if (key === "F" && scale === "minor") {
+      console.log("Detected Vietnamese song in F minor - applying ballad/pop genres");
+      
+      // Try to add ballad genre first
+      const balladId = genreMap.get("ballad");
+      if (balladId) {
+        selectedGenres.push(balladId);
+        console.log("Added: Ballad (F minor key)");
+      }
+      
+      // Add pop genre
+      const popId = genreMap.get("pop");
+      if (popId && !selectedGenres.includes(popId)) {
+        selectedGenres.push(popId);
+        console.log("Added: Pop");
+      }
+      
+      // Add v-pop or bolero genre as third option
+      const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+      if (vPopId && !selectedGenres.includes(vPopId)) {
+        selectedGenres.push(vPopId);
+        console.log("Added: V-Pop");
+      }
+      
+      return selectedGenres.slice(0, 3);
+    }
+
+    const vPopId =
+      genreMap.get("v-pop") ||
+      genreMap.get("vietnamese pop") ||
+      genreMap.get("pop");
+    if (vPopId) {
+      selectedGenres.push(vPopId);
+      console.log("Added: Vietnamese Pop");
+    }
+
+    if (tempo !== null && tempo >= 120 && scale === "major") {
+      const popId = genreMap.get("pop");
+      if (popId && !selectedGenres.includes(popId)) {
+        selectedGenres.push(popId);
+        console.log("Added: Pop (upbeat)");
+      }
+    }
+
+    if (mood === "Melancholic" || mood === "Calm") {
+      const balladId = genreMap.get("ballad");
+      if (balladId && !selectedGenres.includes(balladId)) {
+        selectedGenres.push(balladId);
+        console.log("Added: Ballad");
+      }
+
+      const indieId = genreMap.get("indie");
+      if (indieId && !selectedGenres.includes(indieId)) {
+        selectedGenres.push(indieId);
+        console.log("Added: Indie (melancholic)");
+      }
+    }
+  }
+
+  // Generic genre mapping
+  if (tempo !== null && tempo >= 125) {
+    if (safeEnergy !== null && safeEnergy > 0.7) {
+      const edm = genreMap.get("electronic") || genreMap.get("edm");
+      const dance = genreMap.get("dance");
+
+      if (edm && !selectedGenres.includes(edm)) {
+        selectedGenres.push(edm);
+        console.log("Added: Electronic");
+      }
+
+      if (dance && !selectedGenres.includes(dance)) {
+        selectedGenres.push(dance);
+        console.log("Added: Dance");
+      }
+    }
+
+    if (scale === "major") {
+      const popId = genreMap.get("pop");
+      if (popId && !selectedGenres.includes(popId)) {
+        selectedGenres.push(popId);
+        console.log("Added: Pop (high tempo)");
+      }
+    }
+  }
+
+  if (mood === "Energetic") {
+    const popId = genreMap.get("pop");
+    if (popId && !selectedGenres.includes(popId)) {
+      selectedGenres.push(popId);
+      console.log("Added: Pop (energetic)");
+    }
+
+    if (safeEnergy !== null && safeEnergy > 0.65 && !isVietnameseSong) {
+      const rockId = genreMap.get("rock");
+      if (rockId && !selectedGenres.includes(rockId)) {
+        selectedGenres.push(rockId);
+        console.log("Added: Rock (non-Vietnamese)");
+      }
+    }
+  }
+
+  if (mood === "Calm" || mood === "Melancholic") {
+    const ambientId = genreMap.get("ambient");
+
+    if (ambientId && !selectedGenres.includes(ambientId)) {
+      selectedGenres.push(ambientId);
+      console.log("Added: Ambient");
+    }
+
+    if (mood === "Melancholic") {
+      const indieId = genreMap.get("indie");
+      if (indieId && !selectedGenres.includes(indieId)) {
+        selectedGenres.push(indieId);
+        console.log("Added: Indie (melancholic)");
+      }
+    }
+  }
+
+  if (scale === "minor" && !isVietnameseSong) {
+    const altId = genreMap.get("alternative");
+
+    if (altId && !selectedGenres.includes(altId)) {
+      selectedGenres.push(altId);
+      console.log("Added: Alternative (minor key)");
+    }
+  }
+
+  // Default fallback
+  if (selectedGenres.length === 0) {
+    const popId = genreMap.get("pop");
+    if (popId) {
+      selectedGenres.push(popId);
+      console.log("Added: Pop (default)");
+    }
+  }
+
+  return selectedGenres.slice(0, 3);
+}
+
+// Helper function to convert MP3 buffer to Float32Array PCM data for audio analysis
+async function convertMp3BufferToPcmF32(
+  audioBuffer: Buffer
+): Promise<Float32Array | null> {
+  try {
+    const decoder = new MPEGDecoder();
+    await decoder.ready; // Wait for the decoder WASM to be ready
+
+    // Decode the entire buffer
+    // Need to convert Node Buffer to Uint8Array for the decode method
+    const uint8ArrayBuffer = new Uint8Array(
+      audioBuffer.buffer,
+      audioBuffer.byteOffset,
+      audioBuffer.length
+    );
+    const decoded: MPEGDecodedAudio = decoder.decode(uint8ArrayBuffer);
+
+    decoder.free(); // Release resources
+
+    if (decoded.errors.length > 0) {
+      console.error("MP3 Decoding errors:", decoded.errors);
+      return null;
+    }
+
+    // Check if we got valid channel data
+    if (!decoded.channelData || decoded.channelData.length === 0) {
+      console.error("MP3 Decoding produced no channel data.");
+      return null;
+    }
+
+    // Get the original sample rate from the decoded audio
+    const originalSampleRate = decoded.sampleRate;
+    console.log(`Original audio sample rate: ${originalSampleRate} Hz`);
+
+    // Convert to mono by averaging channels if stereo
+    let monoChannel: Float32Array;
+    if (decoded.channelData.length > 1) {
+      const leftChannel = decoded.channelData[0];
+      const rightChannel = decoded.channelData[1];
+      monoChannel = new Float32Array(leftChannel.length);
+      for (let i = 0; i < leftChannel.length; i++) {
+        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+      }
+    } else {
+      // Already mono
+      monoChannel = decoded.channelData[0];
+    }
+
+    // If the sample rate is already 44100, return as is
+    if (originalSampleRate === 44100) {
+      console.log("Audio already at 44100 Hz, no resampling needed");
+      return monoChannel;
+    }
+
+    // Simple linear resampling to 44100 Hz for RhythmExtractor2013
+    // This is a basic implementation - more sophisticated resampling would be better for production
+    console.log(`Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`);
+    const targetSampleRate = 44100;
+    const resampleRatio = targetSampleRate / originalSampleRate;
+    const resampledLength = Math.floor(monoChannel.length * resampleRatio);
+    const resampledBuffer = new Float32Array(resampledLength);
+
+    for (let i = 0; i < resampledLength; i++) {
+      // Calculate the position in the original buffer
+      const originalPos = i / resampleRatio;
+      const originalPosFloor = Math.floor(originalPos);
+      const originalPosCeil = Math.min(originalPosFloor + 1, monoChannel.length - 1);
+      const fraction = originalPos - originalPosFloor;
+
+      // Linear interpolation between the two closest samples
+      resampledBuffer[i] = 
+        monoChannel[originalPosFloor] * (1 - fraction) + 
+        monoChannel[originalPosCeil] * fraction;
+    }
+
+    console.log(`Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`);
+    return resampledBuffer;
+    // Explicit return to satisfy linter - should never reach here due to earlier returns
+  } catch (error) {
+    console.error("Error during MP3 decoding or processing:", error);
+    return null; // Return null if any error occurs
+  }
+}
+
+// Helper function to generate a cover image for a track based on metadata using DiceBear
+async function generateCoverArtwork(
+  trackTitle: string,
+  artistName: string,
+  mood?: string | null
+): Promise<string | null> {
+  try {
+    const seed = encodeURIComponent(`${artistName}-${trackTitle}`);
+
+    const imageUrl = `https://api.dicebear.com/8.x/shapes/svg?seed=${seed}&radius=0&backgroundType=gradientLinear&backgroundRotation=0,360`; // radius=0 for square
+
+    console.log(
+      `Generated cover artwork for "${trackTitle}" using DiceBear: ${imageUrl}`
+    );
+    return imageUrl;
+  } catch (error) {
+    console.error("Error generating cover artwork with DiceBear:", error);
+    // Fallback to a simple placeholder if generation fails
+    return `https://placehold.co/500x500/EEE/31343C?text=${encodeURIComponent(
+      trackTitle.substring(0, 15)
+    )}`;
+  }
+}
+
+// --- New function for admin use to create verified artist profiles ---
+/**
+ * Get or create a verified artist profile - Admin version
+ * Unlike the regular getOrCreateArtistProfile function, this function creates a verified artist profile
+ * if it doesn't exist, allowing regular users to view the artist profile immediately.
+ * This should only be used in admin contexts like bulk upload.
+ */
+export async function getOrCreateVerifiedArtistProfile(
+  artistNameOrId: string
+): Promise<ArtistProfile> {
+  const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId);
+
+  if (isLikelyId) {
+    const existingProfile = await prisma.artistProfile.findUnique({
+      where: { id: artistNameOrId },
+    });
+    if (existingProfile) {
+      // If profile exists but isn't verified, verify it
+      if (!existingProfile.isVerified) {
+        return await prisma.artistProfile.update({
+          where: { id: existingProfile.id },
+          data: { isVerified: true },
+        });
+      }
+      return existingProfile;
+    }
+  }
+
+  // Treat as name
+  const nameToSearch = artistNameOrId;
+  let artistProfile = await prisma.artistProfile.findFirst({
+    where: {
+      artistName: {
+        equals: nameToSearch,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (artistProfile) {
+    // If profile exists but isn't verified, verify it
+    if (!artistProfile.isVerified) {
+      artistProfile = await prisma.artistProfile.update({
+        where: { id: artistProfile.id },
+        data: { isVerified: true },
+      });
+    }
+    return artistProfile;
+  }
+
+  // If not found, create a verified profile
+  console.log(`Creating verified artist profile for: ${nameToSearch}`);
+  artistProfile = await prisma.artistProfile.create({
+    data: {
+      artistName: nameToSearch,
+      role: Role.ARTIST,
+      isVerified: true,
+      isActive: true,
+      userId: null,
+      monthlyListeners: 0,
+    },
+  });
+
+  return artistProfile;
+}
+
+export const processBulkUpload = async (files: Express.Multer.File[]) => {
+  const results = [];
+
+  for (const file of files) {
+    try {
+      console.log(`Processing file: ${file.originalname}`);
+
+      // 1. Upload to Cloudinary
+      const audioUploadResult = await uploadFile(file.buffer, "tracks", "auto");
+      const audioUrl = audioUploadResult.secure_url;
+
+      // 2. Extract Metadata (music-metadata)
+      let duration = 0;
+      let title = file.originalname.replace(/\.[^/.]+$/, ""); // Default title from filename
+      let derivedArtistName = "Unknown Artist"; // Default artist name
+
+      try {
+        const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+        duration = Math.round(metadata.format.duration || 0);
+
+        // Try to get artist and title from metadata
+        if (metadata.common?.artist) {
+          derivedArtistName = metadata.common.artist;
+        }
+        if (metadata.common?.title) {
+          title = metadata.common.title;
+        }
+      } catch (metadataError) {
+        console.error("Error parsing basic audio metadata:", metadataError);
+      }
+
+      // 3. Analyze Audio - First try ReccoBeats API
+      let tempo: number | null = null;
+      let mood: string | null = null;
+      let key: string | null = null;
+      let scale: string | null = null;
+      let danceability: number | null = null;
+      let energy: number | null = null;
+      let confidence: number | null = null;
+      let apiFeatures: ReccoBeatsAudioFeatures | null = null;
+
+      try {
+        // First try to get features from ReccoBeats API
+        apiFeatures = await fetchAudioFeaturesFromAPI(file.buffer);
+        
+        if (apiFeatures) {
+          console.log("Successfully fetched audio features from ReccoBeats API");
+          // Use tempo from API
+          tempo = apiFeatures.tempo || null;
+          danceability = apiFeatures.danceability || null;
+          energy = apiFeatures.energy || null;
+          
+          // Still run Essentia analysis for key and scale which aren't provided by the API
+          const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
+          
+          if (pcmF32) {
+            const essentia = new Essentia(EssentiaWASM);
+            const audioVector = essentia.arrayToVector(pcmF32);
+            
+            // Key & Scale Estimation
+            try {
+              const keyResult = essentia.KeyExtractor(audioVector);
+              key = keyResult.key;
+              scale = keyResult.scale;
+              console.log("Key estimation from Essentia:", key, scale, "Strength:", keyResult.strength);
+            } catch (keyError) {
+              console.error("Error estimating key/scale with Essentia:", keyError);
+            }
+          }
+        } else {
+          console.log("ReccoBeats API call failed, falling back to Essentia analysis");
+          // Fallback to Essentia if ReccoBeats API fails
+          const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
+
+          if (pcmF32) {
+            const essentia = new Essentia(EssentiaWASM);
+            const audioVector = essentia.arrayToVector(pcmF32);
+
+            // Use original tempo detection logic
+            try {
+              const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+              const targetSampleRate = 44100;
+
+              try {
+                const rhythmResult = essentia.RhythmExtractor2013(
+                  audioVector,
+                  targetSampleRate
+                );
+                let rawTempo = rhythmResult.bpm;
+                confidence = rhythmResult.confidence || null;
+                tempo = Math.round(rawTempo);
+              } catch (tempoError) {
+                console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
+                try {
+                  const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                  tempo = Math.round(tempoResult.bpm);
+                } catch (fallbackError) {
+                  console.error("Error estimating tempo with PercivalBpmEstimator fallback:", fallbackError);
+                  tempo = null;
+                }
+              }
+            } catch (metadataError) {
+              console.error("Error getting sample rate from metadata:", metadataError);
+            }
+
+            // Danceability Estimation
+            try {
+              const danceabilityResult = essentia.Danceability(audioVector);
+              danceability = danceabilityResult.danceability;
+            } catch (danceabilityError) {
+              console.error("Error estimating danceability:", danceabilityError);
+            }
+
+            // Energy Calculation
+            try {
+              const energyResult = essentia.Energy(audioVector);
+              energy = energyResult.energy;
+            } catch (energyError) {
+              console.error("Error calculating energy:", energyError);
+            }
+
+            // Key & Scale Estimation
+            try {
+              const keyResult = essentia.KeyExtractor(audioVector);
+              key = keyResult.key;
+              scale = keyResult.scale;
+            } catch (keyError) {
+              console.error("Error estimating key/scale:", keyError);
+            }
+          }
+        }
+      } catch (analysisError) {
+        console.error("Error during audio analysis pipeline:", analysisError);
+      }
+
+      // 4. Get or Create VERIFIED Artist Profile
+      const artistProfile = await getOrCreateVerifiedArtistProfile(
+        derivedArtistName
+      );
+      const artistId = artistProfile.id;
+
+      // 5. Auto-Determine genres based on analysis and API data
+      let genreIds: string[] = [];
+      try {
+        genreIds = await determineGenresFromAudioAnalysis(
+          tempo,
+          mood,
+          key,
+          scale,
+          energy,
+          danceability,
+          duration,
+          title,
+          derivedArtistName,
+          apiFeatures
+        );
+        console.log(`Auto-determined genres for "${title}": ${genreIds.length} genres`);
+      } catch (genreError) {
+        console.error("Error determining genres from audio analysis:", genreError);
+        // Fallback to default genre logic remains unchanged
+      }
+
+      // 6. Generate cover artwork
+      let coverUrl = null;
+      try {
+        coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+        console.log(`Generated cover artwork for "${title}"`);
+      } catch (coverError) {
+        console.error("Error generating cover artwork:", coverError);
+      }
+
+      // 7. Create Track record in Prisma
+      const releaseDate = new Date();
+
+      const trackData: Prisma.TrackCreateInput = {
+        title,
+        duration,
+        releaseDate,
+        audioUrl,
+        coverUrl,
+        type: AlbumType.SINGLE,
+        isActive: true,
+        tempo,
+        mood,
+        key,
+        scale,
+        danceability,
+        energy,
+        artist: { connect: { id: artistId } },
+      };
+
+      // Store additional ReccoBeats audio features in metadata field if your schema supports it
+      if (apiFeatures) {
+        console.log("Storing ReccoBeats audio features as metadata");
+        // If your Prisma schema has a metadata or additionalFeatures JSON field, uncomment this
+        /* 
+        trackData.metadata = {
+          acousticness: apiFeatures.acousticness,
+          instrumentalness: apiFeatures.instrumentalness,
+          liveness: apiFeatures.liveness,
+          loudness: apiFeatures.loudness,
+          speechiness: apiFeatures.speechiness,
+          valence: apiFeatures.valence
+        };
+        */
+      }
+
+      if (genreIds.length > 0) {
+        trackData.genres = {
+          create: genreIds.map((genreId) => ({
+            genre: { connect: { id: genreId } },
+          })),
+        };
+      }
+
+      const newTrack = await prisma.track.create({
+        data: trackData,
+        select: trackSelect,
+      });
+
+      // 8. Add created track info to results
+      results.push({
+        trackId: newTrack.id,
+        title: newTrack.title,
+        artistName: derivedArtistName,
+        artistId: artistId,
+        duration: newTrack.duration,
+        audioUrl: newTrack.audioUrl,
+        coverUrl: newTrack.coverUrl,
+        tempo: newTrack.tempo,
+        mood: newTrack.mood,
+        key: newTrack.key,
+        scale: newTrack.scale,
+        genreIds: genreIds,
+        genres: newTrack.genres?.map((g) => g.genre.name),
+        // Include additional audio features in result for reference
+        audioFeatures: apiFeatures ? {
+          acousticness: apiFeatures.acousticness,
+          instrumentalness: apiFeatures.instrumentalness,
+          liveness: apiFeatures.liveness,
+          loudness: apiFeatures.loudness,
+          speechiness: apiFeatures.speechiness,
+          valence: apiFeatures.valence
+        } : null,
+        fileName: file.originalname,
+        success: true,
+      });
+    } catch (error) {
+      console.error(`Error processing file ${file.originalname}:`, error);
+      results.push({
+        fileName: file.originalname,
+        error: error instanceof Error ? error.message : "Unknown error",
+        success: false,
+      });
+    }
+  }
+
+  return results;
+};
 
 export const getUsers = async (req: Request, requestingUser: User) => {
   const { search, status, sortBy, sortOrder } = req.query;
@@ -1850,1091 +2666,6 @@ export const rejectArtistClaim = async (
     claimId: rejectedClaim.id,
     userId: rejectedClaim.claimingUserId,
   };
-};
-
-// Helper function to convert MP3 buffer to Float32Array PCM data for audio analysis
-async function convertMp3BufferToPcmF32(
-  audioBuffer: Buffer
-): Promise<Float32Array | null> {
-  try {
-    const decoder = new MPEGDecoder();
-    await decoder.ready; // Wait for the decoder WASM to be ready
-
-    // Decode the entire buffer
-    // Need to convert Node Buffer to Uint8Array for the decode method
-    const uint8ArrayBuffer = new Uint8Array(
-      audioBuffer.buffer,
-      audioBuffer.byteOffset,
-      audioBuffer.length
-    );
-    const decoded: MPEGDecodedAudio = decoder.decode(uint8ArrayBuffer);
-
-    decoder.free(); // Release resources
-
-    if (decoded.errors.length > 0) {
-      console.error("MP3 Decoding errors:", decoded.errors);
-      return null;
-    }
-
-    // Check if we got valid channel data
-    if (!decoded.channelData || decoded.channelData.length === 0) {
-      console.error("MP3 Decoding produced no channel data.");
-      return null;
-    }
-
-    // Get the original sample rate from the decoded audio
-    const originalSampleRate = decoded.sampleRate;
-    console.log(`Original audio sample rate: ${originalSampleRate} Hz`);
-
-    // Convert to mono by averaging channels if stereo
-    let monoChannel: Float32Array;
-    if (decoded.channelData.length > 1) {
-      const leftChannel = decoded.channelData[0];
-      const rightChannel = decoded.channelData[1];
-      monoChannel = new Float32Array(leftChannel.length);
-      for (let i = 0; i < leftChannel.length; i++) {
-        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
-      }
-    } else {
-      // Already mono
-      monoChannel = decoded.channelData[0];
-    }
-
-    // If the sample rate is already 44100, return as is
-    if (originalSampleRate === 44100) {
-      console.log("Audio already at 44100 Hz, no resampling needed");
-      return monoChannel;
-    }
-
-    // Simple linear resampling to 44100 Hz for RhythmExtractor2013
-    // This is a basic implementation - more sophisticated resampling would be better for production
-    console.log(`Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`);
-    const targetSampleRate = 44100;
-    const resampleRatio = targetSampleRate / originalSampleRate;
-    const resampledLength = Math.floor(monoChannel.length * resampleRatio);
-    const resampledBuffer = new Float32Array(resampledLength);
-
-    for (let i = 0; i < resampledLength; i++) {
-      // Calculate the position in the original buffer
-      const originalPos = i / resampleRatio;
-      const originalPosFloor = Math.floor(originalPos);
-      const originalPosCeil = Math.min(originalPosFloor + 1, monoChannel.length - 1);
-      const fraction = originalPos - originalPosFloor;
-
-      // Linear interpolation between the two closest samples
-      resampledBuffer[i] = 
-        monoChannel[originalPosFloor] * (1 - fraction) + 
-        monoChannel[originalPosCeil] * fraction;
-    }
-
-    console.log(`Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`);
-    return resampledBuffer;
-    // Explicit return to satisfy linter - should never reach here due to earlier returns
-  } catch (error) {
-    console.error("Error during MP3 decoding or processing:", error);
-    return null; // Return null if any error occurs
-  }
-}
-
-// Helper function to determine genre based on audio analysis
-async function determineGenresFromAudioAnalysis(
-  tempo: number | null,
-  mood: string | null,
-  key: string | null,
-  scale: string | null,
-  energy?: number | null,
-  danceability?: number | null,
-  duration?: number | null,
-  title?: string | null,
-  artistName?: string | null
-): Promise<string[]> {
-  const genres = await prisma.genre.findMany();
-  const genreMap = new Map(genres.map((g) => [g.name.toLowerCase(), g.id]));
-  const selectedGenres: string[] = [];
-  const safeEnergy = typeof energy === "number" ? energy : null;
-
-  // Detect Vietnamese song via diacritics
-  const isVietnameseSong =
-    (title &&
-      title.match(
-        /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-      ) !== null) ||
-    (artistName &&
-      artistName.match(
-        /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-      ) !== null);
-
-  // Check if the song is a remix
-  const isRemix = title && title.toLowerCase().includes("remix");
-  const isHouseRemix = isRemix && title.toLowerCase().includes("house");
-
-  // Vietnamese indie pattern detection
-  const isVietnameseIndie =
-    isVietnameseSong &&
-    tempo !== null &&
-    tempo >= 110 &&
-    tempo <= 125 &&
-    ((key === "C" && scale === "major") || mood === "Melancholic") &&
-    !isRemix; // Exclude remixes
-
-  if (isVietnameseIndie) {
-    console.log("Vietnamese indie pattern detected");
-
-    const indieId = genreMap.get("indie") || genreMap.get("indie pop");
-    if (indieId) {
-      selectedGenres.push(indieId);
-      console.log("Added: Indie (primary)");
-    }
-
-    const popId = genreMap.get("pop");
-    if (popId && !selectedGenres.includes(popId)) {
-      selectedGenres.push(popId);
-      console.log("Added: Pop (secondary)");
-    }
-
-    if (safeEnergy !== null && safeEnergy > 0.5) {
-      const rockId = genreMap.get("alternative") || genreMap.get("rock");
-      if (rockId && !selectedGenres.includes(rockId)) {
-        selectedGenres.push(rockId);
-        console.log("Added: Alternative/Rock (energetic Vietnamese indie)");
-      }
-    } else {
-      const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
-      if (vPopId && !selectedGenres.includes(vPopId)) {
-        selectedGenres.push(vPopId);
-        console.log("Added: V-Pop");
-      }
-    }
-
-    return selectedGenres.slice(0, 3);
-  }
-
-  // Vietnamese house remix detection for genres
-  if (isVietnameseSong && isHouseRemix) {
-    console.log("Vietnamese house remix detected");
-
-    const houseId =
-      genreMap.get("house") ||
-      genreMap.get("electronic") ||
-      genreMap.get("dance");
-    if (houseId) {
-      selectedGenres.push(houseId);
-      console.log("Added: House/Electronic (primary for house remix)");
-    }
-
-    const danceId = genreMap.get("dance");
-    if (danceId && !selectedGenres.includes(danceId)) {
-      selectedGenres.push(danceId);
-      console.log("Added: Dance (secondary for house remix)");
-    }
-
-    const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
-    if (vPopId && !selectedGenres.includes(vPopId)) {
-      selectedGenres.push(vPopId);
-      console.log("Added: V-Pop (Vietnamese origin)");
-    }
-
-    return selectedGenres.slice(0, 3);
-  }
-
-  // Regular Vietnamese remix detection for genres
-  if (isVietnameseSong && isRemix) {
-    console.log("Vietnamese remix detected");
-
-    const danceId = genreMap.get("dance") || genreMap.get("electronic");
-    if (danceId) {
-      selectedGenres.push(danceId);
-      console.log("Added: Dance/Electronic (Vietnamese remix)");
-    }
-
-    const popId = genreMap.get("pop");
-    if (popId && !selectedGenres.includes(popId)) {
-      selectedGenres.push(popId);
-      console.log("Added: Pop (remix base)");
-    }
-
-    const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
-    if (vPopId && !selectedGenres.includes(vPopId)) {
-      selectedGenres.push(vPopId);
-      console.log("Added: V-Pop (Vietnamese origin)");
-    }
-
-    return selectedGenres.slice(0, 3);
-  }
-
-  // Regular Vietnamese song detection
-  if (isVietnameseSong) {
-    console.log("Vietnamese song detected");
-
-    // Handle F minor key specifically for Vietnamese songs (ballads/bolero)
-    if (key === "F" && scale === "minor") {
-      console.log("Detected Vietnamese song in F minor - applying ballad/pop genres");
-      
-      // Try to add ballad genre first
-      const balladId = genreMap.get("ballad");
-      if (balladId) {
-        selectedGenres.push(balladId);
-        console.log("Added: Ballad (F minor key)");
-      }
-      
-      // Add pop genre
-      const popId = genreMap.get("pop");
-      if (popId && !selectedGenres.includes(popId)) {
-        selectedGenres.push(popId);
-        console.log("Added: Pop");
-      }
-      
-      // Add v-pop or bolero genre as third option
-      const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
-      if (vPopId && !selectedGenres.includes(vPopId)) {
-        selectedGenres.push(vPopId);
-        console.log("Added: V-Pop");
-      }
-      
-      return selectedGenres.slice(0, 3);
-    }
-
-    const vPopId =
-      genreMap.get("v-pop") ||
-      genreMap.get("vietnamese pop") ||
-      genreMap.get("pop");
-    if (vPopId) {
-      selectedGenres.push(vPopId);
-      console.log("Added: Vietnamese Pop");
-    }
-
-    if (tempo !== null && tempo >= 120 && scale === "major") {
-      const popId = genreMap.get("pop");
-      if (popId && !selectedGenres.includes(popId)) {
-        selectedGenres.push(popId);
-        console.log("Added: Pop (upbeat)");
-      }
-    }
-
-    if (mood === "Melancholic" || mood === "Calm") {
-      const balladId = genreMap.get("ballad");
-      if (balladId && !selectedGenres.includes(balladId)) {
-        selectedGenres.push(balladId);
-        console.log("Added: Ballad");
-      }
-
-      const indieId = genreMap.get("indie");
-      if (indieId && !selectedGenres.includes(indieId)) {
-        selectedGenres.push(indieId);
-        console.log("Added: Indie (melancholic)");
-      }
-    }
-  }
-
-  // Generic genre mapping
-  if (tempo !== null && tempo >= 125) {
-    if (safeEnergy !== null && safeEnergy > 0.7) {
-      const edm = genreMap.get("electronic") || genreMap.get("edm");
-      const dance = genreMap.get("dance");
-
-      if (edm && !selectedGenres.includes(edm)) {
-        selectedGenres.push(edm);
-        console.log("Added: Electronic");
-      }
-
-      if (dance && !selectedGenres.includes(dance)) {
-        selectedGenres.push(dance);
-        console.log("Added: Dance");
-      }
-    }
-
-    if (scale === "major") {
-      const popId = genreMap.get("pop");
-      if (popId && !selectedGenres.includes(popId)) {
-        selectedGenres.push(popId);
-        console.log("Added: Pop (high tempo)");
-      }
-    }
-  }
-
-  if (mood === "Energetic") {
-    const popId = genreMap.get("pop");
-    if (popId && !selectedGenres.includes(popId)) {
-      selectedGenres.push(popId);
-      console.log("Added: Pop (energetic)");
-    }
-
-    if (safeEnergy !== null && safeEnergy > 0.65 && !isVietnameseSong) {
-      const rockId = genreMap.get("rock");
-      if (rockId && !selectedGenres.includes(rockId)) {
-        selectedGenres.push(rockId);
-        console.log("Added: Rock (non-Vietnamese)");
-      }
-    }
-  }
-
-  if (mood === "Calm" || mood === "Melancholic") {
-    const ambientId = genreMap.get("ambient");
-
-    if (ambientId && !selectedGenres.includes(ambientId)) {
-      selectedGenres.push(ambientId);
-      console.log("Added: Ambient");
-    }
-
-    if (mood === "Melancholic") {
-      const indieId = genreMap.get("indie");
-      if (indieId && !selectedGenres.includes(indieId)) {
-        selectedGenres.push(indieId);
-        console.log("Added: Indie (melancholic)");
-      }
-    }
-  }
-
-  if (scale === "minor" && !isVietnameseSong) {
-    const altId = genreMap.get("alternative");
-
-    if (altId && !selectedGenres.includes(altId)) {
-      selectedGenres.push(altId);
-      console.log("Added: Alternative (minor key)");
-    }
-  }
-
-  // Default fallback
-  if (selectedGenres.length === 0) {
-    const popId = genreMap.get("pop");
-    if (popId) {
-      selectedGenres.push(popId);
-      console.log("Added: Pop (default)");
-    }
-  }
-
-  return selectedGenres.slice(0, 3);
-}
-
-// Helper function to add a genre if it exists in the system
-function addGenreIfExists(
-  genreName: string,
-  genreMap: Map<string, string>,
-  selectedGenres: string[]
-) {
-  const id = genreMap.get(genreName);
-  if (id && !selectedGenres.includes(id)) {
-    selectedGenres.push(id);
-  }
-}
-
-// Helper function to generate a cover image for a track based on metadata using DiceBear
-async function generateCoverArtwork(
-  trackTitle: string,
-  artistName: string,
-  mood?: string | null
-): Promise<string | null> {
-  try {
-    const seed = encodeURIComponent(`${artistName}-${trackTitle}`);
-
-    const imageUrl = `https://api.dicebear.com/8.x/shapes/svg?seed=${seed}&radius=0&backgroundType=gradientLinear&backgroundRotation=0,360`; // radius=0 for square
-
-    console.log(
-      `Generated cover artwork for "${trackTitle}" using DiceBear: ${imageUrl}`
-    );
-    return imageUrl;
-  } catch (error) {
-    console.error("Error generating cover artwork with DiceBear:", error);
-    // Fallback to a simple placeholder if generation fails
-    return `https://placehold.co/500x500/EEE/31343C?text=${encodeURIComponent(
-      trackTitle.substring(0, 15)
-    )}`;
-  }
-}
-
-// --- New function for admin use to create verified artist profiles ---
-/**
- * Get or create a verified artist profile - Admin version
- * Unlike the regular getOrCreateArtistProfile function, this function creates a verified artist profile
- * if it doesn't exist, allowing regular users to view the artist profile immediately.
- * This should only be used in admin contexts like bulk upload.
- */
-export async function getOrCreateVerifiedArtistProfile(
-  artistNameOrId: string
-): Promise<ArtistProfile> {
-  const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId);
-
-  if (isLikelyId) {
-    const existingProfile = await prisma.artistProfile.findUnique({
-      where: { id: artistNameOrId },
-    });
-    if (existingProfile) {
-      // If profile exists but isn't verified, verify it
-      if (!existingProfile.isVerified) {
-        return await prisma.artistProfile.update({
-          where: { id: existingProfile.id },
-          data: { isVerified: true },
-        });
-      }
-      return existingProfile;
-    }
-  }
-
-  // Treat as name
-  const nameToSearch = artistNameOrId;
-  let artistProfile = await prisma.artistProfile.findFirst({
-    where: {
-      artistName: {
-        equals: nameToSearch,
-        mode: "insensitive",
-      },
-    },
-  });
-
-  if (artistProfile) {
-    // If profile exists but isn't verified, verify it
-    if (!artistProfile.isVerified) {
-      artistProfile = await prisma.artistProfile.update({
-        where: { id: artistProfile.id },
-        data: { isVerified: true },
-      });
-    }
-    return artistProfile;
-  }
-
-  // If not found, create a verified profile
-  console.log(`Creating verified artist profile for: ${nameToSearch}`);
-  artistProfile = await prisma.artistProfile.create({
-    data: {
-      artistName: nameToSearch,
-      role: Role.ARTIST,
-      isVerified: true,
-      isActive: true,
-      userId: null,
-      monthlyListeners: 0,
-    },
-  });
-
-  return artistProfile;
-}
-
-export const processBulkUpload = async (files: Express.Multer.File[]) => {
-  const results = [];
-
-  for (const file of files) {
-    try {
-      console.log(`Processing file: ${file.originalname}`);
-
-      // 1. Upload to Cloudinary
-      const audioUploadResult = await uploadFile(file.buffer, "tracks", "auto");
-      const audioUrl = audioUploadResult.secure_url;
-
-      // 2. Extract Metadata (music-metadata)
-      let duration = 0;
-      let title = file.originalname.replace(/\.[^/.]+$/, ""); // Default title from filename
-      let derivedArtistName = "Unknown Artist"; // Default artist name
-
-      try {
-        const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
-        duration = Math.round(metadata.format.duration || 0);
-
-        // Try to get artist and title from metadata
-        if (metadata.common?.artist) {
-          derivedArtistName = metadata.common.artist;
-        }
-        if (metadata.common?.title) {
-          title = metadata.common.title;
-        }
-      } catch (metadataError) {
-        console.error("Error parsing basic audio metadata:", metadataError);
-      }
-
-      // 3. Analyze Audio (Essentia)
-      let tempo: number | null = null;
-      let mood: string | null = null;
-      let key: string | null = null;
-      let scale: string | null = null;
-      let danceability: number | null = null;
-      let energy: number | null = null;
-      let confidence: number | null = null;
-
-      try {
-        const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
-
-        if (pcmF32) {
-          const essentia = new Essentia(EssentiaWASM);
-          const audioVector = essentia.arrayToVector(pcmF32);
-
-          // Debug: PCM length
-          console.log("PCM length:", pcmF32.length);
-
-          // Get sample rate from metadata
-          try {
-            const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
-            // RhythmExtractor2013 specifically requires 44100 Hz
-            const targetSampleRate = 44100;
-
-            // Try RhythmExtractor2013 for more robust BPM
-            try {
-              const rhythmResult = essentia.RhythmExtractor2013(
-                audioVector,
-                targetSampleRate // Always use 44100 Hz with RhythmExtractor2013
-              );
-              let rawTempo = rhythmResult.bpm;
-              confidence = rhythmResult.confidence || null;
-              console.log(
-                "RhythmExtractor2013 BPM:",
-                rawTempo,
-                "Confidence:",
-                confidence
-              );
-
-              // Get a second tempo estimation if confidence is low
-              let percivalTempo = null;
-              if (confidence === null || confidence < 3) {
-                try {
-                  const percivalResult =
-                    essentia.PercivalBpmEstimator(audioVector);
-                  percivalTempo = percivalResult.bpm;
-                  console.log("PercivalBpmEstimator BPM:", percivalTempo);
-
-                  // If the tempos are close, average them for better accuracy
-                  if (Math.abs(rawTempo - percivalTempo) < 10) {
-                    rawTempo = (rawTempo + percivalTempo) / 2;
-                    console.log("Averaged tempo from two estimators:", rawTempo);
-                  }
-                  // If confidence is very low, prefer Percival result
-                  else if (confidence !== null && confidence < 1) {
-                    rawTempo = percivalTempo;
-                    console.log(
-                      "Using Percival tempo due to very low confidence:",
-                      rawTempo
-                    );
-                  }
-                  // If the estimations are significantly different, go with Percival if it's a more common tempo value
-                  else if (
-                    Math.abs(Math.round(percivalTempo) % 10) <
-                    Math.abs(Math.round(rawTempo) % 10)
-                  ) {
-                    rawTempo = percivalTempo;
-                    console.log(
-                      "Using Percival tempo as it matches common BPM patterns better:",
-                      rawTempo
-                    );
-                  }
-                } catch (percivalError) {
-                  console.error(
-                    "Error estimating tempo with PercivalBpmEstimator:",
-                    percivalError
-                  );
-                }
-              }
-
-              // Round to nearest whole number
-              tempo = Math.round(rawTempo);
-
-              // Last validation against typical ranges
-              if (tempo < 60 || tempo > 200) {
-                console.warn(
-                  `Unusual tempo detected: ${tempo}. Applying sanity check.`
-                );
-                // If we have a backup from Percival and it's more reasonable, use it
-                if (
-                  percivalTempo !== null &&
-                  percivalTempo >= 60 &&
-                  percivalTempo <= 200
-                ) {
-                  tempo = Math.round(percivalTempo);
-                  console.log(
-                    "Using percival tempo as primary was out of expected range:",
-                    tempo
-                  );
-                }
-              }
-              // Check for common BPM detection errors - often off by ~10%
-              else if (percivalTempo !== null) {
-                const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
-
-                // If there's a significant difference (~9-11%) between methods
-                if (percentDiff > 0.08 && percentDiff < 0.12) {
-                  console.log(
-                    `Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(
-                      2
-                    )}`
-                  );
-
-                  // For indie/pop songs, prefer the higher BPM if it's between 110-125
-                  if (
-                    percivalTempo > 110 &&
-                    percivalTempo < 125 &&
-                    percivalTempo > tempo
-                  ) {
-                    tempo = Math.round(percivalTempo);
-                    console.log(
-                      `Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`
-                    );
-                  }
-                  // For songs around 100-114 BPM, also prefer higher tempo
-                  else if (
-                    percivalTempo > 100 &&
-                    percivalTempo < 115 &&
-                    percivalTempo > tempo
-                  ) {
-                    tempo = Math.round(percivalTempo);
-                    console.log(
-                      `Corrected BPM to ${tempo} - likely in 100-115 BPM range`
-                    );
-                  }
-                }
-              }
-            } catch (tempoError) {
-              console.error(
-                "Error estimating tempo with RhythmExtractor2013:",
-                tempoError
-              );
-              // Fallback to PercivalBpmEstimator if RhythmExtractor2013 fails
-              try {
-                const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-                tempo = Math.round(tempoResult.bpm);
-                console.log("PercivalBpmEstimator BPM (fallback):", tempoResult.bpm);
-              } catch (fallbackError) {
-                console.error(
-                  "Error estimating tempo with PercivalBpmEstimator fallback:",
-                  fallbackError
-                );
-                tempo = null;
-              }
-            }
-          } catch (metadataError) {
-            console.error("Error getting sample rate from metadata:", metadataError);
-            // If we can't get the sample rate, try PercivalBpmEstimator which doesn't require it
-            try {
-              const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-              tempo = Math.round(tempoResult.bpm);
-              console.log("PercivalBpmEstimator BPM (no sample rate):", tempo);
-            } catch (fallbackError) {
-              console.error(
-                "Fallback tempo estimation failed:",
-                fallbackError
-              );
-              tempo = null;
-            }
-          }
-
-          // Danceability Estimation
-          try {
-            const danceabilityResult = essentia.Danceability(audioVector);
-            danceability = danceabilityResult.danceability;
-          } catch (danceabilityError) {
-            console.error("Error estimating danceability:", danceabilityError);
-          }
-
-          // Energy Calculation (used for mood placeholder and energy field)
-          try {
-            const energyResult = essentia.Energy(audioVector);
-            const rawEnergy = energyResult.energy;
-
-            // Check for Vietnamese song by looking for diacritics in title/artist
-            const isVietnameseSong =
-              title.match(
-                /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-              ) !== null ||
-              derivedArtistName.match(
-                /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-              ) !== null;
-
-            // Check if the song is a remix
-            const isRemix = title.toLowerCase().includes("remix");
-            const isHouseRemix =
-              isRemix && title.toLowerCase().includes("house");
-
-            // Vietnamese indie song detection based on tempo and energy patterns
-            // Most Vietnamese indie songs in the 110-125 BPM range are misclassified
-            const isVietnameseIndie =
-              isVietnameseSong &&
-              tempo !== null &&
-              tempo >= 110 &&
-              tempo <= 125 &&
-              !isRemix; // Exclude remixes from indie pattern
-
-            // Only apply energy correction for slower Vietnamese ballads
-            // Fast-paced Vietnamese songs can still be energetic
-            if (isVietnameseIndie) {
-              // Vietnamese indie songs are often misclassified as high energy
-              energy = Math.min(rawEnergy, 0.35); // Lower energy value for indie songs
-              console.log(
-                `Energy correction for Vietnamese indie song: ${rawEnergy} → ${energy} (indie pattern detected)`
-              );
-
-              // Vietnamese indie songs are generally more melancholic/calm than detected
-              mood = "Melancholic";
-              console.log(
-                "Mood set to: Melancholic (Vietnamese indie pattern)"
-              );
-            } else if (isVietnameseSong && isHouseRemix) {
-              // House remixes are almost always highly energetic, especially in Vietnamese music
-              energy = Math.max(rawEnergy, 0.85); // Very high energy for house remixes
-              mood = "Energetic";
-              console.log(
-                "Mood set to: Energetic (Vietnamese house remix detected)"
-              );
-            } else if (isVietnameseSong && isRemix) {
-              // Vietnamese remixes should be classified as energetic
-              energy = Math.max(rawEnergy, 0.7); // Higher energy for regular remixes
-              mood = "Energetic";
-              console.log("Mood set to: Energetic (Vietnamese remix detected)");
-            } else if (
-              isVietnameseSong &&
-              tempo !== null &&
-              tempo < 110 &&
-              scale !== null &&
-              (scale as string).toLowerCase() === "minor"
-            ) {
-              // This is likely a Vietnamese ballad (slower tempo, minor key)
-              energy = Math.min(rawEnergy, 0.35);
-              console.log(
-                `Energy correction applied for Vietnamese ballad: ${rawEnergy} → ${energy} (slow tempo, minor key)`
-              );
-            } else if (isVietnameseSong && tempo !== null && tempo >= 130) {
-              // This is likely an upbeat Vietnamese song - allow it to be energetic
-              // But still slightly adjust energy for better accuracy
-              energy = Math.min(rawEnergy, 0.8);
-              console.log(
-                `Minor energy adjustment for upbeat Vietnamese song: ${rawEnergy} → ${energy} (higher tempo)`
-              );
-            } else if (
-              tempo !== null &&
-              tempo >= 90 &&
-              tempo <= 120 &&
-              key !== null &&
-              (key as string).toLowerCase().includes("e") &&
-              scale !== null &&
-              (scale as string).toLowerCase() === "minor"
-            ) {
-              // Apply correction for other ballad characteristics
-              energy = Math.min(rawEnergy, 0.4);
-              console.log(
-                `Energy correction applied: ${rawEnergy} → ${energy} (ballad characteristics detected)`
-              );
-            } else {
-              energy = rawEnergy;
-              console.log(`Using original energy value: ${energy}`);
-            }
-
-            // Set mood based on energy, key, scale and tempo (unless already set)
-            if (mood === null) {
-              if (
-                isVietnameseSong &&
-                tempo !== null &&
-                tempo >= 130 &&
-                energy !== null &&
-                energy > 0.5
-              ) {
-                mood = "Energetic"; // Fast Vietnamese songs with decent energy should be Energetic
-                console.log("Mood set to: Energetic (upbeat Vietnamese song)");
-              } else if (
-                isVietnameseSong &&
-                key !== null &&
-                scale !== null &&
-                (scale as string).toLowerCase() === "minor" &&
-                tempo !== null &&
-                tempo < 120
-              ) {
-                mood = "Melancholic"; // Slower Vietnamese songs in minor key are typically melancholic
-                console.log(
-                  "Mood set to: Melancholic (Vietnamese song in minor key with slower tempo)"
-                );
-              } else if (
-                energy !== null &&
-                key !== null &&
-                scale !== null &&
-                (scale as string).toLowerCase() === "minor" &&
-                energy <= 0.4
-              ) {
-                mood = "Melancholic"; // Minor key with low energy = melancholic
-                console.log(
-                  "Mood set to: Melancholic (minor key + low energy)"
-                );
-              } else if (energy !== null && energy <= 0.4) {
-                mood = "Calm"; // Low energy = calm
-                console.log("Mood set to: Calm (based on low energy)");
-              } else if (energy !== null && energy > 0.6) {
-                mood = "Energetic"; // High energy = energetic
-                console.log("Mood set to: Energetic (based on high energy)");
-              } else if (energy !== null) {
-                mood = "Neutral"; // Medium energy = neutral
-                console.log("Mood set to: Neutral (medium energy)");
-              }
-            }
-          } catch (energyError) {
-            console.error("Error calculating energy:", energyError);
-          }
-
-          // Key & Scale Estimation
-          try {
-            const keyResult = essentia.KeyExtractor(audioVector);
-            const rawKey = keyResult.key;
-            const rawScale = keyResult.scale;
-            console.log(
-              "Key estimation:",
-              rawKey,
-              rawScale,
-              "Strength:",
-              keyResult.strength
-            );
-
-            // Add relative key validation for common confusions
-            // Key detection often confused between relative major/minor keys
-            // (e.g., A minor is the relative minor of C major, F minor is relative to Ab major)
-            let correctedKey = rawKey;
-            let correctedScale = rawScale;
-
-            // Validation for common key detection errors
-            const keyCorrection: Record<
-              string,
-              { key: string; possibleErrors: string[] }
-            > = {
-              A: { key: "A", possibleErrors: ["F", "C"] },
-              F: { key: "F", possibleErrors: ["A", "D"] },
-              Eb: { key: "Eb", possibleErrors: ["C", "G"] }, // Eb minor vs C Major confusion
-              // Could add more corrections based on observed issues
-            };
-
-            // Check for Vietnamese indie song pattern - often Eb minor is actually C Major
-            const isVietnameseSong =
-              title.match(
-                /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-              ) !== null ||
-              derivedArtistName.match(
-                /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i
-              ) !== null;
-
-            // Check if song is a remix - remixes have different key profiles
-            const isRemix =
-              title.toLowerCase().includes("remix") ||
-              title.toLowerCase().includes("edm");
-
-            // Vietnamese indie key correction (skip for remixes as they intentionally change keys)
-            if (
-              isVietnameseSong &&
-              rawKey === "Eb" &&
-              rawScale === "minor" &&
-              tempo !== null &&
-              tempo >= 110 &&
-              tempo <= 125 &&
-              !isRemix
-            ) {
-              console.log(
-                "Detected Vietnamese indie song with Eb minor key - likely C Major confusion"
-              );
-              correctedKey = "C";
-              correctedScale = "major";
-              console.log(
-                `Corrected key from ${rawKey} ${rawScale} to ${correctedKey} ${correctedScale} (Vietnamese indie pattern)`
-              );
-            }
-            // For Vietnamese remixes, we generally trust the raw key/scale detection
-            else if (isVietnameseSong && isRemix) {
-              console.log(
-                "Vietnamese remix detected - using raw key detection without correction"
-              );
-              // No correction for remixes since they may have intentional key changes
-            }
-            // Special case for common A minor / F minor confusion with pop/rock songs
-            // REMOVED: This was causing incorrect key changes from F minor to A minor
-            // else if (
-            //   rawKey === "F" &&
-            //   rawScale === "minor" &&
-            //   tempo !== null &&
-            //   tempo >= 100 &&
-            //   tempo <= 115
-            // ) {
-            //   console.log(
-            //     "Detected potential F minor / A minor confusion in common BPM range (100-115)"
-            //   );
-            //   correctedKey = "A"; // Prefer A minor in this range, especially for pop/rock songs
-            //   console.log(
-            //     `Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`
-            //   );
-            // }
-            // If we have a specific correction and low confidence, do deeper analysis
-            else if (keyResult.strength < 0.6 && keyCorrection[rawKey]) {
-              console.log(
-                `Low confidence key detection, checking for common errors for ${rawKey} ${rawScale}`
-              );
-
-              // Try alternate key detection method for validation
-              try {
-                // Get the sample rate for section calculation
-                const metadataForKey = await mm.parseBuffer(file.buffer, file.mimetype);
-                const sampleRateForKey = metadataForKey.format.sampleRate || 44100;
-                
-                // Run further analysis on first ~30 seconds which often provides better results
-                const shortSection =
-                  pcmF32.length > 30 * sampleRateForKey
-                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRateForKey)
-                    : pcmF32;
-
-                const shortVector = essentia.arrayToVector(shortSection);
-                const secondKeyResult = essentia.KeyExtractor(shortVector);
-
-                console.log(
-                  "Secondary key detection on shorter segment:",
-                  secondKeyResult.key,
-                  secondKeyResult.scale,
-                  "Strength:",
-                  secondKeyResult.strength
-                );
-
-                // If second detection is one of the common confusion keys, trust it more
-                if (
-                  keyCorrection[rawKey].possibleErrors.includes(
-                    secondKeyResult.key
-                  ) &&
-                  secondKeyResult.strength > keyResult.strength
-                ) {
-                  correctedKey = secondKeyResult.key;
-                  correctedScale = secondKeyResult.scale;
-                  console.log(
-                    `Corrected key from ${rawKey} to ${correctedKey} based on secondary analysis`
-                  );
-                }
-              } catch (secondaryKeyError) {
-                console.error(
-                  "Error in secondary key detection:",
-                  secondaryKeyError
-                );
-              }
-            }
-
-            // Assign final key and scale values
-            key = correctedKey;
-            scale = correctedScale;
-          } catch (keyError) {
-            console.error("Error estimating key/scale:", keyError);
-          }
-        } else {
-          console.warn("Audio decoding failed, skipping all audio analysis.");
-        }
-      } catch (analysisError) {
-        console.error("Error during audio analysis pipeline:", analysisError);
-      }
-
-      // 4. Get or Create VERIFIED Artist Profile (for admin bulk upload)
-      const artistProfile = await getOrCreateVerifiedArtistProfile(
-        derivedArtistName
-      );
-      const artistId = artistProfile.id;
-
-      // 5. Auto-Determine genres based on analysis
-      let genreIds: string[] = [];
-      try {
-        genreIds = await determineGenresFromAudioAnalysis(
-          tempo,
-          mood,
-          key,
-          scale,
-          energy,
-          danceability,
-          duration,
-          title,
-          derivedArtistName
-        );
-        console.log(
-          `Auto-determined genres for "${title}": ${genreIds.length} genres`
-        );
-      } catch (genreError) {
-        console.error(
-          "Error determining genres from audio analysis:",
-          genreError
-        );
-
-        // 5b. Fallback to default genre - using "Pop" as a fallback if available
-        try {
-          const popGenre = await prisma.genre.findFirst({
-            where: {
-              name: { equals: "Pop", mode: "insensitive" },
-            },
-          });
-
-          if (popGenre) {
-            genreIds = [popGenre.id];
-          } else {
-            // If Pop genre doesn't exist, get the first genre
-            const anyGenre = await prisma.genre.findFirst({
-              orderBy: { createdAt: "asc" },
-            });
-            if (anyGenre) {
-              genreIds = [anyGenre.id];
-            }
-          }
-        } catch (fallbackGenreError) {
-          console.error("Error finding fallback genre:", fallbackGenreError);
-        }
-      }
-
-      // 6. Generate cover artwork based on track metadata
-      let coverUrl = null;
-      try {
-        coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
-        console.log(`Generated cover artwork for "${title}"`);
-      } catch (coverError) {
-        console.error("Error generating cover artwork:", coverError);
-      }
-
-      // 7. Create Track record in Prisma
-      const releaseDate = new Date(); // Default to current date
-
-      const trackData: Prisma.TrackCreateInput = {
-        title,
-        duration,
-        releaseDate,
-        audioUrl,
-        coverUrl, // Add the generated cover URL
-        type: AlbumType.SINGLE,
-        isActive: true,
-        tempo,
-        mood,
-        key,
-        scale,
-        danceability,
-        energy,
-        artist: { connect: { id: artistId } },
-      };
-
-      // Add genres if we determined any
-      if (genreIds.length > 0) {
-        trackData.genres = {
-          create: genreIds.map((genreId) => ({
-            genre: { connect: { id: genreId } },
-          })),
-        };
-      }
-
-      const newTrack = await prisma.track.create({
-        data: trackData,
-        select: trackSelect,
-      });
-
-      // 8. Add created track info to results
-      results.push({
-        trackId: newTrack.id,
-        title: newTrack.title,
-        artistName: derivedArtistName,
-        artistId: artistId,
-        duration: newTrack.duration,
-        audioUrl: newTrack.audioUrl,
-        coverUrl: newTrack.coverUrl, // Include coverUrl in the result
-        tempo: newTrack.tempo,
-        mood: newTrack.mood,
-        key: newTrack.key,
-        scale: newTrack.scale,
-        genreIds: genreIds,
-        genres: newTrack.genres?.map((g) => g.genre.name),
-        fileName: file.originalname,
-        success: true,
-      });
-    } catch (error) {
-      console.error(`Error processing file ${file.originalname}:`, error);
-      results.push({
-        fileName: file.originalname,
-        error: error instanceof Error ? error.message : "Unknown error",
-        success: false,
-      });
-    }
-  }
-
-  return results;
 };
 
 export const generateAndAssignAiPlaylistToUser = async (
