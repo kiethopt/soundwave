@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteFile = exports.updateFileUrl = exports.uploadFile = void 0;
+exports.analyzeAudioWithReccoBeats = exports.deleteFile = exports.updateFileUrl = exports.uploadFile = void 0;
 const cloudinary_1 = __importDefault(require("../config/cloudinary"));
+const db_1 = __importDefault(require("../config/db"));
 const uploadFile = async (fileBuffer, folder, resourceType = 'auto') => {
     return new Promise((resolve, reject) => {
         cloudinary_1.default.uploader
@@ -28,4 +29,212 @@ const deleteFile = async (publicId, resourceType = 'auto') => {
     return cloudinary_1.default.uploader.destroy(publicId, { resource_type: resourceType });
 };
 exports.deleteFile = deleteFile;
+const analyzeAudioWithReccoBeats = async (audioBuffer, title, artistName) => {
+    try {
+        const reccoFeatures = await callReccoBeatsAPI(audioBuffer);
+        const { key, scale } = deriveKeyAndScale(reccoFeatures);
+        const mood = deriveMood(reccoFeatures.energy, reccoFeatures.valence);
+        const genreIds = await determineGenresFromReccoFeatures(reccoFeatures, title, artistName);
+        return {
+            tempo: reccoFeatures.tempo,
+            mood,
+            key,
+            scale,
+            danceability: reccoFeatures.danceability,
+            energy: reccoFeatures.energy,
+            instrumentalness: reccoFeatures.instrumentalness,
+            acousticness: reccoFeatures.acousticness,
+            valence: reccoFeatures.valence,
+            genreIds
+        };
+    }
+    catch (error) {
+        console.error('Error analyzing audio with ReccoBeats:', error);
+        return {
+            tempo: null,
+            mood: null,
+            key: null,
+            scale: null,
+            danceability: null,
+            energy: null,
+            instrumentalness: null,
+            acousticness: null,
+            valence: null,
+            genreIds: []
+        };
+    }
+};
+exports.analyzeAudioWithReccoBeats = analyzeAudioWithReccoBeats;
+async function callReccoBeatsAPI(audioBuffer) {
+    try {
+        const formData = new FormData();
+        formData.append('audioFile', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
+        const response = await fetch('https://api.reccobeats.com/v1/analysis/audio-features', {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error('ReccoBeats API Error Body:', errorBody);
+            throw new Error(`ReccoBeats API error: ${response.status} ${response.statusText}. Details: ${errorBody}`);
+        }
+        const responseData = await response.json();
+        console.log('ReccoBeats API Response:', responseData);
+        return responseData;
+    }
+    catch (error) {
+        console.error('Error calling ReccoBeats API:', error);
+        throw error;
+    }
+}
+function deriveKeyAndScale(reccoFeatures) {
+    const { energy, valence, tempo } = reccoFeatures;
+    const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const scale = valence > 0.5 ? 'major' : 'minor';
+    const keyIndex = Math.floor((tempo * 0.4 + energy * 0.6) * 12) % 12;
+    const key = keys[keyIndex];
+    return { key, scale };
+}
+function deriveMood(energy, valence) {
+    if (energy > 0.7 && valence > 0.7)
+        return 'Energetic';
+    if (energy > 0.7 && valence < 0.3)
+        return 'Intense';
+    if (energy < 0.3 && valence > 0.7)
+        return 'Calm';
+    if (energy < 0.3 && valence < 0.3)
+        return 'Melancholic';
+    if (energy > valence) {
+        return energy > 0.5 ? 'Energetic' : 'Calm';
+    }
+    else {
+        return valence > 0.5 ? 'Happy' : 'Melancholic';
+    }
+}
+function containsVietnameseChars(text) {
+    return /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(text);
+}
+async function determineGenresFromReccoFeatures(reccoFeatures, title, artistName) {
+    const genres = await db_1.default.genre.findMany();
+    const genreMap = new Map(genres.map((g) => [g.name.toLowerCase(), g.id]));
+    const selectedGenres = [];
+    const isVietnameseSong = title && containsVietnameseChars(title) ||
+        artistName && containsVietnameseChars(artistName);
+    const isRemix = title && title.toLowerCase().includes('remix');
+    const isHouseRemix = isRemix && title && title.toLowerCase().includes('house');
+    if (isVietnameseSong) {
+        if (reccoFeatures.tempo >= 110 && reccoFeatures.tempo <= 125 &&
+            reccoFeatures.acousticness > 0.6 && !isRemix) {
+            addGenreIfExists('indie', genreMap, selectedGenres);
+            addGenreIfExists('v-pop', genreMap, selectedGenres);
+            if (reccoFeatures.energy < 0.4) {
+                addGenreIfExists('ballad', genreMap, selectedGenres);
+            }
+        }
+        else if (isHouseRemix) {
+            addGenreIfExists('house', genreMap, selectedGenres);
+            addGenreIfExists('dance', genreMap, selectedGenres);
+            addGenreIfExists('v-pop', genreMap, selectedGenres);
+        }
+        else if (isRemix) {
+            addGenreIfExists('dance', genreMap, selectedGenres);
+            addGenreIfExists('electronic', genreMap, selectedGenres);
+            addGenreIfExists('v-pop', genreMap, selectedGenres);
+        }
+        else {
+            addGenreIfExists('v-pop', genreMap, selectedGenres);
+            if (reccoFeatures.energy < 0.4 && reccoFeatures.acousticness > 0.6) {
+                addGenreIfExists('ballad', genreMap, selectedGenres);
+            }
+            else if (reccoFeatures.energy > 0.7 && reccoFeatures.tempo > 120) {
+                addGenreIfExists('dance', genreMap, selectedGenres);
+                addGenreIfExists('pop', genreMap, selectedGenres);
+            }
+            else {
+                addGenreIfExists('pop', genreMap, selectedGenres);
+            }
+        }
+    }
+    else {
+        if (reccoFeatures.instrumentalness < 0.7 &&
+            reccoFeatures.danceability > 0.5 &&
+            reccoFeatures.tempo >= 70 && reccoFeatures.tempo <= 170 &&
+            reccoFeatures.acousticness < 0.6 &&
+            reccoFeatures.energy > 0.2) {
+            addGenreIfExists('hip-hop', genreMap, selectedGenres);
+            addGenreIfExists('rap', genreMap, selectedGenres);
+            if (reccoFeatures.valence < 0.4 && selectedGenres.length < 3) {
+                addGenreIfExists('alternative', genreMap, selectedGenres);
+            }
+        }
+        else if (reccoFeatures.instrumentalness > 0.7) {
+            addGenreIfExists('instrumental', genreMap, selectedGenres);
+            if (reccoFeatures.acousticness > 0.7 && selectedGenres.length < 3) {
+                addGenreIfExists('acoustic', genreMap, selectedGenres);
+            }
+            else if (reccoFeatures.energy < 0.4 && selectedGenres.length < 3) {
+                addGenreIfExists('ambient', genreMap, selectedGenres);
+            }
+            else if (reccoFeatures.energy > 0.7 && selectedGenres.length < 3) {
+                addGenreIfExists('electronic', genreMap, selectedGenres);
+            }
+        }
+        else if (reccoFeatures.acousticness > 0.7) {
+            addGenreIfExists('acoustic', genreMap, selectedGenres);
+            if (reccoFeatures.energy < 0.4 && selectedGenres.length < 3) {
+                addGenreIfExists('folk', genreMap, selectedGenres);
+            }
+            else if (selectedGenres.length < 3) {
+                addGenreIfExists('indie', genreMap, selectedGenres);
+            }
+        }
+        else if (reccoFeatures.danceability > 0.7) {
+            if (reccoFeatures.energy > 0.7) {
+                addGenreIfExists('dance', genreMap, selectedGenres);
+                if (isRemix && selectedGenres.length < 3) {
+                    addGenreIfExists('house', genreMap, selectedGenres);
+                }
+                else if (selectedGenres.length < 3) {
+                    addGenreIfExists('pop', genreMap, selectedGenres);
+                }
+            }
+            else if (selectedGenres.length < 3) {
+                addGenreIfExists('funk', genreMap, selectedGenres);
+                if (selectedGenres.length < 3)
+                    addGenreIfExists('pop', genreMap, selectedGenres);
+            }
+        }
+        else if (reccoFeatures.energy > 0.8) {
+            if (reccoFeatures.tempo > 125) {
+                addGenreIfExists('rock', genreMap, selectedGenres);
+            }
+            else if (selectedGenres.length < 3) {
+                addGenreIfExists('pop', genreMap, selectedGenres);
+                if (selectedGenres.length < 3)
+                    addGenreIfExists('rock', genreMap, selectedGenres);
+            }
+        }
+        else if (reccoFeatures.tempo > 120 && selectedGenres.length < 1) {
+            addGenreIfExists('pop', genreMap, selectedGenres);
+        }
+        else if (reccoFeatures.tempo < 85 && selectedGenres.length < 2) {
+            if (reccoFeatures.valence < 0.4) {
+                addGenreIfExists('alternative', genreMap, selectedGenres);
+            }
+            else {
+                addGenreIfExists('soul', genreMap, selectedGenres);
+            }
+        }
+    }
+    if (selectedGenres.length === 0) {
+        addGenreIfExists('pop', genreMap, selectedGenres);
+    }
+    return selectedGenres.slice(0, 3);
+}
+function addGenreIfExists(genreName, genreMap, selectedGenres) {
+    const id = genreMap.get(genreName.toLowerCase());
+    if (id && !selectedGenres.includes(id)) {
+        selectedGenres.push(id);
+    }
+}
 //# sourceMappingURL=upload.service.js.map
