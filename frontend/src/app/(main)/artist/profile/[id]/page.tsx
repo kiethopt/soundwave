@@ -17,12 +17,6 @@ import Image from "next/image";
 import io, { Socket } from "socket.io-client";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import { cn } from "@/lib/utils";
 
 function getBrightness(hexColor: string) {
   const r = parseInt(hexColor.substr(1, 2), 16);
@@ -91,68 +85,94 @@ export default function ArtistProfilePage({
 
     setLoading(true);
     try {
-      const [
-        artistData,
-        followingResponse,
-        albumsResponse,
-        tracksResponse,
-        singlesResponse,
-        relatedArtistsResponse,
-        genresResponse
-      ] = await Promise.all([
-        api.artists.getProfile(id, token),
-        api.user.getUserFollowing(userData.id, token),
-        api.artists.getAlbumByArtistId(id, token),
-        api.artists.getTrackByArtistId(id, token),
-        api.artists.getTrackByArtistId(id, token, "SINGLE"),
-        api.artists.getRelatedArtists(id, token),
-        api.genres.getAll(token, 1, 500)
-      ]);
-
+      // First fetch core artist profile data that any user should be able to access
+      const artistData = await api.artists.getProfile(id, token);
       setArtist(artistData);
       setFollowerCount(artistData.monthlyListeners || 0);
+      
+      // Check if current user is the owner of this artist profile
+      const isOwner = userData.artistProfile?.id === id;
+      setIsOwner(isOwner);
 
-      if (followingResponse) {
-        const isFollowing = followingResponse.some(
-          (following: any) =>
-            (following.type === 'ARTIST' && following.id === id) ||
-            (following.followingArtistId === id)
+      // Next, fetch follow status in a separate try block
+      try {
+        const followingResponse = await api.user.getUserFollowing(userData.id, token);
+        if (followingResponse) {
+          const isFollowing = followingResponse.some(
+            (following: any) =>
+              (following.type === 'ARTIST' && following.id === id) ||
+              (following.followingArtistId === id)
+          );
+          setFollow(isFollowing);
+        }
+      } catch (followError) {
+        console.error("Error checking follow status:", followError);
+        // Don't let this error block rendering
+      }
+
+      // Fetch albums and tracks
+      try {
+        const albumsResponse = await api.artists.getAlbumByArtistId(id, token);
+        setAlbums(albumsResponse.albums || []);
+      } catch (albumsError) {
+        console.error("Error fetching artist albums:", albumsError);
+        setAlbums([]);
+      }
+
+      try {
+        const tracksResponse = await api.artists.getTrackByArtistId(id, token);
+        const sortedTracks = (tracksResponse.tracks || []).sort(
+          (a: any, b: any) => b.playCount - a.playCount
         );
-
-        console.log('Is following:', isFollowing);
-        const isOwner = userData.artistProfile?.id === id;
-        setFollow(isFollowing);
-        setIsOwner(isOwner);
+        setTracks(sortedTracks);
+      } catch (tracksError) {
+        console.error("Error fetching artist tracks:", tracksError);
+        setTracks([]);
       }
 
-      if (genresResponse && genresResponse.genres) {
-        setAvailableGenres(genresResponse.genres);
-      } else {
-        console.error("Error fetching genres or genres not found in response");
-        setAvailableGenres([]);
-      }
-
-      setAlbums(albumsResponse.albums);
-
-      const sortedTracks = tracksResponse.tracks.sort(
-        (a: any, b: any) => b.playCount - a.playCount
-      );
-      setTracks(sortedTracks);
-
-      const singleAndEPs = singlesResponse.tracks.filter(
-        (track: Track) => !track.album
-      );
-      setStandaloneReleases(singleAndEPs);
-
-      setRelatedArtists(relatedArtistsResponse);
-
-      if (relatedArtistsResponse?.length > 0) {
-        const tracksMap = await fetchRelatedArtistTracks(
-          relatedArtistsResponse
+      try {
+        const singlesResponse = await api.artists.getTrackByArtistId(id, token, "SINGLE");
+        const singleAndEPs = (singlesResponse.tracks || []).filter(
+          (track: Track) => !track.album
         );
-        setArtistTracksMap(tracksMap);
+        setStandaloneReleases(singleAndEPs);
+      } catch (singlesError) {
+        console.error("Error fetching artist singles:", singlesError);
+        setStandaloneReleases([]);
       }
 
+      // Fetch related artists in a separate try block
+      try {
+        const relatedArtistsResponse = await api.artists.getRelatedArtists(id, token);
+        setRelatedArtists(relatedArtistsResponse || []);
+        
+        if (relatedArtistsResponse?.length > 0) {
+          const tracksMap = await fetchRelatedArtistTracks(
+            relatedArtistsResponse
+          );
+          setArtistTracksMap(tracksMap);
+        }
+      } catch (relatedError) {
+        console.error("Error fetching related artists:", relatedError);
+        setRelatedArtists([]);
+      }
+
+      // Only fetch genres if the user is the owner of this artist profile
+      if (isOwner) {
+        try {
+          const genresResponse = await api.genres.getAll(token, 1, 500);
+          if (genresResponse && genresResponse.genres) {
+            setAvailableGenres(genresResponse.genres);
+          } else {
+            setAvailableGenres([]);
+          }
+        } catch (genresError) {
+          console.error("Error fetching genres:", genresError);
+          setAvailableGenres([]);
+        }
+      }
+
+      // Fetch playlists and favorites
       const fetchPlaylists = async () => {
         if (!token) return;
         try {
@@ -1070,14 +1090,14 @@ export default function ArtistProfilePage({
                   onClick={() => router.back()}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === "light"
                       ? "bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow"
-                      : "bg-black/20 hover:bg-black/30 text-white/80 hover:text-white"
+                      : "bg-white/10 hover:bg-white/20 text-white"
                     }`}
                 >
                   <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
                   <span>Back</span>
                 </button>
 
-                {isOwner && (
+                {isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified && (
                     <Button
                       variant={theme === "dark" ? "outline" : "outline"}
                       size="sm"
@@ -1103,9 +1123,9 @@ export default function ArtistProfilePage({
                   )}
                 </div>
                 <h1
-                  className={`text-6xl w-fit font-bold uppercase py-4 ${isOwner ? 'cursor-pointer' : ''}`}
+                  className={`text-6xl w-fit font-bold uppercase py-4 ${(isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified) ? 'cursor-pointer' : ''}`}
                   style={{ lineHeight: '1.1', color: textColor }}
-                  onClick={isOwner ? () => setIsEditModalOpen(true) : undefined}
+                  onClick={(isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified) ? () => setIsEditModalOpen(true) : undefined}
                 >
                   {artist.artistName}
                 </h1>

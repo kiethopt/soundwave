@@ -443,19 +443,6 @@ export const api = {
     deleteGenre: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/genres/${id}`, { method: "DELETE" }, token),
 
-    getCacheStatus: async (token: string) =>
-      fetchWithAuth("/api/admin/system/cache", { method: "GET" }, token),
-
-    updateCacheStatus: async (enabled: boolean, token: string) =>
-      fetchWithAuth(
-        "/api/admin/system/cache",
-        {
-          method: "POST",
-          body: JSON.stringify({ enabled }),
-        },
-        token
-      ),
-
     updateGlobalPlaylist: async (token: string) =>
       fetchWithAuth(
         "/api/admin/playlists/global/update",

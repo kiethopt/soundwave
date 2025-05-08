@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -953,7 +953,7 @@ const getSystemStatus = async () => {
             const model = genAI.getGenerativeModel({ model: modelName });
             await model.countTokens("test");
             statuses.push({
-                name: "Gemini AI (Playlists)",
+                name: "Gemini SDK",
                 status: "Available",
                 message: `API Key valid. Configured model: ${modelName}`,
             });
@@ -961,7 +961,7 @@ const getSystemStatus = async () => {
         catch (error) {
             console.error("[System Status] Gemini AI check failed:", error);
             statuses.push({
-                name: "Gemini AI (Playlists)",
+                name: "Gemini SDK",
                 status: "Issue",
                 message: error.message || "Failed to initialize or connect to Gemini",
             });
@@ -969,9 +969,22 @@ const getSystemStatus = async () => {
     }
     else {
         statuses.push({
-            name: "Gemini AI (Playlists)",
+            name: "Gemini SDK",
             status: "Disabled",
             message: "GEMINI_API_KEY not set",
+        });
+    }
+    const acrHost = process.env.ACRCLOUD_HOST;
+    const acrKey = process.env.ACRCLOUD_ACCESS_KEY;
+    const acrSecret = process.env.ACRCLOUD_ACCESS_SECRET;
+    if (acrHost && acrKey && acrSecret) {
+        statuses.push({ name: "ACRCloud (Copyright Check)", status: "Available", message: "SDK configured with credentials." });
+    }
+    else {
+        statuses.push({
+            name: "ACRCloud (Copyright Check)",
+            status: "Disabled",
+            message: "ACRCloud credentials not set in .env",
         });
     }
     if (email_service_1.transporter) {
@@ -1007,22 +1020,6 @@ const getSystemStatus = async () => {
     return statuses;
 };
 exports.getSystemStatus = getSystemStatus;
-const getCacheStatus = async () => {
-    const useCache = process.env.USE_REDIS_CACHE === "true";
-    let redisConnected = false;
-    if (cache_middleware_1.client && cache_middleware_1.client.isOpen) {
-        try {
-            await cache_middleware_1.client.ping();
-            redisConnected = true;
-        }
-        catch (error) {
-            console.error("Redis ping failed:", error);
-            redisConnected = false;
-        }
-    }
-    return { enabled: useCache && redisConnected };
-};
-exports.getCacheStatus = getCacheStatus;
 const getAIModelStatus = async () => {
     const currentModel = process.env.GEMINI_MODEL || "gemini-2.0-flash";
     return {
@@ -1031,69 +1028,11 @@ const getAIModelStatus = async () => {
     };
 };
 exports.getAIModelStatus = getAIModelStatus;
-const updateCacheStatus = async (enabled) => {
-    try {
-        const envPath = process.env.NODE_ENV === "production"
-            ? path.resolve(process.cwd(), "../.env")
-            : path.resolve(process.cwd(), ".env");
-        if (!fs.existsSync(envPath)) {
-            console.error(`.env file not found at ${envPath}`);
-            throw new Error("Environment file not found.");
-        }
-        const currentStatus = process.env.USE_REDIS_CACHE === "true";
-        if (enabled === undefined) {
-            return { enabled: currentStatus };
-        }
-        if (enabled === currentStatus) {
-            console.log(`[Redis] Cache status already ${enabled ? "enabled" : "disabled"}. No change needed.`);
-            return { enabled };
-        }
-        let envContent = fs.readFileSync(envPath, "utf8");
-        const regex = /USE_REDIS_CACHE=.*/;
-        const newLine = `USE_REDIS_CACHE=${enabled}`;
-        if (envContent.match(regex)) {
-            envContent = envContent.replace(regex, newLine);
-        }
-        else {
-            envContent += `
-${newLine}`;
-        }
-        fs.writeFileSync(envPath, envContent);
-        process.env.USE_REDIS_CACHE = String(enabled);
-        console.log(`[Redis] Cache ${enabled ? "enabled" : "disabled"}. Restart might be required for full effect.`);
-        const { client: dynamicRedisClient, } = require("../middleware/cache.middleware");
-        if (enabled && dynamicRedisClient && !dynamicRedisClient.isOpen) {
-            try {
-                await dynamicRedisClient.connect();
-                console.log("[Redis] Connected successfully.");
-            }
-            catch (connectError) {
-                console.error("[Redis] Failed to connect after enabling:", connectError);
-            }
-        }
-        else if (!enabled && dynamicRedisClient && dynamicRedisClient.isOpen) {
-            try {
-                await dynamicRedisClient.disconnect();
-                console.log("[Redis] Disconnected successfully.");
-            }
-            catch (disconnectError) {
-                console.error("[Redis] Failed to disconnect after disabling:", disconnectError);
-            }
-        }
-        return { enabled };
-    }
-    catch (error) {
-        console.error("Error updating cache status:", error);
-        const currentStatusAfterError = process.env.USE_REDIS_CACHE === "true";
-        throw new Error(`Failed to update cache status. Current status: ${currentStatusAfterError}`);
-    }
-};
-exports.updateCacheStatus = updateCacheStatus;
 const updateAIModel = async (model) => {
     try {
         const validModels = [
             "gemini-2.5-flash-preview-04-17",
-            "gemini-2.5-pro-preview-03-25",
+            "gemini-2.5-pro-preview-05-06",
             "gemini-2.0-flash",
             "gemini-2.0-flash-lite",
             "gemini-1.5-flash",
@@ -1474,22 +1413,44 @@ async function convertMp3BufferToPcmF32(audioBuffer) {
             console.error("MP3 Decoding errors:", decoded.errors);
             return null;
         }
-        if (decoded.channelData.length > 1) {
-            const leftChannel = decoded.channelData[0];
-            const rightChannel = decoded.channelData[1];
-            const monoChannel = new Float32Array(leftChannel.length);
-            for (let i = 0; i < leftChannel.length; i++) {
-                monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
-            }
-            return monoChannel;
-        }
-        else if (decoded.channelData.length === 1) {
-            return decoded.channelData[0];
-        }
-        else {
+        if (!decoded.channelData || decoded.channelData.length === 0) {
             console.error("MP3 Decoding produced no channel data.");
             return null;
         }
+        const originalSampleRate = decoded.sampleRate;
+        console.log(`Original audio sample rate: ${originalSampleRate} Hz`);
+        let monoChannel;
+        if (decoded.channelData.length > 1) {
+            const leftChannel = decoded.channelData[0];
+            const rightChannel = decoded.channelData[1];
+            monoChannel = new Float32Array(leftChannel.length);
+            for (let i = 0; i < leftChannel.length; i++) {
+                monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+            }
+        }
+        else {
+            monoChannel = decoded.channelData[0];
+        }
+        if (originalSampleRate === 44100) {
+            console.log("Audio already at 44100 Hz, no resampling needed");
+            return monoChannel;
+        }
+        console.log(`Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`);
+        const targetSampleRate = 44100;
+        const resampleRatio = targetSampleRate / originalSampleRate;
+        const resampledLength = Math.floor(monoChannel.length * resampleRatio);
+        const resampledBuffer = new Float32Array(resampledLength);
+        for (let i = 0; i < resampledLength; i++) {
+            const originalPos = i / resampleRatio;
+            const originalPosFloor = Math.floor(originalPos);
+            const originalPosCeil = Math.min(originalPosFloor + 1, monoChannel.length - 1);
+            const fraction = originalPos - originalPosFloor;
+            resampledBuffer[i] =
+                monoChannel[originalPosFloor] * (1 - fraction) +
+                    monoChannel[originalPosCeil] * fraction;
+        }
+        console.log(`Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`);
+        return resampledBuffer;
     }
     catch (error) {
         console.error("Error during MP3 decoding or processing:", error);
@@ -1583,6 +1544,25 @@ async function determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy,
     }
     if (isVietnameseSong) {
         console.log("Vietnamese song detected");
+        if (key === "F" && scale === "minor") {
+            console.log("Detected Vietnamese song in F minor - applying ballad/pop genres");
+            const balladId = genreMap.get("ballad");
+            if (balladId) {
+                selectedGenres.push(balladId);
+                console.log("Added: Ballad (F minor key)");
+            }
+            const popId = genreMap.get("pop");
+            if (popId && !selectedGenres.includes(popId)) {
+                selectedGenres.push(popId);
+                console.log("Added: Pop");
+            }
+            const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+            if (vPopId && !selectedGenres.includes(vPopId)) {
+                selectedGenres.push(vPopId);
+                console.log("Added: V-Pop");
+            }
+            return selectedGenres.slice(0, 3);
+        }
         const vPopId = genreMap.get("v-pop") ||
             genreMap.get("vietnamese pop") ||
             genreMap.get("pop");
@@ -1769,76 +1749,97 @@ const processBulkUpload = async (files) => {
             let scale = null;
             let danceability = null;
             let energy = null;
+            let confidence = null;
             try {
                 const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
                 if (pcmF32) {
                     const essentia = new essentia_js_1.Essentia(essentia_js_1.EssentiaWASM);
                     const audioVector = essentia.arrayToVector(pcmF32);
                     console.log("PCM length:", pcmF32.length);
-                    const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
-                    const sampleRate = metadata.format.sampleRate || 44100;
                     try {
-                        const rhythmResult = essentia.RhythmExtractor2013(audioVector, sampleRate);
-                        let rawTempo = rhythmResult.bpm;
-                        console.log("RhythmExtractor2013 BPM:", rawTempo, "Confidence:", rhythmResult.confidence);
-                        let percivalTempo = null;
-                        if (rhythmResult.confidence < 3) {
+                        const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+                        const targetSampleRate = 44100;
+                        try {
+                            const rhythmResult = essentia.RhythmExtractor2013(audioVector, targetSampleRate);
+                            let rawTempo = rhythmResult.bpm;
+                            confidence = rhythmResult.confidence || null;
+                            console.log("RhythmExtractor2013 BPM:", rawTempo, "Confidence:", confidence);
+                            let percivalTempo = null;
+                            if (confidence === null || confidence < 3) {
+                                try {
+                                    const percivalResult = essentia.PercivalBpmEstimator(audioVector);
+                                    percivalTempo = percivalResult.bpm;
+                                    console.log("PercivalBpmEstimator BPM:", percivalTempo);
+                                    if (Math.abs(rawTempo - percivalTempo) < 10) {
+                                        rawTempo = (rawTempo + percivalTempo) / 2;
+                                        console.log("Averaged tempo from two estimators:", rawTempo);
+                                    }
+                                    else if (confidence !== null && confidence < 1) {
+                                        rawTempo = percivalTempo;
+                                        console.log("Using Percival tempo due to very low confidence:", rawTempo);
+                                    }
+                                    else if (Math.abs(Math.round(percivalTempo) % 10) <
+                                        Math.abs(Math.round(rawTempo) % 10)) {
+                                        rawTempo = percivalTempo;
+                                        console.log("Using Percival tempo as it matches common BPM patterns better:", rawTempo);
+                                    }
+                                }
+                                catch (percivalError) {
+                                    console.error("Error estimating tempo with PercivalBpmEstimator:", percivalError);
+                                }
+                            }
+                            tempo = Math.round(rawTempo);
+                            if (tempo < 60 || tempo > 200) {
+                                console.warn(`Unusual tempo detected: ${tempo}. Applying sanity check.`);
+                                if (percivalTempo !== null &&
+                                    percivalTempo >= 60 &&
+                                    percivalTempo <= 200) {
+                                    tempo = Math.round(percivalTempo);
+                                    console.log("Using percival tempo as primary was out of expected range:", tempo);
+                                }
+                            }
+                            else if (percivalTempo !== null) {
+                                const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
+                                if (percentDiff > 0.08 && percentDiff < 0.12) {
+                                    console.log(`Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(2)}`);
+                                    if (percivalTempo > 110 &&
+                                        percivalTempo < 125 &&
+                                        percivalTempo > tempo) {
+                                        tempo = Math.round(percivalTempo);
+                                        console.log(`Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`);
+                                    }
+                                    else if (percivalTempo > 100 &&
+                                        percivalTempo < 115 &&
+                                        percivalTempo > tempo) {
+                                        tempo = Math.round(percivalTempo);
+                                        console.log(`Corrected BPM to ${tempo} - likely in 100-115 BPM range`);
+                                    }
+                                }
+                            }
+                        }
+                        catch (tempoError) {
+                            console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
                             try {
-                                const percivalResult = essentia.PercivalBpmEstimator(audioVector);
-                                percivalTempo = percivalResult.bpm;
-                                console.log("PercivalBpmEstimator BPM:", percivalTempo);
-                                if (Math.abs(rawTempo - percivalTempo) < 10) {
-                                    rawTempo = (rawTempo + percivalTempo) / 2;
-                                    console.log("Averaged tempo from two estimators:", rawTempo);
-                                }
-                                else if (Math.abs(Math.round(percivalTempo) % 10) <
-                                    Math.abs(Math.round(rawTempo) % 10)) {
-                                    rawTempo = percivalTempo;
-                                    console.log("Using Percival tempo as it matches common BPM patterns better:", rawTempo);
-                                }
+                                const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                                tempo = Math.round(tempoResult.bpm);
+                                console.log("PercivalBpmEstimator BPM (fallback):", tempoResult.bpm);
                             }
-                            catch (percivalError) {
-                                console.error("Error estimating tempo with PercivalBpmEstimator:", percivalError);
-                            }
-                        }
-                        tempo = Math.round(rawTempo);
-                        if (tempo < 60 || tempo > 200) {
-                            console.warn(`Unusual tempo detected: ${tempo}. Applying sanity check.`);
-                            if (percivalTempo !== null &&
-                                percivalTempo >= 60 &&
-                                percivalTempo <= 200) {
-                                tempo = Math.round(percivalTempo);
-                                console.log("Using percival tempo as primary was out of expected range:", tempo);
-                            }
-                        }
-                        else if (percivalTempo !== null) {
-                            const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
-                            if (percentDiff > 0.08 && percentDiff < 0.12) {
-                                console.log(`Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(2)}`);
-                                if (percivalTempo > 110 &&
-                                    percivalTempo < 125 &&
-                                    percivalTempo > tempo) {
-                                    tempo = Math.round(percivalTempo);
-                                    console.log(`Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`);
-                                }
-                                else if (percivalTempo > 100 &&
-                                    percivalTempo < 115 &&
-                                    percivalTempo > tempo) {
-                                    tempo = Math.round(percivalTempo);
-                                    console.log(`Corrected BPM to ${tempo} - likely in 100-115 BPM range`);
-                                }
+                            catch (fallbackError) {
+                                console.error("Error estimating tempo with PercivalBpmEstimator fallback:", fallbackError);
+                                tempo = null;
                             }
                         }
                     }
-                    catch (tempoError) {
-                        console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
+                    catch (metadataError) {
+                        console.error("Error getting sample rate from metadata:", metadataError);
                         try {
                             const tempoResult = essentia.PercivalBpmEstimator(audioVector);
                             tempo = Math.round(tempoResult.bpm);
-                            console.log("PercivalBpmEstimator BPM:", tempoResult.bpm);
+                            console.log("PercivalBpmEstimator BPM (no sample rate):", tempo);
                         }
                         catch (fallbackError) {
-                            console.error("Error estimating tempo with PercivalBpmEstimator:", fallbackError);
+                            console.error("Fallback tempo estimation failed:", fallbackError);
+                            tempo = null;
                         }
                     }
                     try {
@@ -1976,20 +1977,13 @@ const processBulkUpload = async (files) => {
                         else if (isVietnameseSong && isRemix) {
                             console.log("Vietnamese remix detected - using raw key detection without correction");
                         }
-                        else if (rawKey === "F" &&
-                            rawScale === "minor" &&
-                            tempo !== null &&
-                            tempo >= 100 &&
-                            tempo <= 115) {
-                            console.log("Detected potential F minor / A minor confusion in common BPM range (100-115)");
-                            correctedKey = "A";
-                            console.log(`Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`);
-                        }
                         else if (keyResult.strength < 0.6 && keyCorrection[rawKey]) {
                             console.log(`Low confidence key detection, checking for common errors for ${rawKey} ${rawScale}`);
                             try {
-                                const shortSection = pcmF32.length > 30 * sampleRate
-                                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRate)
+                                const metadataForKey = await mm.parseBuffer(file.buffer, file.mimetype);
+                                const sampleRateForKey = metadataForKey.format.sampleRate || 44100;
+                                const shortSection = pcmF32.length > 30 * sampleRateForKey
+                                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRateForKey)
                                     : pcmF32;
                                 const shortVector = essentia.arrayToVector(shortSection);
                                 const secondKeyResult = essentia.KeyExtractor(shortVector);
@@ -2021,6 +2015,37 @@ const processBulkUpload = async (files) => {
             }
             const artistProfile = await getOrCreateVerifiedArtistProfile(derivedArtistName);
             const artistId = artistProfile.id;
+            const existingTrack = await db_1.default.track.findUnique({
+                where: {
+                    title_artistId: {
+                        title: title,
+                        artistId: artistId,
+                    },
+                },
+                select: { id: true, title: true, artist: { select: { artistName: true } } },
+            });
+            if (existingTrack) {
+                console.log(`Duplicate track found: "${existingTrack.title}" by ${existingTrack.artist?.artistName} (ID: ${existingTrack.id}). Skipping creation for file: ${file.originalname}`);
+                results.push({
+                    fileName: file.originalname,
+                    title: title,
+                    artistName: derivedArtistName,
+                    error: `Duplicate: This track already exists (ID: ${existingTrack.id})`,
+                    success: false,
+                    trackId: existingTrack.id,
+                    artistId: artistId,
+                    duration: 0,
+                    audioUrl: '',
+                    coverUrl: undefined,
+                    tempo: null,
+                    mood: null,
+                    key: null,
+                    scale: null,
+                    genreIds: [],
+                    genres: [],
+                });
+                continue;
+            }
             let genreIds = [];
             try {
                 genreIds = await determineGenresFromAudioAnalysis(tempo, mood, key, scale, energy, danceability, duration, title, derivedArtistName);

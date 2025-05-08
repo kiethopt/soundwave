@@ -21,11 +21,9 @@ import {
   ArrowUp,
   ArrowDown,
   Edit,
-  ShieldCheck,
-  ShieldAlert,
   Bot,
   Loader2,
-} from "lucide-react"; // Added Bot icon
+} from "lucide-react";
 import { UserInfoModal } from "@/components/ui/data-table/data-table-modals";
 import {
   EditUserModal,
@@ -743,15 +741,13 @@ export default function AiUserManagementPage() {
               ? {
                   id: deletingUser.id,
                   name: deletingUser.name || deletingUser.username || "user",
+                  email: deletingUser.email,
                 }
               : {
                   id: "bulk-delete-users",
                   name: `${selectedUserIds.size} user(s)`,
+                  email: "",
                 }
-          }
-          isLoading={
-            actionLoading === "bulk-delete" ||
-            (!!deletingUser && actionLoading === deletingUser.id)
           }
         />
       )}
