@@ -1792,24 +1792,60 @@ async function convertMp3BufferToPcmF32(
       return null;
     }
 
-    // Essentia usually works best with mono audio for analysis like BPM.
-    // Let's average the channels if it's stereo.
-    if (decoded.channelData.length > 1) {
-      const leftChannel = decoded.channelData[0];
-      const rightChannel = decoded.channelData[1];
-      const monoChannel = new Float32Array(leftChannel.length);
-      for (let i = 0; i < leftChannel.length; i++) {
-        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
-      }
-      return monoChannel;
-    } else if (decoded.channelData.length === 1) {
-      // Already mono
-      return decoded.channelData[0];
-    } else {
-      // No channel data?
+    // Check if we got valid channel data
+    if (!decoded.channelData || decoded.channelData.length === 0) {
       console.error("MP3 Decoding produced no channel data.");
       return null;
     }
+
+    // Get the original sample rate from the decoded audio
+    const originalSampleRate = decoded.sampleRate;
+    console.log(`Original audio sample rate: ${originalSampleRate} Hz`);
+
+    // Convert to mono by averaging channels if stereo
+    let monoChannel: Float32Array;
+    if (decoded.channelData.length > 1) {
+      const leftChannel = decoded.channelData[0];
+      const rightChannel = decoded.channelData[1];
+      monoChannel = new Float32Array(leftChannel.length);
+      for (let i = 0; i < leftChannel.length; i++) {
+        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+      }
+    } else {
+      // Already mono
+      monoChannel = decoded.channelData[0];
+    }
+
+    // If the sample rate is already 44100, return as is
+    if (originalSampleRate === 44100) {
+      console.log("Audio already at 44100 Hz, no resampling needed");
+      return monoChannel;
+    }
+
+    // Simple linear resampling to 44100 Hz for RhythmExtractor2013
+    // This is a basic implementation - more sophisticated resampling would be better for production
+    console.log(`Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`);
+    const targetSampleRate = 44100;
+    const resampleRatio = targetSampleRate / originalSampleRate;
+    const resampledLength = Math.floor(monoChannel.length * resampleRatio);
+    const resampledBuffer = new Float32Array(resampledLength);
+
+    for (let i = 0; i < resampledLength; i++) {
+      // Calculate the position in the original buffer
+      const originalPos = i / resampleRatio;
+      const originalPosFloor = Math.floor(originalPos);
+      const originalPosCeil = Math.min(originalPosFloor + 1, monoChannel.length - 1);
+      const fraction = originalPos - originalPosFloor;
+
+      // Linear interpolation between the two closest samples
+      resampledBuffer[i] = 
+        monoChannel[originalPosFloor] * (1 - fraction) + 
+        monoChannel[originalPosCeil] * fraction;
+    }
+
+    console.log(`Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`);
+    return resampledBuffer;
+    // Explicit return to satisfy linter - should never reach here due to earlier returns
   } catch (error) {
     console.error("Error during MP3 decoding or processing:", error);
     return null; // Return null if any error occurs
@@ -1945,6 +1981,34 @@ async function determineGenresFromAudioAnalysis(
   // Regular Vietnamese song detection
   if (isVietnameseSong) {
     console.log("Vietnamese song detected");
+
+    // Handle F minor key specifically for Vietnamese songs (ballads/bolero)
+    if (key === "F" && scale === "minor") {
+      console.log("Detected Vietnamese song in F minor - applying ballad/pop genres");
+      
+      // Try to add ballad genre first
+      const balladId = genreMap.get("ballad");
+      if (balladId) {
+        selectedGenres.push(balladId);
+        console.log("Added: Ballad (F minor key)");
+      }
+      
+      // Add pop genre
+      const popId = genreMap.get("pop");
+      if (popId && !selectedGenres.includes(popId)) {
+        selectedGenres.push(popId);
+        console.log("Added: Pop");
+      }
+      
+      // Add v-pop or bolero genre as third option
+      const vPopId = genreMap.get("v-pop") || genreMap.get("vietnamese pop");
+      if (vPopId && !selectedGenres.includes(vPopId)) {
+        selectedGenres.push(vPopId);
+        console.log("Added: V-Pop");
+      }
+      
+      return selectedGenres.slice(0, 3);
+    }
 
     const vPopId =
       genreMap.get("v-pop") ||
@@ -2198,6 +2262,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       let scale: string | null = null;
       let danceability: number | null = null;
       let energy: number | null = null;
+      let confidence: number | null = null;
 
       try {
         const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
@@ -2210,127 +2275,155 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           console.log("PCM length:", pcmF32.length);
 
           // Get sample rate from metadata
-          const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
-          const sampleRate = metadata.format.sampleRate || 44100;
-
-          // Try RhythmExtractor2013 for more robust BPM
           try {
-            const rhythmResult = essentia.RhythmExtractor2013(
-              audioVector,
-              sampleRate
-            );
-            let rawTempo = rhythmResult.bpm;
-            console.log(
-              "RhythmExtractor2013 BPM:",
-              rawTempo,
-              "Confidence:",
-              rhythmResult.confidence
-            );
+            const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+            // RhythmExtractor2013 specifically requires 44100 Hz
+            const targetSampleRate = 44100;
 
-            // Get a second tempo estimation if confidence is low
-            let percivalTempo = null;
-            if (rhythmResult.confidence < 3) {
-              try {
-                const percivalResult =
-                  essentia.PercivalBpmEstimator(audioVector);
-                percivalTempo = percivalResult.bpm;
-                console.log("PercivalBpmEstimator BPM:", percivalTempo);
-
-                // If the tempos are close, average them for better accuracy
-                if (Math.abs(rawTempo - percivalTempo) < 10) {
-                  rawTempo = (rawTempo + percivalTempo) / 2;
-                  console.log("Averaged tempo from two estimators:", rawTempo);
-                }
-                // If the estimations are significantly different, go with Percival if it's a more common tempo value
-                else if (
-                  Math.abs(Math.round(percivalTempo) % 10) <
-                  Math.abs(Math.round(rawTempo) % 10)
-                ) {
-                  rawTempo = percivalTempo;
-                  console.log(
-                    "Using Percival tempo as it matches common BPM patterns better:",
-                    rawTempo
-                  );
-                }
-              } catch (percivalError) {
-                console.error(
-                  "Error estimating tempo with PercivalBpmEstimator:",
-                  percivalError
-                );
-              }
-            }
-
-            // Round to nearest whole number
-            tempo = Math.round(rawTempo);
-
-            // Last validation against typical ranges
-            if (tempo < 60 || tempo > 200) {
-              console.warn(
-                `Unusual tempo detected: ${tempo}. Applying sanity check.`
+            // Try RhythmExtractor2013 for more robust BPM
+            try {
+              const rhythmResult = essentia.RhythmExtractor2013(
+                audioVector,
+                targetSampleRate // Always use 44100 Hz with RhythmExtractor2013
               );
-              // If we have a backup from Percival and it's more reasonable, use it
-              if (
-                percivalTempo !== null &&
-                percivalTempo >= 60 &&
-                percivalTempo <= 200
-              ) {
-                tempo = Math.round(percivalTempo);
-                console.log(
-                  "Using percival tempo as primary was out of expected range:",
-                  tempo
-                );
+              let rawTempo = rhythmResult.bpm;
+              confidence = rhythmResult.confidence || null;
+              console.log(
+                "RhythmExtractor2013 BPM:",
+                rawTempo,
+                "Confidence:",
+                confidence
+              );
+
+              // Get a second tempo estimation if confidence is low
+              let percivalTempo = null;
+              if (confidence === null || confidence < 3) {
+                try {
+                  const percivalResult =
+                    essentia.PercivalBpmEstimator(audioVector);
+                  percivalTempo = percivalResult.bpm;
+                  console.log("PercivalBpmEstimator BPM:", percivalTempo);
+
+                  // If the tempos are close, average them for better accuracy
+                  if (Math.abs(rawTempo - percivalTempo) < 10) {
+                    rawTempo = (rawTempo + percivalTempo) / 2;
+                    console.log("Averaged tempo from two estimators:", rawTempo);
+                  }
+                  // If confidence is very low, prefer Percival result
+                  else if (confidence !== null && confidence < 1) {
+                    rawTempo = percivalTempo;
+                    console.log(
+                      "Using Percival tempo due to very low confidence:",
+                      rawTempo
+                    );
+                  }
+                  // If the estimations are significantly different, go with Percival if it's a more common tempo value
+                  else if (
+                    Math.abs(Math.round(percivalTempo) % 10) <
+                    Math.abs(Math.round(rawTempo) % 10)
+                  ) {
+                    rawTempo = percivalTempo;
+                    console.log(
+                      "Using Percival tempo as it matches common BPM patterns better:",
+                      rawTempo
+                    );
+                  }
+                } catch (percivalError) {
+                  console.error(
+                    "Error estimating tempo with PercivalBpmEstimator:",
+                    percivalError
+                  );
+                }
               }
-            }
-            // Check for common BPM detection errors - often off by ~10%
-            else if (percivalTempo !== null) {
-              const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
 
-              // If there's a significant difference (~9-11%) between methods
-              if (percentDiff > 0.08 && percentDiff < 0.12) {
-                console.log(
-                  `Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(
-                    2
-                  )}`
+              // Round to nearest whole number
+              tempo = Math.round(rawTempo);
+
+              // Last validation against typical ranges
+              if (tempo < 60 || tempo > 200) {
+                console.warn(
+                  `Unusual tempo detected: ${tempo}. Applying sanity check.`
                 );
-
-                // For indie/pop songs, prefer the higher BPM if it's between 110-125
+                // If we have a backup from Percival and it's more reasonable, use it
                 if (
-                  percivalTempo > 110 &&
-                  percivalTempo < 125 &&
-                  percivalTempo > tempo
+                  percivalTempo !== null &&
+                  percivalTempo >= 60 &&
+                  percivalTempo <= 200
                 ) {
                   tempo = Math.round(percivalTempo);
                   console.log(
-                    `Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`
-                  );
-                }
-                // For songs around 100-114 BPM, also prefer higher tempo
-                else if (
-                  percivalTempo > 100 &&
-                  percivalTempo < 115 &&
-                  percivalTempo > tempo
-                ) {
-                  tempo = Math.round(percivalTempo);
-                  console.log(
-                    `Corrected BPM to ${tempo} - likely in 100-115 BPM range`
+                    "Using percival tempo as primary was out of expected range:",
+                    tempo
                   );
                 }
               }
+              // Check for common BPM detection errors - often off by ~10%
+              else if (percivalTempo !== null) {
+                const percentDiff = Math.abs(tempo - percivalTempo) / tempo;
+
+                // If there's a significant difference (~9-11%) between methods
+                if (percentDiff > 0.08 && percentDiff < 0.12) {
+                  console.log(
+                    `Detected possible BPM harmonic error (${tempo} vs ${percivalTempo}), percentDiff: ${percentDiff.toFixed(
+                      2
+                    )}`
+                  );
+
+                  // For indie/pop songs, prefer the higher BPM if it's between 110-125
+                  if (
+                    percivalTempo > 110 &&
+                    percivalTempo < 125 &&
+                    percivalTempo > tempo
+                  ) {
+                    tempo = Math.round(percivalTempo);
+                    console.log(
+                      `Corrected BPM to ${tempo} - likely indie/pop song in 110-125 BPM range`
+                    );
+                  }
+                  // For songs around 100-114 BPM, also prefer higher tempo
+                  else if (
+                    percivalTempo > 100 &&
+                    percivalTempo < 115 &&
+                    percivalTempo > tempo
+                  ) {
+                    tempo = Math.round(percivalTempo);
+                    console.log(
+                      `Corrected BPM to ${tempo} - likely in 100-115 BPM range`
+                    );
+                  }
+                }
+              }
+            } catch (tempoError) {
+              console.error(
+                "Error estimating tempo with RhythmExtractor2013:",
+                tempoError
+              );
+              // Fallback to PercivalBpmEstimator if RhythmExtractor2013 fails
+              try {
+                const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+                tempo = Math.round(tempoResult.bpm);
+                console.log("PercivalBpmEstimator BPM (fallback):", tempoResult.bpm);
+              } catch (fallbackError) {
+                console.error(
+                  "Error estimating tempo with PercivalBpmEstimator fallback:",
+                  fallbackError
+                );
+                tempo = null;
+              }
             }
-          } catch (tempoError) {
-            console.error(
-              "Error estimating tempo with RhythmExtractor2013:",
-              tempoError
-            );
+          } catch (metadataError) {
+            console.error("Error getting sample rate from metadata:", metadataError);
+            // If we can't get the sample rate, try PercivalBpmEstimator which doesn't require it
             try {
               const tempoResult = essentia.PercivalBpmEstimator(audioVector);
               tempo = Math.round(tempoResult.bpm);
-              console.log("PercivalBpmEstimator BPM:", tempoResult.bpm);
+              console.log("PercivalBpmEstimator BPM (no sample rate):", tempo);
             } catch (fallbackError) {
               console.error(
-                "Error estimating tempo with PercivalBpmEstimator:",
+                "Fallback tempo estimation failed:",
                 fallbackError
               );
+              tempo = null;
             }
           }
 
@@ -2554,21 +2647,22 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               // No correction for remixes since they may have intentional key changes
             }
             // Special case for common A minor / F minor confusion with pop/rock songs
-            else if (
-              rawKey === "F" &&
-              rawScale === "minor" &&
-              tempo !== null &&
-              tempo >= 100 &&
-              tempo <= 115
-            ) {
-              console.log(
-                "Detected potential F minor / A minor confusion in common BPM range (100-115)"
-              );
-              correctedKey = "A"; // Prefer A minor in this range, especially for pop/rock songs
-              console.log(
-                `Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`
-              );
-            }
+            // REMOVED: This was causing incorrect key changes from F minor to A minor
+            // else if (
+            //   rawKey === "F" &&
+            //   rawScale === "minor" &&
+            //   tempo !== null &&
+            //   tempo >= 100 &&
+            //   tempo <= 115
+            // ) {
+            //   console.log(
+            //     "Detected potential F minor / A minor confusion in common BPM range (100-115)"
+            //   );
+            //   correctedKey = "A"; // Prefer A minor in this range, especially for pop/rock songs
+            //   console.log(
+            //     `Corrected key from ${rawKey} to ${correctedKey} based on common A minor / F minor confusion`
+            //   );
+            // }
             // If we have a specific correction and low confidence, do deeper analysis
             else if (keyResult.strength < 0.6 && keyCorrection[rawKey]) {
               console.log(
@@ -2577,10 +2671,14 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
 
               // Try alternate key detection method for validation
               try {
+                // Get the sample rate for section calculation
+                const metadataForKey = await mm.parseBuffer(file.buffer, file.mimetype);
+                const sampleRateForKey = metadataForKey.format.sampleRate || 44100;
+                
                 // Run further analysis on first ~30 seconds which often provides better results
                 const shortSection =
-                  pcmF32.length > 30 * sampleRate
-                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRate)
+                  pcmF32.length > 30 * sampleRateForKey
+                    ? new Float32Array(pcmF32.buffer, 0, 30 * sampleRateForKey)
                     : pcmF32;
 
                 const shortVector = essentia.arrayToVector(shortSection);
