@@ -6,10 +6,6 @@ import { api } from "@/utils/api";
 import { Track, Playlist } from "@/types";
 import {
   ArrowLeft,
-  ChevronRight,
-  Heart,
-  MoreHorizontal,
-  Share2,
   Flag,
 } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
@@ -23,11 +19,6 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { AddSimple } from "@/components/ui/Icons";
-import { Spinner } from "@/components/ui/Spinner";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { toast } from "react-hot-toast";
 
 export default function TrackDetailPage() {
   const params = useParams();

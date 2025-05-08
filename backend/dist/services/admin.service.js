@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -953,7 +953,7 @@ const getSystemStatus = async () => {
             const model = genAI.getGenerativeModel({ model: modelName });
             await model.countTokens("test");
             statuses.push({
-                name: "Gemini AI (Playlists)",
+                name: "Gemini SDK",
                 status: "Available",
                 message: `API Key valid. Configured model: ${modelName}`,
             });
@@ -961,7 +961,7 @@ const getSystemStatus = async () => {
         catch (error) {
             console.error("[System Status] Gemini AI check failed:", error);
             statuses.push({
-                name: "Gemini AI (Playlists)",
+                name: "Gemini SDK",
                 status: "Issue",
                 message: error.message || "Failed to initialize or connect to Gemini",
             });
@@ -969,9 +969,22 @@ const getSystemStatus = async () => {
     }
     else {
         statuses.push({
-            name: "Gemini AI (Playlists)",
+            name: "Gemini SDK",
             status: "Disabled",
             message: "GEMINI_API_KEY not set",
+        });
+    }
+    const acrHost = process.env.ACRCLOUD_HOST;
+    const acrKey = process.env.ACRCLOUD_ACCESS_KEY;
+    const acrSecret = process.env.ACRCLOUD_ACCESS_SECRET;
+    if (acrHost && acrKey && acrSecret) {
+        statuses.push({ name: "ACRCloud (Copyright Check)", status: "Available", message: "SDK configured with credentials." });
+    }
+    else {
+        statuses.push({
+            name: "ACRCloud (Copyright Check)",
+            status: "Disabled",
+            message: "ACRCloud credentials not set in .env",
         });
     }
     if (email_service_1.transporter) {
@@ -1007,22 +1020,6 @@ const getSystemStatus = async () => {
     return statuses;
 };
 exports.getSystemStatus = getSystemStatus;
-const getCacheStatus = async () => {
-    const useCache = process.env.USE_REDIS_CACHE === "true";
-    let redisConnected = false;
-    if (cache_middleware_1.client && cache_middleware_1.client.isOpen) {
-        try {
-            await cache_middleware_1.client.ping();
-            redisConnected = true;
-        }
-        catch (error) {
-            console.error("Redis ping failed:", error);
-            redisConnected = false;
-        }
-    }
-    return { enabled: useCache && redisConnected };
-};
-exports.getCacheStatus = getCacheStatus;
 const getAIModelStatus = async () => {
     const currentModel = process.env.GEMINI_MODEL || "gemini-2.0-flash";
     return {
@@ -1031,69 +1028,11 @@ const getAIModelStatus = async () => {
     };
 };
 exports.getAIModelStatus = getAIModelStatus;
-const updateCacheStatus = async (enabled) => {
-    try {
-        const envPath = process.env.NODE_ENV === "production"
-            ? path.resolve(process.cwd(), "../.env")
-            : path.resolve(process.cwd(), ".env");
-        if (!fs.existsSync(envPath)) {
-            console.error(`.env file not found at ${envPath}`);
-            throw new Error("Environment file not found.");
-        }
-        const currentStatus = process.env.USE_REDIS_CACHE === "true";
-        if (enabled === undefined) {
-            return { enabled: currentStatus };
-        }
-        if (enabled === currentStatus) {
-            console.log(`[Redis] Cache status already ${enabled ? "enabled" : "disabled"}. No change needed.`);
-            return { enabled };
-        }
-        let envContent = fs.readFileSync(envPath, "utf8");
-        const regex = /USE_REDIS_CACHE=.*/;
-        const newLine = `USE_REDIS_CACHE=${enabled}`;
-        if (envContent.match(regex)) {
-            envContent = envContent.replace(regex, newLine);
-        }
-        else {
-            envContent += `
-${newLine}`;
-        }
-        fs.writeFileSync(envPath, envContent);
-        process.env.USE_REDIS_CACHE = String(enabled);
-        console.log(`[Redis] Cache ${enabled ? "enabled" : "disabled"}. Restart might be required for full effect.`);
-        const { client: dynamicRedisClient, } = require("../middleware/cache.middleware");
-        if (enabled && dynamicRedisClient && !dynamicRedisClient.isOpen) {
-            try {
-                await dynamicRedisClient.connect();
-                console.log("[Redis] Connected successfully.");
-            }
-            catch (connectError) {
-                console.error("[Redis] Failed to connect after enabling:", connectError);
-            }
-        }
-        else if (!enabled && dynamicRedisClient && dynamicRedisClient.isOpen) {
-            try {
-                await dynamicRedisClient.disconnect();
-                console.log("[Redis] Disconnected successfully.");
-            }
-            catch (disconnectError) {
-                console.error("[Redis] Failed to disconnect after disabling:", disconnectError);
-            }
-        }
-        return { enabled };
-    }
-    catch (error) {
-        console.error("Error updating cache status:", error);
-        const currentStatusAfterError = process.env.USE_REDIS_CACHE === "true";
-        throw new Error(`Failed to update cache status. Current status: ${currentStatusAfterError}`);
-    }
-};
-exports.updateCacheStatus = updateCacheStatus;
 const updateAIModel = async (model) => {
     try {
         const validModels = [
             "gemini-2.5-flash-preview-04-17",
-            "gemini-2.5-pro-preview-03-25",
+            "gemini-2.5-pro-preview-05-06",
             "gemini-2.0-flash",
             "gemini-2.0-flash-lite",
             "gemini-1.5-flash",

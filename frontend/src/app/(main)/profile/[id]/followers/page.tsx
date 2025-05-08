@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { User } from "@/types";
 import Image from "next/image";
-import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
+import Link from "next/link"
 
 const DEFAULT_AVATAR = "/images/default-avatar.jpg";
 
@@ -17,7 +16,6 @@ export default function UserFollowersPage({
 }) {
   const router = useRouter();
   const { id } = use(params);
-  const { userData, isAuthenticated } = useAuth();
   const [follower, setFollower] = useState<User[]>([]);
 
   useEffect(() => {

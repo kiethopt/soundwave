@@ -109,30 +109,10 @@ export const TrackDetailsModal: React.FC<TrackDetailsModalProps> = ({
             result.track.genres !== undefined
               ? result.track.genres
               : currentTrack.genres,
-          filePath:
-            result.track.filePath !== undefined
-              ? result.track.filePath
-              : currentTrack.filePath,
-          status:
-            result.track.status !== undefined
-              ? result.track.status
-              : currentTrack.status,
-          privacy:
-            result.track.privacy !== undefined
-              ? result.track.privacy
-              : currentTrack.privacy,
           playCount:
             result.track.playCount !== undefined
               ? result.track.playCount
               : currentTrack.playCount,
-          isExplicit:
-            result.track.isExplicit !== undefined
-              ? result.track.isExplicit
-              : currentTrack.isExplicit,
-          uploadedById:
-            result.track.uploadedById !== undefined
-              ? result.track.uploadedById
-              : currentTrack.uploadedById,
           artist:
             result.track.artist !== undefined
               ? result.track.artist

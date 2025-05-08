@@ -5,12 +5,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 import toast from 'react-hot-toast';
 import {
   Settings,
-  RefreshCw,
-  Database,
-  Server,
   Bot,
   AlertCircle,
   Loader2,
+  Server,
 } from 'lucide-react';
 import {
   Card,
@@ -19,10 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { SystemSettings, SystemComponentStatus } from '@/types';
 import { api } from '@/utils/api';
 import {
@@ -55,9 +50,8 @@ export default function SystemManagementPage() {
         if (!token) return;
 
         // Fetch settings and system status
-        const [cacheResponse, aiModelResponse, statusResponse] =
+        const [aiModelResponse, statusResponse] =
           await Promise.all([
-            api.admin.getCacheStatus(token),
             api.admin.getAIModelStatus(token),
             api.admin.getSystemStatus(token),
           ]);
@@ -67,7 +61,6 @@ export default function SystemManagementPage() {
         setSettings((prev) => {
           const newState = {
             ...prev,
-            cacheEnabled: cacheResponse.enabled,
             aiModel: aiModelResponse.data?.model || '',
             supportedAIModels: aiModelResponse.data?.validModels || [],
           };
@@ -102,10 +95,7 @@ export default function SystemManagementPage() {
         return;
       }
 
-      if (key === 'cacheEnabled') {
-        await api.admin.updateCacheStatus(value, token);
-        toast.success('Cache settings updated successfully');
-      } else if (key === 'aiModel') {
+      if (key === 'aiModel') {
         await api.admin.updateAIModelStatus(value, token);
         toast.success('AI model updated successfully');
       }
@@ -146,7 +136,7 @@ export default function SystemManagementPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* System Status Card - NEW */}
           <Card
-            className={`md:col-span-2 ${theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'}`}
+            className={`${theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'}`}
           >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -178,77 +168,6 @@ export default function SystemManagementPage() {
                   System status information is unavailable.
                 </p>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Cache Management Card */}
-          <Card
-            className={
-              theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            }
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-blue-500" />
-                Cache Management
-              </CardTitle>
-              <CardDescription>
-                Configure system caching behavior
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Enable Caching</Label>
-                  <p
-                    className={`text-sm ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                    }`}
-                  >
-                    Improves performance by storing frequently accessed data
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.cacheEnabled}
-                  onCheckedChange={(checked) =>
-                    updateSetting('cacheEnabled', checked)
-                  }
-                />
-              </div>
-
-              {/* Add Status Text */}
-              <div className="text-sm flex items-center gap-1.5">
-                <span className="font-medium">Status:</span>
-                <span
-                  className={settings.cacheEnabled ? 'text-green-600' : 'text-red-600'}
-                >
-                  {settings.cacheEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-
-              <Separator
-                className={theme === 'light' ? 'bg-gray-200' : 'bg-gray-700'}
-              />
-
-              <div className="pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
-                  disabled={refreshing === 'cache'}
-                >
-                  {refreshing === 'cache' ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Clearing Cache...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4" />
-                      Clear Cache
-                    </>
-                  )}
-                </Button>
-              </div>
             </CardContent>
           </Card>
 

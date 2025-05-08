@@ -318,9 +318,9 @@ export default function NotificationsPage() {
         let markedAsReadSuccess = true;
         if (!notification.isRead) {
           try {
-            await api.notifications.markNotificationAsRead(
-              token,
-              notification.id
+            await api.notifications.markAsRead(
+              notification.id,
+              token
             );
             setNotifications((prev) =>
               prev.map((n) =>

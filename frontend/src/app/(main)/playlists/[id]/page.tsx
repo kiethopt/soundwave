@@ -979,11 +979,9 @@ export default function PlaylistPage() {
                       playlist.type === "NORMAL"
                     }
                     onRemove={handleRemoveTrack}
-                    requiresAuth={!isAuthenticated}
                     playlists={userPlaylists}
                     favoriteTrackIds={favoriteTrackIds}
                     theme={theme}
-                    // Pass down necessary props for drag-and-drop
                     isDraggable={
                       !!playlist &&
                       playlist.canEdit === true &&

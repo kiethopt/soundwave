@@ -542,20 +542,6 @@ export const getDashboardStats = async (
   }
 };
 
-// Cập nhật trạng thái cache - ADMIN only
-export const handleCacheStatus = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { enabled } = req.method === "POST" ? req.body : {};
-    const result = await adminService.updateCacheStatus(enabled);
-    res.json(result);
-  } catch (error) {
-    handleError(res, error, "Manage cache status");
-  }
-};
-
 // Lấy và cập nhật trạng thái model AI - ADMIN only
 export const handleAIModelStatus = async (
   req: Request,
