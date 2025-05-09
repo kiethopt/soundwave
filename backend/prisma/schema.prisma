@@ -456,12 +456,11 @@ model LabelRegistrationRequest {
 }
 
 model ArtistRequest {
-  id                        String        @id @default(cuid())
+  id                        String        @id @default(cuid())  
   artistName                String
   bio                       String?       @db.Text
   avatarUrl                 String?
   socialMediaLinks          Json?
-  idVerificationDocumentUrl String?
   requestedGenres           String[]      @default([])
   status                    RequestStatus @default(PENDING)
   rejectionReason           String?       @db.Text
