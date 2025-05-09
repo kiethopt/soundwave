@@ -622,7 +622,6 @@ const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDoc
             bio: bio?.trim(),
             avatarUrl: avatarUrl,
             socialMediaLinks: socialMediaLinksJson || client_1.Prisma.JsonNull,
-            idVerificationDocumentUrl: idVerificationDocumentUrl,
             requestedGenres: requestedGenresArray,
             requestedLabelName: requestedLabelName?.trim() || null,
             status: client_1.RequestStatus.PENDING,

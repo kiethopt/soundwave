@@ -456,7 +456,7 @@ model LabelRegistrationRequest {
 }
 
 model ArtistRequest {
-  id                        String        @id @default(cuid())
+  id                        String        @id @default(cuid())  
   artistName                String
   bio                       String?       @db.Text
   avatarUrl                 String?

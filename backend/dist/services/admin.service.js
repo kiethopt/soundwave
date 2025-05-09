@@ -208,7 +208,6 @@ const getArtistRequestDetail = async (id) => {
                 rejectionReason: true,
                 socialMediaLinks: true,
                 avatarUrl: true,
-                idVerificationDocumentUrl: true,
                 requestedGenres: true,
                 user: {
                     select: {

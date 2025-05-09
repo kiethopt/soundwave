@@ -224,8 +224,7 @@ async function main() {
           },
           requestedGenres: faker.helpers.arrayElements(genreNames, faker.number.int({ min: 1, max: 3 })),
           status: RequestStatus.PENDING,
-          requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records']),
-          idVerificationDocumentUrl: null,
+          requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records'])
         },
       });
       requestBar.increment();
@@ -349,6 +348,12 @@ async function main() {
             isActive: true,
             type: album.type,
             labelId: null, // Explicitly null for tracks within albums
+            tempo: trackData.tempo || null,
+            mood: trackData.mood || null,
+            key: trackData.key || null,
+            scale: trackData.scale || null,
+            danceability: trackData.danceability || null,
+            energy: trackData.energy || null,
             genres: {
               deleteMany: {},
               create: albumGenreIds.map((genreId) => ({ genreId })), // Inherit genres from album
@@ -368,6 +373,12 @@ async function main() {
             artistId: artistId, // Main artist
             albumId: album.id, // Link to the album
             labelId: null, // Explicitly null for tracks within albums
+            tempo: trackData.tempo || null,
+            mood: trackData.mood || null,
+            key: trackData.key || null,
+            scale: trackData.scale || null,
+            danceability: trackData.danceability || null,
+            energy: trackData.energy || null,
             createdAt: trackCreatedDate, // Created after album release
             updatedAt: trackCreatedDate,
             genres: { create: albumGenreIds.map((genreId) => ({ genreId })) },
@@ -447,6 +458,12 @@ async function main() {
           albumId: null, // Explicitly null for singles
           labelId: singleLabelId,
           playCount: singleData.playCount || 0, // Use the play count from the data
+          tempo: singleData.tempo || null,
+          mood: singleData.mood || null,
+          key: singleData.key || null,
+          scale: singleData.scale || null,
+          danceability: singleData.danceability || null,
+          energy: singleData.energy || null,
           genres: {
             deleteMany: {}, // Ensure genres are updated if track exists
             create: singleGenreIds.map((genreId) => ({ genreId })),
@@ -466,6 +483,12 @@ async function main() {
           artistId: artistId, // Main artist
           albumId: null, // No album link
           labelId: singleLabelId,
+          tempo: singleData.tempo || null,
+          mood: singleData.mood || null,
+          key: singleData.key || null,
+          scale: singleData.scale || null,
+          danceability: singleData.danceability || null,
+          energy: singleData.energy || null,
           createdAt: singleReleaseDate, // Created on release date
           updatedAt: singleReleaseDate,
           genres: { create: singleGenreIds.map((genreId) => ({ genreId })) },

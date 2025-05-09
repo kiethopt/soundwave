@@ -224,7 +224,6 @@ export const getArtistRequestDetail = async (id: string) => {
         rejectionReason: true,     // Make sure this is in your Prisma schema for ArtistRequest
         socialMediaLinks: true,    // Assuming this is a Json field in ArtistRequest
         avatarUrl: true,            // Added avatarUrl
-        idVerificationDocumentUrl: true, // Added idVerificationDocumentUrl
         requestedGenres: true,      // Added requestedGenres
         // createdAt: true,              // Or submittedAt, if you have it
         user: {                     // Nested user data
