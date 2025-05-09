@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import prisma from '../config/db';
-import { FollowingType, HistoryType, Role, User, ClaimStatus, NotificationType, RecipientType } from '@prisma/client';
+import { FollowingType, HistoryType, Role, User, ClaimStatus, NotificationType, RecipientType, RequestStatus, Prisma } from '@prisma/client';
 import { uploadFile } from './upload.service';
 import {
   searchAlbumSelect,
@@ -605,158 +605,132 @@ export const getUserFollowing = async (userId: string) => {
 
 // Gửi yêu cầu trở thành Artist
 export const requestArtistRole = async (
-  user: any,
-  data: any,
-  avatarFile?: Express.Multer.File
+  user: User,
+  data: {
+    artistName: string;
+    bio?: string;
+    socialMediaLinks?: string;
+    portfolioLinks?: string;
+    requestedLabelName?: string;
+    genres?: string;
+  },
+  avatarFileDirect?: Express.Multer.File,
+  idVerificationDocumentFileDirect?: Express.Multer.File
 ) => {
   const {
     artistName,
     bio,
-    label,
     socialMediaLinks: socialMediaLinksString,
+    portfolioLinks: portfolioLinksString,
+    requestedLabelName,
     genres: genresString,
   } = data;
 
-  // Chuyển đổi socialMediaLinks từ chuỗi JSON sang đối tượng JavaScript
-  let socialMediaLinksObject: Record<string, any> = {}; // Type for flexibility
-  if (socialMediaLinksString) {
-    try {
-      socialMediaLinksObject = JSON.parse(socialMediaLinksString);
-    } catch (e) {
-      console.error("Error parsing socialMediaLinksString:", e);
-      throw new Error("Invalid format for social media links.");
-    }
+  // Basic validation
+  if (!artistName?.trim()) {
+    throw { status: 400, message: 'Artist name is required.' };
   }
-
-  // Chuyển đổi genres từ chuỗi sang mảng
-  let genres = [];
-  if (genresString) {
-    genres = genresString.split(',');
+  if (artistName.trim().length < 2) {
+    throw { status: 400, message: 'Artist name must be at least 2 characters.' };
   }
-
-  // Validate artist data (excluding label from social links validation)
-  const validationError = validateArtistData({
-    artistName,
-    bio,
-    socialMediaLinks: socialMediaLinksObject, // Keep validating actual social links
-    genres,
-  });
-  if (validationError) {
-    throw new Error(validationError);
+  if (bio && bio.length > 1000) {
+    throw { status: 400, message: 'Bio must be less than 1000 characters.' };
+  }
+  if (requestedLabelName && requestedLabelName.length > 100) {
+    throw { status: 400, message: 'Requested label name cannot exceed 100 characters.' };
   }
 
   // Chỉ USER mới có thể yêu cầu trở thành ARTIST
-  if (
-    !user ||
-    user.role !== Role.USER ||
-    user.artistProfile?.role === Role.ARTIST
-  ) {
-    throw new Error('Forbidden');
+  if (!user || user.role !== Role.USER) {
+    throw { status: 403, message: 'Only users can request to become an artist.' };
   }
 
-  // Kiểm tra xem USER đã gửi yêu cầu trước đó chưa
-  const existingRequest = await prisma.artistProfile.findUnique({
-    where: { userId: user.id },
-    select: { verificationRequestedAt: true },
-  });
-
-  if (existingRequest?.verificationRequestedAt) {
-    throw new Error('You have already requested to become an artist');
-  }
-
-  // Upload avatar lên Cloudinary
-  let avatarUrl = null;
-  if (avatarFile) {
-    const uploadResult = await uploadFile(avatarFile.buffer, 'artist-avatars');
-    avatarUrl = uploadResult.secure_url;
-  }
-
-  // Tạo ArtistProfile với thông tin cung cấp
-  const createdProfile = await prisma.artistProfile.create({
-    data: {
-      artistName,
-      bio,
-      socialMediaLinks: socialMediaLinksObject, // Store only actual social links
-      avatar: avatarUrl,
-      role: Role.ARTIST,
-      verificationRequestedAt: new Date(),
-      requestedLabelName: label && typeof label === 'string' ? label.trim() : null, // Use the new field
-      user: { connect: { id: user.id } },
-      genres: {
-        create: genres.map((genreId: string) => ({
-          genre: { connect: { id: genreId } },
-        })),
-      },
-      isVerified: false,
+  // Kiểm tra xem USER đã gửi yêu cầu ArtistRequest nào đang PENDING chưa
+  const existingPendingRequest = await prisma.artistRequest.findFirst({
+    where: {
+      userId: user.id,
+      status: RequestStatus.PENDING,
     },
-    include: { user: { select: { name: true, username: true } } } // Lấy tên user để dùng trong thông báo
   });
 
-  // --- START: Gửi thông báo cho ADMIN --- 
-  try {
-    const admins = await prisma.user.findMany({ where: { role: Role.ADMIN } });
-    const notificationPromises = admins.map(async (admin: { id: string }) => {
-      const notificationRecord = await prisma.notification.create({
-        data: {
-          type: NotificationType.ARTIST_REQUEST_SUBMITTED,
-          message: `User '${createdProfile.user?.name || createdProfile.user?.username || user.id}' requested to become artist: ${artistName}.`,
-          recipientType: RecipientType.USER,
-          userId: admin.id,
-          senderId: user.id,
-          artistId: createdProfile.id,
-        },
-        select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true }
-      });
-       return { adminId: admin.id, notification: notificationRecord };
-    });
-
-    const createdNotifications = await Promise.all(notificationPromises);
-
-     // Gửi socket event cho admin rooms
-     const io = getIO();
-     const userSocketsMap = getUserSockets();
-     createdNotifications.forEach(({ adminId, notification }) => {
-       const adminSocketId = userSocketsMap.get(adminId);
-       if (adminSocketId) {
-          console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
-          io.to(adminSocketId).emit('notification', {
-          id: notification.id,
-          type: notification.type,
-          message: notification.message,
-          recipientType: notification.recipientType,
-          isRead: notification.isRead,
-          createdAt: notification.createdAt.toISOString(),
-          artistId: notification.artistId,
-          senderId: notification.senderId,
-          sender: { id: user.id, name: user.name || user.username },
-          artistProfile: { id: createdProfile.id, artistName: artistName, avatar: createdProfile.avatar }
-        });
-       }
-     });
-
-  } catch (notificationError) {
-    console.error("[Notify Error] Failed to create admin notifications for artist request:", notificationError);
+  if (existingPendingRequest) {
+    throw { status: 400, message: 'You already have a pending request to become an artist. Please wait for it to be processed.' };
   }
-  // --- END: Gửi thông báo cho ADMIN --- 
 
-  // Send email notification to admin(s)
-  const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
-  if (adminNotificationEmail) {
+  // Xử lý socialMediaLinks từ chuỗi JSON
+  let socialMediaLinksJson: Prisma.JsonValue | undefined = undefined;
+  if (socialMediaLinksString) {
     try {
-      const emailOptions = emailService.createArtistRequestNotificationEmail(
-        adminNotificationEmail,
-        artistName,
-        user.name || user.username || 'User',
-        user.id,
-        createdProfile.id
-      );
-      await emailService.sendEmail(emailOptions);
-      console.log(`Admin notification email sent for artist request: ${createdProfile.id}`);
-    } catch (emailError) {
-      console.error('Failed to send admin notification email:', emailError);
+      socialMediaLinksJson = JSON.parse(socialMediaLinksString);
+    } catch (e) {
+      console.error("Error parsing socialMediaLinksString:", e);
+      throw { status: 400, message: 'Invalid format for social media links.' };
     }
   }
-  return createdProfile;
+  
+  // Xử lý portfolioLinks từ chuỗi JSON (nếu có)
+  let portfolioLinksJson: Prisma.JsonValue | undefined = undefined;
+  if (portfolioLinksString) {
+    try {
+      portfolioLinksJson = JSON.parse(portfolioLinksString);
+    } catch (e) {
+      console.error("Error parsing portfolioLinksString:", e);
+      throw { status: 400, message: 'Invalid format for portfolio links.' };
+    }
+  }
+
+  let avatarUrl: string | null = null;
+  if (avatarFileDirect) {
+    try {
+      const uploadResult = await uploadFile(avatarFileDirect.buffer, 'artist-request-avatars');
+      avatarUrl = uploadResult.secure_url;
+    } catch (uploadError) {
+      console.error("Error uploading avatar for artist request:", uploadError);
+      throw { status: 500, message: "Failed to upload avatar. Please try again."};
+    }
+  }
+
+  let idVerificationDocumentUrl: string | null = null;
+  if (idVerificationDocumentFileDirect) {
+    try {
+      const uploadResult = await uploadFile(idVerificationDocumentFileDirect.buffer, 'artist-request-id-docs');
+      idVerificationDocumentUrl = uploadResult.secure_url;
+    } catch (uploadError) {
+      console.error("Error uploading ID verification document for artist request:", uploadError);
+      throw { status: 500, message: "Failed to upload ID verification document. Please try again."};
+    }
+  }
+  
+  // Process genres string into an array
+  const requestedGenresArray = genresString?.split(',').map(g => g.trim()).filter(g => g) || [];
+
+  // Tạo ArtistRequest mới
+  const newArtistRequest = await prisma.artistRequest.create({
+    data: {
+      userId: user.id,
+      artistName: artistName.trim(),
+      bio: bio?.trim(),
+      avatarUrl: avatarUrl,
+      socialMediaLinks: socialMediaLinksJson || Prisma.JsonNull,
+      portfolioLinks: portfolioLinksJson || Prisma.JsonNull,
+      idVerificationDocumentUrl: idVerificationDocumentUrl,
+      requestedGenres: requestedGenresArray,
+      requestedLabelName: requestedLabelName?.trim() || null,
+      status: RequestStatus.PENDING,
+    },
+    select: {
+      id: true,
+      artistName: true,
+      status: true,
+      avatarUrl: true,
+      requestedGenres: true
+    }
+  });
+
+  return {
+    message: 'Artist request submitted successfully. It will be reviewed by an administrator.',
+    request: newArtistRequest,
+  };
 };
 
 // Lấy thông tin yêu cầu trở thành nghệ sĩ của người dùng

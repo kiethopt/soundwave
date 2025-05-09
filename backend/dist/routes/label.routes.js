@@ -48,5 +48,7 @@ router.get('/:id', cache_middleware_1.cacheMiddleware, label_controller_1.getLab
 router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('logoFile'), upload_middleware_1.handleUploadError, label_controller_1.createLabel);
 router.put('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('logoFile'), upload_middleware_1.handleUploadError, label_controller_1.updateLabel);
 router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), label_controller_1.deleteLabel);
+router.post('/registrations', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ARTIST]), upload_middleware_1.default.single('logoFile'), upload_middleware_1.handleUploadError, label_controller_1.requestNewLabelRegistration);
+router.get('/selectable/by-artist', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ARTIST]), label_controller_1.getSelectableLabels);
 exports.default = router;
 //# sourceMappingURL=label.routes.js.map

@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { cn } from "@/lib/utils";
+import { RegisterLabelModal } from "@/components/ui/artist-modals";
 
 function getBrightness(hexColor: string) {
   const r = parseInt(hexColor.substr(1, 2), 16);
@@ -71,6 +72,7 @@ export default function ArtistProfilePage({
     "popular"
   );
   const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [isRegisterLabelModalOpen, setIsRegisterLabelModalOpen] = useState(false);
 
   const {
     currentTrack,
@@ -1016,6 +1018,34 @@ export default function ArtistProfilePage({
     }
   };
 
+  const handleRegisterLabelSubmit = async (formData: FormData) => {
+    if (!token) {
+      toast.error("Authentication required.");
+      return;
+    }
+
+    const labelName = formData.get("name") as string;
+    toast.loading(`Submitting request for label "${labelName || 'New Label'}"...`, { id: 'register-label' });
+
+    try {
+      // Gọi API backend
+      const response = await api.labels.requestRegistration(formData, token);
+      
+      toast.success(`Request for label "${labelName || 'New Label'}" submitted successfully!`, {
+        id: 'register-label',
+      });
+      setIsRegisterLabelModalOpen(false); // Đóng modal sau khi thành công
+      // Bạn có thể không cần fetchData() ở đây vì request sẽ được xử lý bởi admin
+
+    } catch (error: any) {
+      console.error("Failed to submit label registration:", error);
+      toast.error(error.message || "Failed to submit label registration.", {
+        id: 'register-label',
+      });
+      // Không đóng modal khi có lỗi để người dùng có thể thử lại
+    }
+  };
+
   const handleFeaturedTrackPlay = (track: Track) => {
     if (currentTrack?.id === track.id && isPlaying && queueType === "featuredOn") {
       pauseTrack();
@@ -1078,6 +1108,7 @@ export default function ArtistProfilePage({
                 </button>
 
                 {isOwner && (
+                  <div className="flex gap-2">
                     <Button
                       variant={theme === "dark" ? "outline" : "outline"}
                       size="sm"
@@ -1087,20 +1118,34 @@ export default function ArtistProfilePage({
                       <Edit className="w-4 h-4" />
                       Edit Profile
                     </Button>
+                    <Button
+                      variant={theme === "dark" ? "outline" : "outline"}
+                      size="sm"
+                      onClick={() => setIsRegisterLabelModalOpen(true)}
+                      className="flex-shrink-0 gap-2"
+                    >
+                      <Tag className="w-4 h-4" />
+                      Register Label
+                    </Button>
+                  </div>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center space-x-2">
                   {artist.isVerified && <Verified className="w-6 h-6" />}
-                  {artist.isVerified && (
-                    <span
-                      className="text-sm font-semibold"
-                      style={{ lineHeight: "1.1", color: textColor }}
-                    >
-                      Verified Artist
-                    </span>
-                  )}
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ lineHeight: "1.1", color: textColor }}
+                  >
+                    {artist.isVerified 
+                      ? "Verified Artist" 
+                      : (artist as any).verificationStatus === 'pending' 
+                      ? "Verification Pending" 
+                      : (artist as any).verificationStatus === 'rejected'
+                      ? `Verification Rejected ${((artist as any).verificationRejectionReason ? `- ${(artist as any).verificationRejectionReason}` : '')}`
+                      : "Not Verified"}
+                  </span>
                 </div>
                 <h1
                   className={`text-6xl w-fit font-bold uppercase py-4 ${isOwner ? 'cursor-pointer' : ''}`}
@@ -1361,6 +1406,13 @@ export default function ArtistProfilePage({
             onSubmit={handleProfileUpdate}
             theme={theme}
             availableGenres={availableGenres}
+          />
+
+          <RegisterLabelModal
+            isOpen={isRegisterLabelModalOpen}
+            onClose={() => setIsRegisterLabelModalOpen(false)}
+            onSubmit={handleRegisterLabelSubmit}
+            theme={theme}
           />
 
         </div>

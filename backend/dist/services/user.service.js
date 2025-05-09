@@ -556,120 +556,100 @@ const getUserFollowing = async (userId) => {
     });
 };
 exports.getUserFollowing = getUserFollowing;
-const requestArtistRole = async (user, data, avatarFile) => {
-    const { artistName, bio, label, socialMediaLinks: socialMediaLinksString, genres: genresString, } = data;
-    let socialMediaLinksObject = {};
+const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDocumentFileDirect) => {
+    const { artistName, bio, socialMediaLinks: socialMediaLinksString, portfolioLinks: portfolioLinksString, requestedLabelName, genres: genresString, } = data;
+    if (!artistName?.trim()) {
+        throw { status: 400, message: 'Artist name is required.' };
+    }
+    if (artistName.trim().length < 2) {
+        throw { status: 400, message: 'Artist name must be at least 2 characters.' };
+    }
+    if (bio && bio.length > 1000) {
+        throw { status: 400, message: 'Bio must be less than 1000 characters.' };
+    }
+    if (requestedLabelName && requestedLabelName.length > 100) {
+        throw { status: 400, message: 'Requested label name cannot exceed 100 characters.' };
+    }
+    if (!user || user.role !== client_1.Role.USER) {
+        throw { status: 403, message: 'Only users can request to become an artist.' };
+    }
+    const existingPendingRequest = await db_1.default.artistRequest.findFirst({
+        where: {
+            userId: user.id,
+            status: client_1.RequestStatus.PENDING,
+        },
+    });
+    if (existingPendingRequest) {
+        throw { status: 400, message: 'You already have a pending request to become an artist. Please wait for it to be processed.' };
+    }
+    let socialMediaLinksJson = undefined;
     if (socialMediaLinksString) {
         try {
-            socialMediaLinksObject = JSON.parse(socialMediaLinksString);
+            socialMediaLinksJson = JSON.parse(socialMediaLinksString);
         }
         catch (e) {
             console.error("Error parsing socialMediaLinksString:", e);
-            throw new Error("Invalid format for social media links.");
+            throw { status: 400, message: 'Invalid format for social media links.' };
         }
     }
-    let genres = [];
-    if (genresString) {
-        genres = genresString.split(',');
-    }
-    const validationError = (0, exports.validateArtistData)({
-        artistName,
-        bio,
-        socialMediaLinks: socialMediaLinksObject,
-        genres,
-    });
-    if (validationError) {
-        throw new Error(validationError);
-    }
-    if (!user ||
-        user.role !== client_1.Role.USER ||
-        user.artistProfile?.role === client_1.Role.ARTIST) {
-        throw new Error('Forbidden');
-    }
-    const existingRequest = await db_1.default.artistProfile.findUnique({
-        where: { userId: user.id },
-        select: { verificationRequestedAt: true },
-    });
-    if (existingRequest?.verificationRequestedAt) {
-        throw new Error('You have already requested to become an artist');
+    let portfolioLinksJson = undefined;
+    if (portfolioLinksString) {
+        try {
+            portfolioLinksJson = JSON.parse(portfolioLinksString);
+        }
+        catch (e) {
+            console.error("Error parsing portfolioLinksString:", e);
+            throw { status: 400, message: 'Invalid format for portfolio links.' };
+        }
     }
     let avatarUrl = null;
-    if (avatarFile) {
-        const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
-        avatarUrl = uploadResult.secure_url;
-    }
-    const createdProfile = await db_1.default.artistProfile.create({
-        data: {
-            artistName,
-            bio,
-            socialMediaLinks: socialMediaLinksObject,
-            avatar: avatarUrl,
-            role: client_1.Role.ARTIST,
-            verificationRequestedAt: new Date(),
-            requestedLabelName: label && typeof label === 'string' ? label.trim() : null,
-            user: { connect: { id: user.id } },
-            genres: {
-                create: genres.map((genreId) => ({
-                    genre: { connect: { id: genreId } },
-                })),
-            },
-            isVerified: false,
-        },
-        include: { user: { select: { name: true, username: true } } }
-    });
-    try {
-        const admins = await db_1.default.user.findMany({ where: { role: client_1.Role.ADMIN } });
-        const notificationPromises = admins.map(async (admin) => {
-            const notificationRecord = await db_1.default.notification.create({
-                data: {
-                    type: client_1.NotificationType.ARTIST_REQUEST_SUBMITTED,
-                    message: `User '${createdProfile.user?.name || createdProfile.user?.username || user.id}' requested to become artist: ${artistName}.`,
-                    recipientType: client_1.RecipientType.USER,
-                    userId: admin.id,
-                    senderId: user.id,
-                    artistId: createdProfile.id,
-                },
-                select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true }
-            });
-            return { adminId: admin.id, notification: notificationRecord };
-        });
-        const createdNotifications = await Promise.all(notificationPromises);
-        const io = (0, socket_1.getIO)();
-        const userSocketsMap = (0, socket_1.getUserSockets)();
-        createdNotifications.forEach(({ adminId, notification }) => {
-            const adminSocketId = userSocketsMap.get(adminId);
-            if (adminSocketId) {
-                console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
-                io.to(adminSocketId).emit('notification', {
-                    id: notification.id,
-                    type: notification.type,
-                    message: notification.message,
-                    recipientType: notification.recipientType,
-                    isRead: notification.isRead,
-                    createdAt: notification.createdAt.toISOString(),
-                    artistId: notification.artistId,
-                    senderId: notification.senderId,
-                    sender: { id: user.id, name: user.name || user.username },
-                    artistProfile: { id: createdProfile.id, artistName: artistName, avatar: createdProfile.avatar }
-                });
-            }
-        });
-    }
-    catch (notificationError) {
-        console.error("[Notify Error] Failed to create admin notifications for artist request:", notificationError);
-    }
-    const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
-    if (adminNotificationEmail) {
+    if (avatarFileDirect) {
         try {
-            const emailOptions = emailService.createArtistRequestNotificationEmail(adminNotificationEmail, artistName, user.name || user.username || 'User', user.id, createdProfile.id);
-            await emailService.sendEmail(emailOptions);
-            console.log(`Admin notification email sent for artist request: ${createdProfile.id}`);
+            const uploadResult = await (0, upload_service_1.uploadFile)(avatarFileDirect.buffer, 'artist-request-avatars');
+            avatarUrl = uploadResult.secure_url;
         }
-        catch (emailError) {
-            console.error('Failed to send admin notification email:', emailError);
+        catch (uploadError) {
+            console.error("Error uploading avatar for artist request:", uploadError);
+            throw { status: 500, message: "Failed to upload avatar. Please try again." };
         }
     }
-    return createdProfile;
+    let idVerificationDocumentUrl = null;
+    if (idVerificationDocumentFileDirect) {
+        try {
+            const uploadResult = await (0, upload_service_1.uploadFile)(idVerificationDocumentFileDirect.buffer, 'artist-request-id-docs');
+            idVerificationDocumentUrl = uploadResult.secure_url;
+        }
+        catch (uploadError) {
+            console.error("Error uploading ID verification document for artist request:", uploadError);
+            throw { status: 500, message: "Failed to upload ID verification document. Please try again." };
+        }
+    }
+    const requestedGenresArray = genresString?.split(',').map(g => g.trim()).filter(g => g) || [];
+    const newArtistRequest = await db_1.default.artistRequest.create({
+        data: {
+            userId: user.id,
+            artistName: artistName.trim(),
+            bio: bio?.trim(),
+            avatarUrl: avatarUrl,
+            socialMediaLinks: socialMediaLinksJson || client_1.Prisma.JsonNull,
+            portfolioLinks: portfolioLinksJson || client_1.Prisma.JsonNull,
+            idVerificationDocumentUrl: idVerificationDocumentUrl,
+            requestedGenres: requestedGenresArray,
+            requestedLabelName: requestedLabelName?.trim() || null,
+            status: client_1.RequestStatus.PENDING,
+        },
+        select: {
+            id: true,
+            artistName: true,
+            status: true,
+            avatarUrl: true,
+            requestedGenres: true
+        }
+    });
+    return {
+        message: 'Artist request submitted successfully. It will be reviewed by an administrator.',
+        request: newArtistRequest,
+    };
 };
 exports.requestArtistRole = requestArtistRole;
 const getArtistRequest = async (userId) => {

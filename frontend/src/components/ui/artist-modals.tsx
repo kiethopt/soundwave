@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { XIcon, Music, Upload, Edit, UserIcon } from 'lucide-react';
+import { XIcon, Music, Upload, Edit, UserIcon, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Image } from 'lucide-react';
@@ -1124,3 +1124,294 @@ export function EditArtistProfileModal({
 }
 
 // --- End NEW MODAL ---
+
+interface RegisterLabelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function RegisterLabelModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: RegisterLabelModalProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset form when modal closes
+      setName("");
+      setDescription("");
+      setLogoFile(null);
+      setLogoPreview(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogoClick = () => {
+    logoInputRef.current?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Label name is required.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", name.trim());
+    if (description.trim()) {
+      formData.append("description", description.trim());
+    }
+    if (logoFile) {
+      formData.append("logoFile", logoFile);
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+      onClose(); // Close modal on successful submission
+    } catch (error) {
+      // Error is usually handled by the onSubmit prop, but a generic one can be here
+      console.error("Error submitting label registration:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to register label."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white text-gray-900"
+        )}
+      >
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-purple-900/30" : "bg-purple-100"
+                )}
+              >
+                <Tag
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-purple-300" : "text-purple-600"
+                  )}
+                  strokeWidth={1.5}
+                />
+              </div>
+              <div>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
+                  Register New Label
+                </DialogTitle>
+                <DialogDescription
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
+                  Provide details for your new record label.
+                </DialogDescription>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              disabled={isSubmitting}
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === "dark"
+                  ? "hover:bg-white/10"
+                  : "hover:bg-black/5"
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          id="register-label-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
+          <div className="space-y-6">
+            {/* Logo Upload */}
+            <div className="flex flex-col items-center gap-3">
+              <UILabel
+                htmlFor="logo-upload"
+                className="self-start text-sm font-medium"
+              >
+                Label Logo (Optional)
+              </UILabel>
+              <Avatar
+                className={cn(
+                  "w-32 h-32 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer relative overflow-hidden group",
+                  theme === "dark"
+                    ? "border-gray-600 hover:border-gray-500 bg-gray-700/50"
+                    : "border-gray-300 hover:border-gray-400 bg-gray-100"
+                )}
+                onClick={handleLogoClick}
+              >
+                <AvatarImage
+                  src={logoPreview || undefined}
+                  alt="Logo preview"
+                  className="w-full h-full object-contain" // object-contain to show full logo
+                />
+                <AvatarFallback className="bg-transparent flex flex-col items-center justify-center">
+                  <Upload
+                    className={cn(
+                      "mx-auto h-8 w-8 transition-opacity group-hover:opacity-70",
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    )}
+                  />
+                  <p
+                    className={cn(
+                      "mt-1 text-xs transition-opacity group-hover:opacity-70",
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    )}
+                  >
+                    Upload Logo
+                  </p>
+                </AvatarFallback>
+              </Avatar>
+              <Input
+                id="logo-upload"
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Label Name */}
+            <div className="space-y-2">
+              <UILabel
+                htmlFor="labelName"
+                className={
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }
+              >
+                Label Name <span className="text-red-500">*</span>
+              </UILabel>
+              <Input
+                id="labelName"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Indie Records"
+                className={cn(
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 placeholder-gray-400"
+                    : "bg-white"
+                )}
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <UILabel
+                htmlFor="description"
+                className={
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }
+              >
+                Description (Optional)
+              </UILabel>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Tell us about your label..."
+                rows={4}
+                className={cn(
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 placeholder-gray-400"
+                    : "bg-white"
+                )}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Footer with actions */}
+        <div
+          className={cn(
+            "px-6 py-4 border-t",
+            theme === "dark" ? "border-gray-700" : "border-gray-200"
+          )}
+        >
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className={cn(
+                theme === "dark"
+                  ? "border-gray-600 hover:bg-gray-700"
+                  : "text-gray-700"
+              )}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="register-label-form" // Associate with the form
+              disabled={isSubmitting || !name.trim()}
+              className={cn(
+                "bg-purple-600 hover:bg-purple-700 text-white",
+                isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+              )}
+            >
+              {isSubmitting ? "Submitting..." : "Register Label"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

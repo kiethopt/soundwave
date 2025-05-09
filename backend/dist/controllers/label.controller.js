@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
+exports.getSelectableLabels = exports.requestNewLabelRegistration = exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
 const labelService = __importStar(require("../services/label.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const getAllLabels = async (req, res) => {
@@ -101,4 +101,39 @@ const deleteLabel = async (req, res) => {
     }
 };
 exports.deleteLabel = deleteLabel;
+const requestNewLabelRegistration = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: 'User not authenticated or user ID not found.' });
+            return;
+        }
+        const { name, description } = req.body;
+        const logoFile = req.file;
+        const registrationRequest = await labelService.requestNewLabelRegistration(userId, { name, description }, logoFile);
+        res.status(201).json({
+            message: 'Label registration request submitted successfully.',
+            data: registrationRequest,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Request new label registration');
+    }
+};
+exports.requestNewLabelRegistration = requestNewLabelRegistration;
+const getSelectableLabels = async (req, res) => {
+    try {
+        if (!req.user || !req.user.artistProfile || !req.user.artistProfile.id) {
+            res.status(403).json({ message: 'Forbidden: Artist profile not found or user not authenticated as artist.' });
+            return;
+        }
+        const artistProfileId = req.user.artistProfile.id;
+        const labels = await labelService.getSelectableLabelsForArtist(artistProfileId);
+        res.status(200).json({ data: labels });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get selectable labels for artist');
+    }
+};
+exports.getSelectableLabels = getSelectableLabels;
 //# sourceMappingURL=label.controller.js.map

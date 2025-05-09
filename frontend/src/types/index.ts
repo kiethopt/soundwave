@@ -170,21 +170,25 @@ export interface Artist {
 export interface ArtistRequest {
   id: string;
   artistName: string;
-  bio?: string;
+  bio?: string | null;
   socialMediaLinks?: {
     facebook?: string;
-    twitter?: string;
     instagram?: string;
-  };
-  verificationRequestedAt: string;
-  avatar?: string;
+    twitter?: string;
+  } | null;
+  status: RequestStatus;
   requestedLabelName?: string | null;
+  rejectionReason?: string | null;
   user: {
     id: string;
-    name: string;
+    name?: string | null;
     email: string;
+    avatar?: string | null;
   };
-  isVerified: boolean;
+  avatarUrl?: string | null;
+  idVerificationDocumentUrl?: string | null;
+  portfolioLinks?: any | null;
+  requestedGenres?: string[];
 }
 
 export interface Label {
@@ -387,22 +391,39 @@ export interface Notification {
   type:
     | "NEW_TRACK"
     | "NEW_ALBUM"
-    | "EVENT_REMINDER"
     | "NEW_FOLLOW"
     | "ARTIST_REQUEST_APPROVE"
     | "ARTIST_REQUEST_REJECT"
     | "ACCOUNT_ACTIVATED"
-    | "ACCOUNT_DEACTIVATED";
+    | "ACCOUNT_DEACTIVATED"
+    | "ARTIST_REQUEST_SUBMITTED"
+    | "CLAIM_REQUEST_SUBMITTED"
+    | "CLAIM_REQUEST_APPROVED"
+    | "CLAIM_REQUEST_REJECTED"
+    | "NEW_REPORT_SUBMITTED"
+    | "REPORT_RESOLVED"
+    | "LABEL_REGISTRATION_SUBMITTED"
+    | "LABEL_REGISTRATION_APPROVED"
+    | "LABEL_REGISTRATION_REJECTED";
   message: string;
   isRead: boolean;
-  recipientType: "USER" | "ARTIST"; // Loại người nhận (USER hoặc ARTIST)
-  recipientId: string; // ID của người nhận (User hoặc ArtistProfile)
-  senderId?: string; // ID của người gửi thông báo (nếu có)
-  count?: number; // Số lượng hành động trong thông báo nhóm
+  recipientType: "USER" | "ARTIST";
+  userId?: string | null;
+  artistId?: string | null;
+  senderId?: string | null;
+  trackId?: string | null;
+  albumId?: string | null;
+  claimId?: string | null;
+  reportId?: string | null;
+  labelId?: string | null;
+  labelName?: string | null;
+  rejectionReason?: string | null;
+  count?: number;
   createdAt: string;
   updatedAt: string;
-  user?: User; // Quan hệ với User (nếu recipientType là USER)
-  artist?: ArtistProfile; // Quan hệ với ArtistProfile (nếu recipientType là ARTIST)
+  user?: User;
+  artist?: ArtistProfile;
+  sender?: Partial<User> | Partial<ArtistProfile> | { name?: string, id?: string };
 }
 
 export interface Event {
@@ -531,52 +552,6 @@ export interface SearchSuggestion {
   };
 }
 
-// Type for Artist Verification Request (existing)
-export interface ArtistRequest {
-  id: string;
-  artistName: string;
-  bio?: string;
-  socialMediaLinks?: {
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-  };
-  verificationRequestedAt: string;
-  avatar?: string;
-  requestedLabelName?: string | null;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  isVerified: boolean;
-}
-
-// --- NEW TYPE for Artist Claim Request ---
-export interface ArtistClaimRequest {
-  id: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  submittedAt: string;
-  reviewedAt?: string | null;
-  rejectionReason?: string | null;
-  proof: string;
-  claimingUser: User; // Full user object
-  artistProfile: {
-    // Information about the profile being claimed
-    id: string;
-    artistName: string;
-    avatar?: string | null;
-    userId?: string | null; // ID of the user currently linked (should be null for claimable profiles)
-    isVerified: boolean; // Status of the profile itself
-  };
-  reviewedByAdmin?: {
-    // Basic info of admin who reviewed
-    id: string;
-    name?: string | null;
-    username?: string | null;
-  } | null;
-}
-
 export type ReportType =
   | "COPYRIGHT_VIOLATION"
   | "INAPPROPRIATE_CONTENT"
@@ -660,4 +635,64 @@ export interface ReportFormData {
   trackId?: string;
   playlistId?: string;
   albumId?: string;
+}
+
+export enum RequestStatus {
+  PENDING = "PENDING",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+}
+
+export interface LabelRegistrationRequest {
+  id: string;
+  requestedLabelName: string;
+  requestedLabelDescription?: string | null;
+  requestedLabelLogoUrl?: string | null;
+  requestingArtistId: string;
+  requestingArtist: {
+    id: string;
+    artistName: string;
+    avatar?: string | null;
+    user?: { 
+      email?: string | null;
+      name?: string | null;
+    }
+  };
+  status: RequestStatus;
+  submittedAt: string;
+  reviewedAt?: string | null;
+  reviewedByAdminId?: string | null;
+  reviewedByAdmin?: {
+    id: string;
+    name?: string | null;
+  };
+  rejectionReason?: string | null;
+  createdLabelId?: string | null;
+  createdLabel?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  } | null;
+}
+
+export interface ArtistClaimRequest {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED"; 
+  submittedAt: string;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  proof: string[]; 
+  claimingUser: User; 
+  artistProfile: {
+    id: string;
+    artistName: string;
+    avatar?: string | null;
+    userId?: string | null; 
+    isVerified: boolean; 
+  };
+  reviewedByAdmin?: {
+    id: string;
+    name?: string | null;
+    username?: string | null;
+  } | null;
 }

@@ -692,6 +692,100 @@ export const api = {
       }
       return response.json();
     },
+
+    // --- Label Registration Requests by Admin ---
+    getLabelRegistrations: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      filters?: ArtistRequestFilters 
+    ) => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filters) {
+        if (filters.startDate) {
+          params.append("startDate", filters.startDate);
+        }
+        if (filters.endDate) {
+          params.append("endDate", filters.endDate);
+        }
+        if (filters.search) {
+          params.append("search", filters.search);
+        }
+        if (filters.status) { 
+          params.append("status", filters.status);
+        }
+      }
+
+      return fetchWithAuth(
+        `/api/admin/label-registrations?${params.toString()}`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    getLabelRegistrationById: async (token: string, registrationId: string) => {
+      return fetchWithAuth(
+        `/api/admin/label-registrations/${registrationId}`,
+        { method: 'GET' }, 
+        token
+      );
+    },
+
+    approveLabelRegistration: async (token: string, registrationId: string) => {
+      return fetchWithAuth(
+        `/api/admin/label-registrations/${registrationId}/approve`,
+        { method: 'PUT' }, 
+        token
+      );
+    },
+
+    rejectLabelRegistration: async (token: string, registrationId: string, reason: string) => {
+      return fetchWithAuth(
+        `/api/admin/label-registrations/${registrationId}/reject`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ reason }),
+        }, 
+        token
+      );
+    },
+
+    // New function for ArtistRequest model
+    getArtistRoleRequests: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      filters?: ArtistRequestFilters // Can reuse filters if applicable, or define a new type
+    ) => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filters) {
+        if (filters.startDate) {
+          params.append("startDate", filters.startDate);
+        }
+        if (filters.endDate) {
+          params.append("endDate", filters.endDate);
+        }
+        if (filters.status) { // This will now be RequestStatus for ArtistRequest
+          params.append("status", filters.status);
+        }
+        if (filters.search) {
+          params.append("search", filters.search);
+        }
+      }
+      return fetchWithAuth(
+        `/api/admin/artist-role-requests?${params.toString()}`,
+        { method: "GET" },
+        token
+      );
+    },
   },
 
   user: {
@@ -1430,6 +1524,19 @@ export const api = {
 
     delete: async (id: string, token: string) =>
       fetchWithAuth(`/api/labels/${id}`, { method: "DELETE" }, token),
+
+    requestRegistration: async (formData: FormData, token: string) => {
+      return fetchWithAuth(
+        `/api/labels/registrations`,
+        { method: 'POST', body: formData },
+        token
+      );
+    },
+
+    // New function to get labels selectable by the current artist
+    getSelectableByArtist: async (token: string) => {
+      return fetchWithAuth('/api/labels/selectable/by-artist', { method: 'GET' }, token);
+    },
   },
 
   dashboard: {
@@ -1476,7 +1583,7 @@ export const api = {
         "/api/notifications/delete-read",
         { method: "DELETE" },
         token
-      ), // Thêm dòng này
+      ),
   },
 
   playlists: {

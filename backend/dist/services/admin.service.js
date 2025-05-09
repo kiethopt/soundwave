@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.getPendingArtistRoleRequests = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -183,12 +183,12 @@ const getArtistRequests = async (req) => {
 };
 exports.getArtistRequests = getArtistRequests;
 const getArtistRequestDetail = async (id) => {
-    let request = await db_1.default.artistProfile.findUnique({
+    let requestData = await db_1.default.artistProfile.findUnique({
         where: { id },
         select: prisma_selects_1.artistRequestDetailsSelect,
     });
-    if (!request) {
-        request = await db_1.default.artistProfile.findFirst({
+    if (!requestData) {
+        requestData = await db_1.default.artistProfile.findFirst({
             where: {
                 userId: id,
                 verificationRequestedAt: { not: null },
@@ -196,10 +196,39 @@ const getArtistRequestDetail = async (id) => {
             select: prisma_selects_1.artistRequestDetailsSelect,
         });
     }
-    if (!request) {
+    if (!requestData) {
+        const artistRoleRequest = await db_1.default.artistRequest.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                artistName: true,
+                bio: true,
+                status: true,
+                requestedLabelName: true,
+                rejectionReason: true,
+                socialMediaLinks: true,
+                portfolioLinks: true,
+                avatarUrl: true,
+                idVerificationDocumentUrl: true,
+                requestedGenres: true,
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatar: true,
+                    },
+                },
+            },
+        });
+        if (artistRoleRequest) {
+            return { ...artistRoleRequest, _sourceTable: 'ArtistRequest' };
+        }
+    }
+    if (!requestData) {
         throw new Error("Request not found");
     }
-    return request;
+    return { ...requestData, _sourceTable: 'ArtistProfile' };
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUserInfo = async (id, data, requestingUser) => {
@@ -645,85 +674,121 @@ const deleteGenreById = async (id) => {
     return db_1.default.genre.delete({ where: { id } });
 };
 exports.deleteGenreById = deleteGenreById;
-const approveArtistRequest = async (requestId) => {
-    const artistProfile = await db_1.default.artistProfile.findFirst({
-        where: {
-            id: requestId,
-            verificationRequestedAt: { not: null },
-            isVerified: false,
-        },
+const approveArtistRequest = async (adminUserId, artistRequestId) => {
+    const artistRequest = await db_1.default.artistRequest.findUnique({
+        where: { id: artistRequestId },
         select: {
             id: true,
             userId: true,
+            artistName: true,
+            bio: true,
+            avatarUrl: true,
+            socialMediaLinks: true,
+            portfolioLinks: true,
+            requestedGenres: true,
             requestedLabelName: true,
+            status: true,
             user: { select: { id: true, email: true, name: true, username: true } },
         },
     });
-    if (!artistProfile) {
-        throw new Error("Artist request not found, already verified, or rejected.");
+    if (!artistRequest) {
+        throw new Error("Artist request not found.");
     }
-    const requestedLabelName = artistProfile.requestedLabelName;
-    const userForNotification = artistProfile.user;
-    const updatedProfile = await db_1.default.$transaction(async (tx) => {
-        const verifiedProfile = await tx.artistProfile.update({
-            where: { id: requestId },
-            data: {
+    if (artistRequest.status !== client_1.RequestStatus.PENDING) {
+        throw new Error(`Artist request cannot be approved as it is already in '${artistRequest.status}' status.`);
+    }
+    if (!artistRequest.userId) {
+        throw new Error("User ID missing from artist request, cannot create artist profile.");
+    }
+    const updatedData = await db_1.default.$transaction(async (tx) => {
+        const userArtistProfile = await tx.artistProfile.upsert({
+            where: { userId: artistRequest.userId },
+            update: {
+                artistName: artistRequest.artistName,
+                bio: artistRequest.bio,
+                avatar: artistRequest.avatarUrl,
+                socialMediaLinks: artistRequest.socialMediaLinks || client_1.Prisma.JsonNull,
+                isVerified: true,
+                verifiedAt: new Date(),
+                role: client_1.Role.ARTIST,
+                isActive: true,
+                verificationRequestedAt: null,
+            },
+            create: {
+                userId: artistRequest.userId,
+                artistName: artistRequest.artistName,
+                bio: artistRequest.bio,
+                avatar: artistRequest.avatarUrl,
+                socialMediaLinks: artistRequest.socialMediaLinks || client_1.Prisma.JsonNull,
                 role: client_1.Role.ARTIST,
                 isVerified: true,
                 verifiedAt: new Date(),
-                verificationRequestedAt: null,
-                requestedLabelName: null,
+                isActive: true,
+                monthlyListeners: 0,
             },
-            select: { id: true },
+            select: { id: true, userId: true, artistName: true, labelId: true, user: { select: prisma_selects_1.userSelect }, label: true },
         });
-        let finalLabelId = null;
-        if (requestedLabelName) {
+        let finalLabelId = userArtistProfile.labelId;
+        let createdLabelViaRequest = false;
+        if (artistRequest.requestedLabelName) {
             const labelRecord = await tx.label.upsert({
-                where: { name: requestedLabelName },
+                where: { name: artistRequest.requestedLabelName },
                 update: {},
-                create: { name: requestedLabelName },
+                create: { name: artistRequest.requestedLabelName, description: "Created via artist request" },
                 select: { id: true },
             });
             finalLabelId = labelRecord.id;
-        }
-        if (finalLabelId) {
+            createdLabelViaRequest = true;
             await tx.artistProfile.update({
-                where: { id: verifiedProfile.id },
-                data: {
-                    labelId: finalLabelId,
-                },
+                where: { id: userArtistProfile.id },
+                data: { labelId: finalLabelId },
             });
         }
-        const finalProfile = await tx.artistProfile.findUnique({
-            where: { id: verifiedProfile.id },
-            include: {
-                user: { select: prisma_selects_1.userSelect },
-                label: true,
-            },
-        });
-        if (!finalProfile) {
-            throw new Error("Failed to retrieve updated profile after transaction.");
+        if (createdLabelViaRequest && finalLabelId && artistRequest.requestedLabelName) {
+            await tx.labelRegistrationRequest.create({
+                data: {
+                    requestedLabelName: artistRequest.requestedLabelName,
+                    requestingArtistId: userArtistProfile.id,
+                    status: client_1.RequestStatus.APPROVED,
+                    submittedAt: new Date(),
+                    reviewedAt: new Date(),
+                    reviewedByAdminId: adminUserId,
+                    createdLabelId: finalLabelId,
+                }
+            });
         }
-        return finalProfile;
+        const finalArtistRequest = await tx.artistRequest.update({
+            where: { id: artistRequestId },
+            data: {
+                status: client_1.RequestStatus.APPROVED,
+            },
+            select: { id: true, status: true, userId: true, artistName: true }
+        });
+        const finalPopulatedProfile = await tx.artistProfile.findUnique({
+            where: { id: userArtistProfile.id },
+            include: { user: { select: prisma_selects_1.userSelect }, label: true }
+        });
+        if (!finalPopulatedProfile) {
+            throw new Error("Failed to retrieve final populated artist profile after transaction.");
+        }
+        return { artistRequest: finalArtistRequest, artistProfile: finalPopulatedProfile };
     });
+    const userForNotification = artistRequest.user;
     if (userForNotification) {
-        db_1.default.notification
-            .create({
+        db_1.default.notification.create({
             data: {
                 type: "ARTIST_REQUEST_APPROVE",
-                message: "Your request to become an Artist has been approved!",
+                message: `Congratulations! Your request to become artist '${artistRequest.artistName}' has been approved. Your artist profile is now active.`,
                 recipientType: "USER",
                 userId: userForNotification.id,
-                artistId: updatedProfile.id,
+                artistId: updatedData.artistProfile.id,
+                isRead: false,
             },
-        })
-            .catch((err) => console.error("[Async Notify Error] Failed to create approval notification:", err));
+        }).catch((err) => console.error("[Service Notify Error] Failed to create approval notification:", err));
         if (userForNotification.email) {
             try {
                 const emailOptions = emailService.createArtistRequestApprovedEmail(userForNotification.email, userForNotification.name || userForNotification.username || "User");
-                emailService
-                    .sendEmail(emailOptions)
-                    .catch((err) => console.error("[Async Email Error] Failed to send approval email:", err));
+                emailService.sendEmail(emailOptions).catch((err) => console.error("[Service Email Error] Failed to send approval email:", err));
             }
             catch (syncError) {
                 console.error("[Email Setup Error] Failed to create approval email options:", syncError);
@@ -734,34 +799,83 @@ const approveArtistRequest = async (requestId) => {
         }
     }
     else {
-        console.error("[Approve Request] User data missing for notification/email.");
+        console.error("[Approve Request Service] User data missing on ArtistRequest for notification/email.");
     }
     return {
-        ...updatedProfile,
-        hasPendingRequest: false,
+        message: "Artist request approved successfully.",
+        data: updatedData,
     };
 };
 exports.approveArtistRequest = approveArtistRequest;
-const rejectArtistRequest = async (requestId) => {
-    const artistProfile = await db_1.default.artistProfile.findFirst({
+const rejectArtistRequest = async (artistRequestId, rejectionReason) => {
+    const artistRequest = await db_1.default.artistRequest.findUnique({
         where: {
-            id: requestId,
-            verificationRequestedAt: { not: null },
-            isVerified: false,
+            id: artistRequestId,
         },
-        include: {
-            user: { select: prisma_selects_1.userSelect },
+        select: {
+            id: true,
+            status: true,
+            userId: true,
+            artistName: true,
+            user: { select: { id: true, email: true, name: true, username: true } }
         },
     });
-    if (!artistProfile) {
-        throw new Error("Artist request not found, already verified, or rejected.");
+    if (!artistRequest) {
+        throw new Error("Artist request not found.");
     }
-    await db_1.default.artistProfile.delete({
-        where: { id: requestId },
+    if (artistRequest.status !== client_1.RequestStatus.PENDING) {
+        throw new Error(`Artist request cannot be rejected as it is already in '${artistRequest.status}' status.`);
+    }
+    const updatedRequest = await db_1.default.artistRequest.update({
+        where: { id: artistRequestId },
+        data: {
+            status: client_1.RequestStatus.REJECTED,
+            rejectionReason: rejectionReason || "No reason provided",
+        },
+        select: {
+            id: true,
+            userId: true,
+            status: true,
+            user: { select: { id: true, email: true, name: true, username: true } },
+            artistName: true,
+            rejectionReason: true
+        }
     });
+    if (updatedRequest.user) {
+        let notificationMessage = `Your request to become artist '${updatedRequest.artistName}' has been rejected.`;
+        if (updatedRequest.rejectionReason && updatedRequest.rejectionReason !== "No reason provided") {
+            notificationMessage += ` Reason: ${updatedRequest.rejectionReason}`;
+        }
+        db_1.default.notification.create({
+            data: {
+                type: "ARTIST_REQUEST_REJECT",
+                message: notificationMessage,
+                recipientType: "USER",
+                userId: updatedRequest.user.id,
+                isRead: false,
+            },
+            select: {
+                id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                userId: true,
+            }
+        }).catch(err => console.error("[Service Notify Error] Failed to create rejection notification:", err));
+        if (updatedRequest.user.email) {
+            try {
+                const emailOptions = emailService.createArtistRequestRejectedEmail(updatedRequest.user.email, updatedRequest.user.name || updatedRequest.user.username || "User", updatedRequest.rejectionReason || undefined);
+                emailService.sendEmail(emailOptions).catch(err => console.error("[Service Email Error] Failed to send rejection email:", err));
+                console.log(`Artist rejection email sent to ${updatedRequest.user.email}`);
+            }
+            catch (emailError) {
+                console.error("Failed to setup artist rejection email:", emailError);
+            }
+        }
+        else {
+            console.warn(`Could not send rejection email: No email found for user ${updatedRequest.user.id}`);
+        }
+    }
     return {
-        user: artistProfile.user,
-        hasPendingRequest: false,
+        message: "Artist request rejected successfully.",
+        request: updatedRequest,
     };
 };
 exports.rejectArtistRequest = rejectArtistRequest;
@@ -1173,7 +1287,7 @@ const getArtistClaimRequests = async (req) => {
                     },
                     {
                         claimingUser: {
-                            email: { contains: trimmedSearch, mode: "insensitive" },
+                            email: { contains: trimmedSearch, mode: "insensitive" }
                         },
                     },
                     {
@@ -2412,4 +2526,306 @@ const getUserListeningHistoryDetails = async (adminExecutingId, targetUserId, re
     };
 };
 exports.getUserListeningHistoryDetails = getUserListeningHistoryDetails;
+const getAllLabelRegistrations = async (req) => {
+    const { search, status, sortBy, sortOrder } = req.query;
+    const whereClause = {};
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { requestedLabelName: { contains: search, mode: 'insensitive' } },
+            { requestingArtist: { artistName: { contains: search, mode: 'insensitive' } } },
+        ];
+    }
+    if (status && typeof status === 'string' && Object.values(client_1.RequestStatus).includes(status)) {
+        whereClause.status = status;
+    }
+    else {
+        if (status && status !== 'ALL') {
+            whereClause.status = status;
+        }
+        else if (!status) {
+            whereClause.status = client_1.RequestStatus.PENDING;
+        }
+    }
+    const orderByClause = {};
+    const validSortKeys = ['submittedAt', 'requestedLabelName', 'status'];
+    const key = sortBy;
+    const order = sortOrder === 'desc' ? 'desc' : 'asc';
+    if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+        orderByClause[key] = order;
+    }
+    else {
+        orderByClause.submittedAt = 'desc';
+    }
+    const result = await (0, handle_utils_1.paginate)(db_1.default.labelRegistrationRequest, req, {
+        where: whereClause,
+        include: {
+            requestingArtist: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                },
+            },
+            reviewedByAdmin: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            createdLabel: {
+                select: {
+                    id: true,
+                    name: true,
+                }
+            }
+        },
+        orderBy: orderByClause,
+    });
+    return {
+        data: result.data,
+        pagination: result.pagination,
+    };
+};
+exports.getAllLabelRegistrations = getAllLabelRegistrations;
+const getLabelRegistrationById = async (registrationId) => {
+    const request = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+        include: {
+            requestingArtist: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                    user: { select: { email: true, name: true } },
+                },
+            },
+            reviewedByAdmin: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            createdLabel: {
+                select: {
+                    id: true,
+                    name: true,
+                    logoUrl: true,
+                }
+            }
+        },
+    });
+    if (!request) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    return request;
+};
+exports.getLabelRegistrationById = getLabelRegistrationById;
+const approveLabelRegistration = async (adminUserId, registrationId) => {
+    const registrationRequest = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+        include: { requestingArtist: true },
+    });
+    if (!registrationRequest) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
+        throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+    }
+    return db_1.default.$transaction(async (tx) => {
+        const newLabel = await tx.label.create({
+            data: {
+                name: registrationRequest.requestedLabelName,
+                description: registrationRequest.requestedLabelDescription,
+                logoUrl: registrationRequest.requestedLabelLogoUrl,
+            },
+            select: prisma_selects_1.labelSelect,
+        });
+        await tx.artistProfile.update({
+            where: { id: registrationRequest.requestingArtistId },
+            data: { labelId: newLabel.id },
+        });
+        const updatedRequest = await tx.labelRegistrationRequest.update({
+            where: { id: registrationId },
+            data: {
+                status: client_1.RequestStatus.APPROVED,
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId,
+                createdLabelId: newLabel.id,
+            },
+        });
+        if (registrationRequest.requestingArtist.userId) {
+            const notificationData = {
+                data: {
+                    recipientType: client_1.RecipientType.ARTIST,
+                    artistId: registrationRequest.requestingArtistId,
+                    type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
+                    message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+                    isRead: false,
+                },
+                select: {
+                    id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                    artistId: true,
+                }
+            };
+            const notification = await tx.notification.create(notificationData);
+            const io = (0, socket_1.getIO)();
+            const targetUserSocketId = (0, socket_2.getUserSockets)().get(registrationRequest.requestingArtist.userId);
+            if (targetUserSocketId) {
+                io.to(targetUserSocketId).emit('notification', {
+                    ...notification,
+                    createdAt: notification.createdAt.toISOString(),
+                    labelName: newLabel.name,
+                    labelId: newLabel.id,
+                });
+                console.log(`[Socket Emit] Sent LABEL_REGISTRATION_APPROVED (to ArtistProfile ${notification.artistId}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`);
+            }
+            else {
+                console.log(`[Socket Emit] User ${registrationRequest.requestingArtist.userId} (for ArtistProfile ${notification.artistId}) not connected for LABEL_REGISTRATION_APPROVED.`);
+            }
+        }
+        return { updatedRequest, newLabel };
+    });
+};
+exports.approveLabelRegistration = approveLabelRegistration;
+const rejectLabelRegistration = async (adminUserId, registrationId, rejectionReason) => {
+    const errors = (0, handle_utils_1.runValidations)([
+        (0, handle_utils_1.validateField)(rejectionReason, 'rejectionReason', { required: true, minLength: 5, maxLength: 500 }),
+    ]);
+    if (errors.length > 0) {
+        console.warn(`[AdminService] Validation failed for rejection reason for request ${registrationId}, but proceeding with rejection.`);
+    }
+    const registrationRequest = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+    });
+    if (!registrationRequest) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
+        console.warn(`[AdminService] Attempting to reject a request that is already ${registrationRequest.status.toLowerCase()}. ID: ${registrationId}`);
+    }
+    const updatedRequest = await db_1.default.labelRegistrationRequest.update({
+        where: { id: registrationId },
+        data: {
+            status: client_1.RequestStatus.REJECTED,
+            rejectionReason: rejectionReason,
+            reviewedAt: new Date(),
+            reviewedByAdminId: adminUserId,
+        },
+        select: {
+            id: true,
+            requestedLabelName: true,
+            requestingArtistId: true,
+            requestingArtist: { select: { userId: true } }
+        }
+    });
+    console.log(`[AdminService] Updated LabelRegistrationRequest ID: ${updatedRequest.id} to REJECTED`);
+    if (updatedRequest.requestingArtist?.userId) {
+        const artistUserIdForSocketTargeting = updatedRequest.requestingArtist.userId;
+        const notificationData = {
+            data: {
+                recipientType: client_1.RecipientType.ARTIST,
+                artistId: updatedRequest.requestingArtistId,
+                type: client_1.NotificationType.LABEL_REGISTRATION_REJECTED,
+                message: `We regret to inform you that your request to register the label "${updatedRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+                isRead: false,
+            },
+            select: {
+                id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                artistId: true,
+            }
+        };
+        db_1.default.notification.create(notificationData)
+            .then(createdNotification => {
+            const io = (0, socket_1.getIO)();
+            const targetSocketId = (0, socket_2.getUserSockets)().get(artistUserIdForSocketTargeting);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('notification', {
+                    ...createdNotification,
+                    createdAt: createdNotification.createdAt.toISOString(),
+                    rejectionReason: rejectionReason,
+                    labelName: updatedRequest.requestedLabelName,
+                });
+                console.log(`[Socket Emit] Sent LABEL_REGISTRATION_REJECTED (to ArtistProfile ${createdNotification.artistId}) to user ${artistUserIdForSocketTargeting} via socket ${targetSocketId}`);
+            }
+            else {
+                console.log(`[Socket Emit] User ${artistUserIdForSocketTargeting} (for ArtistProfile ${createdNotification.artistId}) not connected for LABEL_REGISTRATION_REJECTED.`);
+            }
+        })
+            .catch(err => {
+            console.error(`[AdminService] Failed to create or emit rejection notification for user ${artistUserIdForSocketTargeting} (Request ID: ${updatedRequest.id}):`, err);
+        });
+    }
+    else {
+        console.warn(`[AdminService] Cannot send rejection notification for request ${updatedRequest.id} - requesting artist has no associated user ID for socket targeting.`);
+    }
+    return {
+        message: `Label registration request ${updatedRequest.id} rejected successfully.`,
+        rejectedRequestId: updatedRequest.id
+    };
+};
+exports.rejectLabelRegistration = rejectLabelRegistration;
+const getPendingArtistRoleRequests = async (req) => {
+    const { search, startDate, endDate, status } = req.query;
+    const where = {
+        status: client_1.RequestStatus.PENDING,
+    };
+    if (status && typeof status === 'string' && status !== 'ALL' && Object.values(client_1.RequestStatus).includes(status)) {
+        where.status = status;
+    }
+    else if (status === 'ALL') {
+        delete where.status;
+    }
+    const andConditions = [];
+    if (search && typeof search === 'string' && search.trim()) {
+        const trimmedSearch = search.trim();
+        andConditions.push({
+            OR: [
+                { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
+                { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+                { user: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+                { requestedLabelName: { contains: trimmedSearch, mode: 'insensitive' } },
+            ],
+        });
+    }
+    const dateFilter = {};
+    if (andConditions.length > 0) {
+        if (where.AND) {
+            if (Array.isArray(where.AND)) {
+                where.AND.push(...andConditions);
+            }
+            else {
+                where.AND = [where.AND, ...andConditions];
+            }
+        }
+        else {
+            where.AND = andConditions;
+        }
+    }
+    const artistRoleRequestSelect = {
+        id: true,
+        artistName: true,
+        bio: true,
+        status: true,
+        requestedLabelName: true,
+        user: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                avatar: true,
+            },
+        },
+    };
+    const options = {
+        where,
+        select: artistRoleRequestSelect,
+        orderBy: { id: 'desc' },
+    };
+    const result = await (0, handle_utils_1.paginate)(db_1.default.artistRequest, req, options);
+    return {
+        requests: result.data,
+        pagination: result.pagination,
+    };
+};
+exports.getPendingArtistRoleRequests = getPendingArtistRoleRequests;
 //# sourceMappingURL=admin.service.js.map

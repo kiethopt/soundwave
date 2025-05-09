@@ -14,25 +14,38 @@ export type NotificationType = {
   type:
     | "NEW_TRACK"
     | "NEW_ALBUM"
-    | "EVENT_REMINDER"
     | "NEW_FOLLOW"
     | "ARTIST_REQUEST_APPROVE"
     | "ARTIST_REQUEST_REJECT"
     | "ARTIST_REQUEST_SUBMITTED"
     | "CLAIM_REQUEST_SUBMITTED"
     | "CLAIM_REQUEST_APPROVED"
-    | "CLAIM_REQUEST_REJECTED";
+    | "CLAIM_REQUEST_REJECTED"
+    | "NEW_REPORT_SUBMITTED"
+    | "REPORT_RESOLVED"
+    | "LABEL_REGISTRATION_SUBMITTED"
+    | "LABEL_REGISTRATION_APPROVED"
+    | "LABEL_REGISTRATION_REJECTED";
   message: string;
   isRead: boolean;
   coverUrl?: string;
   title?: string;
   createdAt: string;
-  senderId?: string;
+  senderId?: string | null;
   recipientType: string;
-  trackId?: string;
-  albumId?: string;
-  artistId?: string;
-  claimId?: string;
+  trackId?: string | null;
+  albumId?: string | null;
+  artistId?: string | null;
+  claimId?: string | null;
+  reportId?: string | null;
+  labelId?: string | null;
+  labelName?: string | null;
+  rejectionReason?: string | null;
+  sender?: { 
+    id: string;
+    name?: string | null;
+    avatar?: string | null;
+  } | null;
 };
 
 export default function NotificationsPage() {
@@ -261,6 +274,12 @@ export default function NotificationsPage() {
             );
             path = `/admin/artist-requests?tab=claim`;
           }
+        } else if (notification.type === "LABEL_REGISTRATION_SUBMITTED") {
+          if (notification.artistId) {
+            path = `/admin/labels/request/${notification.artistId}`;
+          } else {
+            path = `/admin/labels?tab=requests`;
+          }
         }
       } else {
         if (notification.type === "NEW_FOLLOW" && notification.senderId) {
@@ -303,6 +322,16 @@ export default function NotificationsPage() {
         ) {
           path = `/profile/${user.id}`;
           toast("Your request was reviewed. Check your profile or settings.");
+        } else if (notification.type === "LABEL_REGISTRATION_APPROVED") {
+          toast.success(notification.message || 'Your label registration was approved!');
+          if (notification.labelId && user.artistProfile?.id === notification.artistId) {
+            path = `/artist/dashboard`;
+          } else {
+            shouldNavigate = false;
+          }
+        } else if (notification.type === "LABEL_REGISTRATION_REJECTED") {
+          toast.error(notification.message || 'Your label registration was rejected.');
+          shouldNavigate = false;
         }
       }
 
@@ -318,9 +347,9 @@ export default function NotificationsPage() {
         let markedAsReadSuccess = true;
         if (!notification.isRead) {
           try {
-            await api.notifications.markNotificationAsRead(
-              token,
-              notification.id
+            await api.notifications.markAsRead(
+              notification.id,
+              token
             );
             setNotifications((prev) =>
               prev.map((n) =>

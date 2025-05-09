@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -34,6 +35,8 @@ model User {
   reviewedClaims       ArtistClaimRequest[] @relation("ReviewingAdmin")
   submittedReports     Report[]        @relation("UserReports")
   resolvedReports      Report[]        @relation("AdminResolutions")
+  reviewedLabelRequests LabelRegistrationRequest[] @relation("AdminReviewedLabelRequests")
+  artistRequests       ArtistRequest[]
 
   @@unique([email, username])
   @@index([email])
@@ -65,12 +68,13 @@ model ArtistProfile {
   albums                  Album[]
   genres                  ArtistGenre[]
   user                    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label                   Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull) // Relation to Label
+  label                   Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull)
   notifications           Notification[] @relation("ArtistNotifications")
   tracks                  Track[]
   featuredInTracks        TrackArtist[] @relation("FeaturedArtistRelation")
   followers               UserFollow[]   @relation("FollowingArtist")
   claimRequests           ArtistClaimRequest[] @relation("ClaimedProfile")
+  labelRegistrationRequests LabelRegistrationRequest[] @relation("LabelRequestsByArtist")
 
   @@index([artistName])
   @@index([isVerified])
@@ -101,7 +105,8 @@ model Label {
   updatedAt   DateTime @updatedAt
   tracks      Track[]
   albums      Album[]
-  artists     ArtistProfile[] // Relation back to ArtistProfile
+  artists     ArtistProfile[]
+  registrationRequest LabelRegistrationRequest?
 
   @@map("labels")
 }
@@ -436,6 +441,12 @@ enum Role {
   ADMIN
 }
 
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum AlbumType {
   ALBUM
   EP
@@ -472,6 +483,9 @@ enum NotificationType {
   CLAIM_REQUEST_REJECTED
   NEW_REPORT_SUBMITTED
   REPORT_RESOLVED
+  LABEL_REGISTRATION_SUBMITTED
+  LABEL_REGISTRATION_APPROVED
+  LABEL_REGISTRATION_REJECTED
 }
 
 enum FollowingType {
@@ -495,4 +509,51 @@ enum ReportStatus {
   PENDING
   RESOLVED
   REJECTED
+}
+
+model LabelRegistrationRequest {
+  id                          String        @id @default(cuid())
+  requestedLabelName          String
+  requestedLabelDescription   String?
+  requestedLabelLogoUrl       String?       // This will store the path to the uploaded logo
+
+  requestingArtistId          String
+  requestingArtist            ArtistProfile @relation("LabelRequestsByArtist", fields: [requestingArtistId], references: [id], onDelete: Cascade)
+
+  status                      RequestStatus @default(PENDING)
+  submittedAt                 DateTime      @default(now())
+  reviewedAt                  DateTime?
+  reviewedByAdminId           String?
+  reviewedByAdmin             User?         @relation("AdminReviewedLabelRequests", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  rejectionReason             String?
+
+  createdLabelId              String?       @unique
+  createdLabel                Label?        @relation(fields: [createdLabelId], references: [id], onDelete: SetNull)
+
+  @@index([requestingArtistId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([reviewedByAdminId])
+  @@map("label_registration_requests")
+}
+
+model ArtistRequest {
+  id                         String      @id @default(cuid())
+  artistName                 String
+  bio                        String?     @db.Text
+  avatarUrl                  String?     // Added for request-specific avatar
+  socialMediaLinks           Json?
+  portfolioLinks             Json?       // Can store multiple links
+  idVerificationDocumentUrl  String?
+  requestedGenres            String[]    @default([]) // Added for requested genres
+  status                     RequestStatus @default(PENDING)
+  rejectionReason            String?     @db.Text
+  requestedLabelName         String?    // New field for label name
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("artist_requests")
 }
