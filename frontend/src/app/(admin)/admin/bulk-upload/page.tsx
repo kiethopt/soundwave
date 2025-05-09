@@ -35,6 +35,15 @@ interface UploadResult {
   albumName?: string | null;
   albumId?: string;
   albumType?: string;
+  album?: { 
+    id?: string;
+    title?: string;
+    releaseDate?: string;
+    type?: string;
+    coverUrl?: string;
+    totalTracks?: number;
+    duration?: number;
+  };
 }
 
 export default function BulkUploadPage() {
@@ -134,7 +143,25 @@ export default function BulkUploadPage() {
     if (!results.length) return;
     
     // Create CSV headers
-    const headers = ['Status', 'File Name', 'Track Title', 'Artist', 'Album Name', 'Album Type', 'Duration', 'Tempo', 'Mood', 'Key', 'Scale', 'Genres', 'Cover URL', 'Track ID', 'Audio URL'];
+    const headers = [
+      'Status', 
+      'File Name', 
+      'Track Title', 
+      'Artist', 
+      'Album Name', 
+      'Album Type', 
+      'Album ID',
+      'Album Release Date',
+      'Duration', 
+      'Tempo', 
+      'Mood', 
+      'Key', 
+      'Scale', 
+      'Genres', 
+      'Cover URL', 
+      'Track ID', 
+      'Audio URL'
+    ];
     
     // Convert results to CSV rows
     const csvRows = results.map(result => {
@@ -145,6 +172,8 @@ export default function BulkUploadPage() {
         result.artistName || '',
         result.albumName || 'N/A',
         result.albumType || 'SINGLE',
+        result.albumId || '',
+        result.album?.releaseDate ? new Date(result.album.releaseDate).toISOString().split('T')[0] : '',
         formatDuration(result.duration),
         result.tempo || '',
         result.mood || '',

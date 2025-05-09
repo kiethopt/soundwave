@@ -322,7 +322,6 @@ const addTracksToAlbum = async (req) => {
         try {
             const metadata = await mm.parseBuffer(file.buffer);
             duration = Math.floor(metadata.format.duration || 0);
-            console.log(`[addTracksToAlbum] Track ${index} (${file.originalname}): Parsed duration = ${metadata.format.duration}, Saved duration = ${duration}`);
             if (!metadata.format.duration) {
                 console.warn(`[addTracksToAlbum] Track ${index} (${file.originalname}): music-metadata could not find duration.`);
             }
@@ -389,7 +388,7 @@ const addTracksToAlbum = async (req) => {
         console.timeEnd(`[addTracksToAlbum] DB Create Track ${index}`);
         return track;
     }));
-    const tracks = await db_1.default.track.findMany({ where: { albumId }, select: { duration: true } });
+    const tracks = await db_1.default.track.findMany({ where: { albumId }, select: { duration: true, id: true, title: true } });
     const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
     const updatedAlbum = await db_1.default.album.update({
         where: { id: albumId },

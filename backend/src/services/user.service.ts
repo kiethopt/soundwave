@@ -706,9 +706,72 @@ export const requestArtistRole = async (
       artistName: true,
       status: true,
       avatarUrl: true,
-      requestedGenres: true
+      requestedGenres: true,
+      user: { select: { id: true, name: true, username: true, avatar: true } }, // Select user for notification
     }
   });
+
+  // --- START: Notify Admins about new Artist Request ---
+  try {
+    const admins = await prisma.user.findMany({ where: { role: Role.ADMIN } });
+    const requestingUserName = newArtistRequest.user.name || newArtistRequest.user.username || 'A user';
+    const notificationMessage = `User '${requestingUserName}' has submitted a request to become artist '${newArtistRequest.artistName}'.`;
+
+    const notificationPromises = admins.map(admin =>
+      prisma.notification.create({
+        data: {
+          type: NotificationType.ARTIST_REQUEST_SUBMITTED,
+          message: notificationMessage,
+          recipientType: RecipientType.USER,
+          userId: admin.id,
+          senderId: user.id,
+          artistRequestId: newArtistRequest.id,
+        },
+        select: {
+          id: true, type: true, message: true, recipientType: true, userId: true, 
+          senderId: true, artistRequestId: true, createdAt: true, isRead: true 
+        }
+      })
+    );
+    const createdNotifications = await Promise.all(notificationPromises);
+
+    const io = getIO();
+    const userSocketsMap = getUserSockets();
+
+    createdNotifications.forEach(notification => {
+      const adminSocketId = userSocketsMap.get(notification.userId as string);
+      if (adminSocketId) {
+        console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${notification.userId} via socket ${adminSocketId}`);
+        io.to(adminSocketId).emit('notification', {
+          id: notification.id,
+          type: notification.type,
+          message: notification.message,
+          recipientType: notification.recipientType,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt.toISOString(),
+          artistRequestId: notification.artistRequestId,
+          senderId: notification.senderId,
+          requestingUser: {
+            id: newArtistRequest.user.id,
+            name: newArtistRequest.user.name,
+            username: newArtistRequest.user.username,
+            avatar: newArtistRequest.user.avatar,
+          },
+          artistRequestDetails: {
+            id: newArtistRequest.id,
+            artistName: newArtistRequest.artistName,
+            avatarUrl: newArtistRequest.avatarUrl,
+          }
+        });
+      } else {
+        console.log(`[Socket Emit] Admin ${notification.userId} not connected, skipping ARTIST_REQUEST_SUBMITTED socket event.`);
+      }
+    });
+
+  } catch (notificationError) {
+    console.error("[Notify Error] Failed to create admin notifications for new artist request:", notificationError);
+  }
+  // --- END: Notify Admins ---
 
   return {
     message: 'Artist request submitted successfully. It will be reviewed by an administrator.',
@@ -1510,7 +1573,6 @@ export const getGenreTopTracks = async (genreId: string) => {
           genreId,
         },
       },
-      type: 'SINGLE',
     },
     select: searchTrackSelect,
     orderBy: { playCount: 'desc' },
@@ -1542,7 +1604,6 @@ export const getGenreNewestTracks = async (genreId: string) => {
           genreId,
         },
       },
-      type: 'SINGLE',
     },
     select: searchTrackSelect,
     orderBy: { createdAt: 'desc' },
@@ -1678,9 +1739,6 @@ export const submitArtistClaim = async (userId: string, artistProfileId: string,
   }
   if (targetProfile.userId) {
     throw new Error('This artist profile is already associated with a user.');
-  }
-  if (targetProfile.isVerified) {
-    throw new Error('This artist profile is already verified.');
   }
 
   // 2. Check if the user already submitted a claim for this profile

@@ -258,6 +258,7 @@ model Notification {
   trackId       String?
   albumId       String?
   claimId       String?
+  artistRequestId String?
   count         Int?             @default(1)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -265,6 +266,7 @@ model Notification {
   user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   track         Track?           @relation(fields: [trackId], references: [id], onDelete: SetNull)
   album         Album?           @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  artistRequest ArtistRequest?   @relation(fields: [artistRequestId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([artistId])
@@ -272,6 +274,7 @@ model Notification {
   @@index([trackId])
   @@index([albumId])
   @@index([claimId])
+  @@index([artistRequestId])
   @@index([createdAt])
   @@map("notifications")
 }
@@ -468,6 +471,7 @@ model ArtistRequest {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
   @@index([userId])
   @@index([status])

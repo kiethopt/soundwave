@@ -484,18 +484,6 @@ const deleteUserById = async (id, requestingUser, reason) => {
         }
         throw new Error("Permission denied: Admins cannot delete other admins.");
     }
-    if (userToDelete.email) {
-        try {
-            const userName = userToDelete.name || userToDelete.username || "User";
-            const emailOptions = emailService.createAccountDeletedEmail(userToDelete.email, userName, reason);
-            emailService
-                .sendEmail(emailOptions)
-                .catch((err) => console.error("[Async Email Error] Failed to send account deletion email:", err));
-        }
-        catch (syncError) {
-            console.error("[Email Setup Error] Failed to create deletion email options:", syncError);
-        }
-    }
     await db_1.default.user.delete({ where: { id } });
     return {
         message: `User ${id} deleted successfully. Reason: ${reason || "No reason provided"}`,
@@ -1312,8 +1300,7 @@ const approveArtistClaim = async (claimId, adminUserId) => {
     if (claimRequest.status !== client_1.ClaimStatus.PENDING) {
         throw new Error(`Cannot approve claim request with status: ${claimRequest.status}`);
     }
-    if (claimRequest.artistProfile.userId ||
-        claimRequest.artistProfile.isVerified) {
+    if (claimRequest.artistProfile.userId) {
         await db_1.default.artistClaimRequest.update({
             where: { id: claimId },
             data: {
@@ -2688,6 +2675,53 @@ const extractTrackAndArtistData = async () => {
                 artistName: 'asc'
             }
         });
+        const albums = await db_1.default.album.findMany({
+            where: {
+                isActive: true
+            },
+            select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                releaseDate: true,
+                duration: true,
+                totalTracks: true,
+                type: true,
+                createdAt: true,
+                artist: {
+                    select: {
+                        id: true,
+                        artistName: true
+                    }
+                },
+                label: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                genres: {
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
+                    }
+                },
+            },
+            orderBy: [
+                {
+                    artist: {
+                        artistName: 'asc'
+                    }
+                },
+                {
+                    releaseDate: 'desc'
+                }
+            ]
+        });
         const tracks = await db_1.default.track.findMany({
             where: {
                 isActive: true
@@ -2718,8 +2752,13 @@ const extractTrackAndArtistData = async () => {
                 },
                 album: {
                     select: {
+                        id: true,
                         title: true,
-                        type: true
+                        type: true,
+                        releaseDate: true,
+                        coverUrl: true,
+                        totalTracks: true,
+                        duration: true
                     }
                 },
                 genres: {
@@ -2764,13 +2803,31 @@ const extractTrackAndArtistData = async () => {
             trackCount: artist.tracks.length,
             createdAt: artist.createdAt.toISOString().split('T')[0]
         }));
+        const albumsForExport = albums.map(album => ({
+            id: album.id,
+            title: album.title,
+            artistName: album.artist.artistName,
+            artistId: album.artist.id,
+            releaseDate: album.releaseDate.toISOString().split('T')[0],
+            albumType: album.type,
+            totalTracks: album.totalTracks,
+            duration: album.duration,
+            labelName: album.label?.name || '',
+            coverUrl: album.coverUrl || '',
+            genres: album.genres.map(g => g.genre.name).join(', '),
+            createdAt: album.createdAt.toISOString().split('T')[0]
+        }));
         const tracksForExport = tracks.map(track => ({
             id: track.id,
             title: track.title,
             artist: track.artist.artistName,
             album: track.album?.title || '(Single)',
+            albumId: track.album?.id || '',
             albumType: track.album?.type || 'SINGLE',
-            coverUrl: track.coverUrl,
+            albumReleaseDate: track.album?.releaseDate ? track.album.releaseDate.toISOString().split('T')[0] : '',
+            albumTotalTracks: track.album?.totalTracks || 1,
+            albumDuration: track.album?.duration || track.duration,
+            coverUrl: track.coverUrl || track.album?.coverUrl || '',
             audioUrl: track.audioUrl,
             labelName: track.label?.name || '',
             featuredArtistNames: track.featuredArtists?.map(fa => fa.artistProfile.artistName).join(', ') || '',
@@ -2787,6 +2844,7 @@ const extractTrackAndArtistData = async () => {
         }));
         return {
             artists: artistsForExport,
+            albums: albumsForExport,
             tracks: tracksForExport,
             exportDate: new Date().toISOString()
         };

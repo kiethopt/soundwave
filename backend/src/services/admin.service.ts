@@ -1670,8 +1670,7 @@ export const approveArtistClaim = async (
 
   // Double-check if the target profile is still available before approving
   if (
-    claimRequest.artistProfile.userId ||
-    claimRequest.artistProfile.isVerified
+    claimRequest.artistProfile.userId
   ) {
     // Optionally auto-reject here instead of throwing
     await prisma.artistClaimRequest.update({
@@ -3500,6 +3499,55 @@ export const extractTrackAndArtistData = async () => {
       }
     });
 
+    // Get albums with detailed info
+    const albums = await prisma.album.findMany({
+      where: {
+        isActive: true
+      },
+      select: {
+        id: true,
+        title: true,
+        coverUrl: true,
+        releaseDate: true,
+        duration: true,
+        totalTracks: true,
+        type: true,
+        createdAt: true,
+        artist: {
+          select: {
+            id: true,
+            artistName: true
+          }
+        },
+        label: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+      },
+      orderBy: [
+        {
+          artist: {
+            artistName: 'asc'
+          }
+        },
+        {
+          releaseDate: 'desc'
+        }
+      ]
+    });
+
     // Get tracks with detailed info
     const tracks = await prisma.track.findMany({
       where: {
@@ -3531,8 +3579,13 @@ export const extractTrackAndArtistData = async () => {
         },
         album: {
           select: {
+            id: true,
             title: true,
-            type: true
+            type: true,
+            releaseDate: true,
+            coverUrl: true,
+            totalTracks: true,
+            duration: true
           }
         },
         genres: {
@@ -3580,13 +3633,33 @@ export const extractTrackAndArtistData = async () => {
       createdAt: artist.createdAt.toISOString().split('T')[0]
     }));
 
+    // Format albums for export
+    const albumsForExport = albums.map(album => ({
+      id: album.id,
+      title: album.title,
+      artistName: album.artist.artistName,
+      artistId: album.artist.id,
+      releaseDate: album.releaseDate.toISOString().split('T')[0],
+      albumType: album.type,
+      totalTracks: album.totalTracks,
+      duration: album.duration,
+      labelName: album.label?.name || '',
+      coverUrl: album.coverUrl || '',
+      genres: album.genres.map(g => g.genre.name).join(', '),
+      createdAt: album.createdAt.toISOString().split('T')[0]
+    }));
+
     const tracksForExport = tracks.map(track => ({
       id: track.id,
       title: track.title,
       artist: track.artist.artistName,
       album: track.album?.title || '(Single)',
+      albumId: track.album?.id || '',
       albumType: track.album?.type || 'SINGLE',
-      coverUrl: track.coverUrl,
+      albumReleaseDate: track.album?.releaseDate ? track.album.releaseDate.toISOString().split('T')[0] : '',
+      albumTotalTracks: track.album?.totalTracks || 1,
+      albumDuration: track.album?.duration || track.duration,
+      coverUrl: track.coverUrl || track.album?.coverUrl || '',
       audioUrl: track.audioUrl,
       labelName: track.label?.name || '',
       featuredArtistNames: track.featuredArtists?.map(fa => fa.artistProfile.artistName).join(', ') || '',
@@ -3604,6 +3677,7 @@ export const extractTrackAndArtistData = async () => {
 
     return {
       artists: artistsForExport,
+      albums: albumsForExport,
       tracks: tracksForExport,
       exportDate: new Date().toISOString()
     };

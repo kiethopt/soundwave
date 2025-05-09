@@ -776,17 +776,35 @@ const exportTrackAndArtistData = async (req, res) => {
             { header: 'Created At', key: 'createdAt', width: 15 }
         ];
         artistsSheet.addRows(data.artists);
+        const albumsSheet = workbook.addWorksheet('Albums');
+        albumsSheet.columns = [
+            { header: 'ID', key: 'id', width: 30 },
+            { header: 'Title', key: 'title', width: 40 },
+            { header: 'Artist', key: 'artistName', width: 30 },
+            { header: 'Artist ID', key: 'artistId', width: 30 },
+            { header: 'Album Type', key: 'albumType', width: 15 },
+            { header: 'Release Date', key: 'releaseDate', width: 15 },
+            { header: 'Total Tracks', key: 'totalTracks', width: 15 },
+            { header: 'Duration (sec)', key: 'duration', width: 15 },
+            { header: 'Label', key: 'labelName', width: 25 },
+            { header: 'Cover URL', key: 'coverUrl', width: 40 },
+            { header: 'Genres', key: 'genres', width: 30 },
+            { header: 'Created At', key: 'createdAt', width: 15 }
+        ];
+        albumsSheet.addRows(data.albums);
         const tracksSheet = workbook.addWorksheet('Tracks');
         tracksSheet.columns = [
             { header: 'ID', key: 'id', width: 30 },
             { header: 'Title', key: 'title', width: 40 },
             { header: 'Artist', key: 'artist', width: 30 },
             { header: 'Album', key: 'album', width: 30 },
+            { header: 'Album ID', key: 'albumId', width: 30 },
+            { header: 'Album Type', key: 'albumType', width: 15 },
+            { header: 'Album Release Date', key: 'albumReleaseDate', width: 15 },
+            { header: 'Album Total Tracks', key: 'albumTotalTracks', width: 15 },
             { header: 'Audio URL', key: 'audioUrl', width: 40 },
             { header: 'Label Name', key: 'labelName', width: 30 },
             { header: 'Featured Artist Names', key: 'featuredArtistNames', width: 40 },
-            { header: 'Album', key: 'album', width: 40 },
-            { header: 'Album Type', key: 'albumType', width: 15 },
             { header: 'Duration (sec)', key: 'duration', width: 15 },
             { header: 'Release Date', key: 'releaseDate', width: 15 },
             { header: 'Play Count', key: 'playCount', width: 15 },
@@ -796,7 +814,8 @@ const exportTrackAndArtistData = async (req, res) => {
             { header: 'Scale', key: 'scale', width: 10 },
             { header: 'Danceability', key: 'danceability', width: 15 },
             { header: 'Energy', key: 'energy', width: 15 },
-            { header: 'Genres', key: 'genres', width: 30 }
+            { header: 'Genres', key: 'genres', width: 30 },
+            { header: 'Cover URL', key: 'coverUrl', width: 40 }
         ];
         tracksSheet.addRows(data.tracks);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
