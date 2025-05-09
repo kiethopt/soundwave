@@ -22,7 +22,7 @@ import { disconnectSocket } from '@/utils/socket';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LogOut, Clock, Flag } from 'lucide-react';
+import { LogOut, Clock, Flag, Eye, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useSession } from '@/contexts/SessionContext';
@@ -106,6 +106,19 @@ export default function Header({
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // Add this debugging helper before the fetchAndSetNotifications function
+  const checkUnreadNotifications = () => {
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    console.log('Current notification state:', { 
+      notificationCount, 
+      actualUnreadCount: unreadCount,
+      notificationsLength: notifications.length,
+      hasUnreadNotifications: unreadCount > 0,
+      buttonShouldBeDisabled: notificationCount === 0
+    });
+    return unreadCount;
+  };
 
   const fetchAndSetNotifications = async () => {
     try {
@@ -281,6 +294,9 @@ export default function Header({
       setShowNotifications((prev) => !prev);
 
       if (opening) {
+        // Check unread notifications before fetching
+        checkUnreadNotifications();
+        
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
@@ -295,6 +311,7 @@ export default function Header({
         });
 
         const currentUnreadCount = relevantNotifications.filter(n => !n.isRead).length;
+        console.log('Current unread count:', currentUnreadCount, 'Button should be disabled:', currentUnreadCount === 0);
         setNotificationCount(currentUnreadCount);
         if (String(currentUnreadCount) !== localStorage.getItem('notificationCount')) {
           localStorage.setItem('notificationCount', String(currentUnreadCount));
@@ -363,14 +380,10 @@ export default function Header({
 
       setShowNotifications(false);
 
-      // Handle navigation based on notification type
       if (notification.type === 'NEW_REPORT_SUBMITTED' || notification.type === 'REPORT_RESOLVED') {
-        // Check if current user is Admin, and route appropriately
         if (user?.role === 'ADMIN') {
-          // Admin should go to admin reports page
           router.push('/admin/reports');
         } else {
-          // Regular users go to user reports page
           if (notification.reportId) {
             router.push(`/reports?reportId=${notification.reportId}`);
           } else {
@@ -378,14 +391,9 @@ export default function Header({
           }
         }
       } else if (notification.type === 'LABEL_REGISTRATION_APPROVED') {
-        // Navigate to artist dashboard or a success page
-        // For now, just a toast, actual navigation can be decided later
         toast.success(notification.message || 'Your label registration was approved!');
-        // Potentially navigate to the artist's label management section or dashboard
-        // router.push('/artist/dashboard'); 
       } else if (notification.type === 'LABEL_REGISTRATION_REJECTED') {
         toast.error(notification.message || 'Your label registration was rejected.');
-        // router.push('/profile/settings'); // Or some relevant page
       }
 
     } catch (error) {
@@ -468,34 +476,36 @@ export default function Header({
     setSearchQuery(e.target.value);
   };
 
-  const handleMarkAsRead = async () => {
-     if (!socket || !isConnected) {
-         console.warn("[Header] Cannot mark as read: Socket not connected.");
-         toast.error("Cannot connect to update notifications.");
-         return;
-     }
-     if (notifications.length === 0 || !hasUnread) return;
+  const handleMarkAllNotificationsAsRead = async () => {
+    const token = localStorage.getItem('userToken');
+    if (!token || !user) {
+      toast.error('Authentication required to mark notifications as read.');
+      return;
+    }
 
-     const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
-     if (unreadIds.length === 0) {
-         setHasUnread(false);
-         return;
-     }
+    // Check unread notifications before marking all as read
+    const actualUnreadCount = checkUnreadNotifications();
+    if (actualUnreadCount === 0) {
+      toast.success('No unread notifications to mark as read.');
+      return;
+    }
 
-     console.log("[Header] Emitting mark_notifications_read for IDs:", unreadIds);
-     socket.emit('mark_notifications_read', { notificationIds: unreadIds }, (ack: any) => {
-         if (ack?.success) {
-             console.log("[Header] Server acknowledged mark_notifications_read.");
-             setNotifications(prev => 
-                 prev.map(n => unreadIds.includes(n.id) ? { ...n, isRead: true } : n)
-             );
-             setHasUnread(false);
-             toast.success("Notifications marked as read.");
-         } else {
-             console.error("[Header] Failed to mark notifications as read (server ack failed):", ack?.error);
-             toast.error(ack?.error || "Failed to mark notifications as read.");
-         }
-     });
+    try {
+      const response = await api.notifications.markAllAsRead(token);
+      if (response.success || response.message === 'All notifications marked as read') { 
+        setNotifications(prevNotifications => 
+          prevNotifications.map(n => ({ ...n, isRead: true }))
+        );
+        setNotificationCount(0);
+        localStorage.setItem('notificationCount', '0');
+        toast.success('All notifications marked as read.');
+      } else {
+        toast.error(response.message || 'Failed to mark all notifications as read.');
+      }
+    } catch (error: any) {
+      console.error('Error marking all notifications as read:', error);
+      toast.error(error.message || 'An error occurred.');
+    }
   };
 
   return (
@@ -713,16 +723,25 @@ export default function Header({
                      ))
                    )}
                    <div
-                    className={`sticky bottom-0 px-3 py-2 ${theme === 'light' ? 'bg-white/95 backdrop-blur-sm' : 'bg-[#282828]/95 backdrop-blur-sm'} border-t ${theme === 'light' ? 'border-gray-200' : 'border-white/10'}`}
+                    className={`sticky bottom-0 px-3 py-2 flex items-center gap-2 ${theme === 'light' ? 'bg-white/95 backdrop-blur-sm' : 'bg-[#282828]/95 backdrop-blur-sm'} border-t ${theme === 'light' ? 'border-gray-200' : 'border-white/10'}`}
                   >
-                    <Link href="/notifications" className="block">
+                    <Link href="/notifications" className="flex-1 block">
                       <button
-                        className={`w-full text-center text-sm py-1.5 rounded-md transition-colors duration-200 ${theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                        className={`w-full text-center text-sm py-1.5 rounded-md transition-colors duration-200 flex items-center justify-center gap-1.5 ${theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20'}`}
                         onClick={() => setShowNotifications(false)}
                       >
-                        View All Notifications
+                        <Eye className="w-4 h-4" />
+                        View All
                       </button>
                     </Link>
+                    <button
+                      className={`flex-1 text-center text-sm py-1.5 rounded-md transition-colors duration-200 flex items-center justify-center gap-1.5 ${unreadCount === 0 ? (theme === 'light' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white/5 text-white/40 cursor-not-allowed') : (theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20')}`}
+                      onClick={handleMarkAllNotificationsAsRead}
+                      disabled={unreadCount === 0}
+                    >
+                      <CheckCheck className="w-4 h-4" />
+                      Mark All Read
+                    </button>
                   </div>
                 </div>
               )}

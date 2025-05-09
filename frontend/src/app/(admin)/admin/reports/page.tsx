@@ -172,11 +172,11 @@ export default function ReportsPage() {
         setActionLoading(null);
         return;
       }
-      await api.reports.deleteReport(reportToDelete.id, token); // Assumes this API function exists/will be created
+      await api.reports.deleteReport(reportToDelete.id, token);
       toast.success('Report deleted successfully');
       setIsDeleteModalOpen(false);
       setReportToDelete(null);
-      refreshTable(); // Refresh table after deletion
+      refreshTable();
     } catch (error: any) {
       console.error('Error deleting report:', error);
       toast.error(error.message || 'Failed to delete report');
@@ -196,25 +196,26 @@ export default function ReportsPage() {
 
       const response = await api.reports.resolveReport(reportId, data, token);
 
-      // The API now returns the updated report directly
       if (response.message && response.report) {
         toast.success(response.message);
-        // Update local reports list with the single updated report
         setReports((prevReports) =>
           prevReports.map((r) => (r.id === response.report.id ? response.report : r))
         );
-        // Close the modal after successful resolution
         setIsResolveOpen(false);
+        if (data.status === 'REJECTED' || data.status === 'RESOLVED') {
+          setIsDetailOpen(false); 
+        }
       } else {
-        // Fallback if report object isn't returned for some reason
-        toast.success(response.message || 'Report resolved successfully');
-        fetchReports(); // Refetch all reports as a fallback
-        // Close the modal even in fallback case
+        toast.success(response.message || 'Report processed successfully');
+        fetchReports();
         setIsResolveOpen(false);
+        if (data.status === 'REJECTED' || data.status === 'RESOLVED') {
+          setIsDetailOpen(false);
+        }
       }
     } catch (error: any) {
       console.error('Error resolving report:', error);
-      toast.error(error.message || 'Failed to resolve report');
+      toast.error(error.message || 'Failed to process report');
     } finally {
       setActionLoading(null);
     }
