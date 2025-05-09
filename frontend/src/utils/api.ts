@@ -773,6 +773,22 @@ export const api = {
         token
       );
     },
+
+    // Add this new method for exporting track and artist data
+    async exportTrackArtistData(token: string): Promise<Blob> {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/export/track-artist-data`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+      
+      return response.blob();
+    },
   },
 
   user: {
