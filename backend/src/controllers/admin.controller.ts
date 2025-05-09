@@ -984,6 +984,10 @@ export const exportTrackAndArtistData = async (
       { header: 'ID', key: 'id', width: 30 },
       { header: 'Title', key: 'title', width: 40 },
       { header: 'Artist', key: 'artist', width: 30 },
+      { header: 'Cover URL', key: 'coverUrl', width: 40 },
+      { header: 'Audio URL', key: 'audioUrl', width: 40 },
+      { header: 'Label Name', key: 'labelName', width: 40 },
+      { header: 'Featured Artist Names', key: 'featuredArtistNames', width: 40 },
       { header: 'Album', key: 'album', width: 40 },
       { header: 'Album Type', key: 'albumType', width: 15 },
       { header: 'Duration (sec)', key: 'duration', width: 15 },
@@ -997,6 +1001,21 @@ export const exportTrackAndArtistData = async (
       { header: 'Energy', key: 'energy', width: 15 },
       { header: 'Genres', key: 'genres', width: 30 }
     ];
+
+    // artistName: 'Dương Domic',
+    // title: 'Là Em, Chính Em',
+    // coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745731659/laemlachinhem_wzepft.jpg',
+    // audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731671/L%C3%A0_Em_Ch%C3%ADnh_Em_ki38w0.mp3',
+    // genreNames: ['V-Pop', 'Ballad'],
+    // labelName: 'DAO Entertainment',
+    // featuredArtistNames: [],
+    // playCount: 25,
+    // tempo: 80,
+    // mood: 'Romantic',
+    // key: 'Bb',
+    // scale: 'major',
+    // danceability: 0.60,
+    // energy: 0.55
     
     // Add the data to the tracks worksheet
     tracksSheet.addRows(data.tracks);
