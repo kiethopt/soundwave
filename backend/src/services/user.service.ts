@@ -697,7 +697,6 @@ export const requestArtistRole = async (
       bio: bio?.trim(),
       avatarUrl: avatarUrl,
       socialMediaLinks: socialMediaLinksJson || Prisma.JsonNull,
-      idVerificationDocumentUrl: idVerificationDocumentUrl,
       requestedGenres: requestedGenresArray,
       requestedLabelName: requestedLabelName?.trim() || null,
       status: RequestStatus.PENDING,
