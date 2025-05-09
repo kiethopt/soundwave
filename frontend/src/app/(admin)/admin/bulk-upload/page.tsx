@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
-import { FileAudio, Upload, X, Check, Info, AlertCircle, Download, Image } from 'lucide-react';
+import { FileAudio, Upload, X, Check, Info, AlertCircle, Download, Image, Database } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,16 @@ interface UploadResult {
   genres?: string[];
   success: boolean;
   error?: string;
+  danceability?: number | null;
+  energy?: number | null;
+  instrumentalness?: number | null;
+  acousticness?: number | null;
+  loudness?: number | null;
+  speechiness?: number | null;
+  valence?: number | null;
+  albumName?: string | null;
+  albumId?: string;
+  albumType?: string;
 }
 
 export default function BulkUploadPage() {
@@ -33,6 +43,7 @@ export default function BulkUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [results, setResults] = useState<UploadResult[]>([]);
+  const [exportingData, setExportingData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +134,7 @@ export default function BulkUploadPage() {
     if (!results.length) return;
     
     // Create CSV headers
-    const headers = ['Status', 'File Name', 'Track Title', 'Artist', 'Duration', 'Tempo', 'Mood', 'Key', 'Scale', 'Genres', 'Cover URL', 'Track ID', 'Audio URL'];
+    const headers = ['Status', 'File Name', 'Track Title', 'Artist', 'Album Name', 'Album Type', 'Duration', 'Tempo', 'Mood', 'Key', 'Scale', 'Genres', 'Cover URL', 'Track ID', 'Audio URL'];
     
     // Convert results to CSV rows
     const csvRows = results.map(result => {
@@ -132,6 +143,8 @@ export default function BulkUploadPage() {
         result.fileName,
         result.title || '',
         result.artistName || '',
+        result.albumName || 'N/A',
+        result.albumType || 'SINGLE',
         formatDuration(result.duration),
         result.tempo || '',
         result.mood || '',
@@ -141,6 +154,13 @@ export default function BulkUploadPage() {
         result.coverUrl || '',
         result.trackId || '',
         result.audioUrl || '',
+        result.danceability !== undefined ? result.danceability : '',
+        result.energy !== undefined ? result.energy : '',
+        result.instrumentalness !== undefined ? result.instrumentalness : '',
+        result.acousticness !== undefined ? result.acousticness : '',
+        result.loudness !== undefined ? result.loudness : '',
+        result.speechiness !== undefined ? result.speechiness : '',
+        result.valence !== undefined ? result.valence : '',
         result.error || ''
       ].join(',');
     });
@@ -158,12 +178,69 @@ export default function BulkUploadPage() {
     link.click();
   };
 
+  const handleExportTrackArtistData = async () => {
+    try {
+      setExportingData(true);
+      toast.loading('Preparing export data...');
+      
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Use the API utility instead of direct fetch
+      const blob = await api.admin.exportTrackArtistData(token);
+      
+      // Generate a filename using current date
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `soundwave_data_export_${date}.xlsx`;
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a link element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      toast.dismiss();
+      toast.success('Export completed successfully');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.dismiss();
+      toast.error(error instanceof Error ? error.message : 'Failed to export data');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
   return (
     <div className="container mx-auto space-y-6 p-4 pb-20">
       <div className="mb-6">
-        <h1 className={`text-2xl md:text-3xl font-bold tracking-tight`}>
-          Bulk Upload Tracks
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className={`text-2xl md:text-3xl font-bold tracking-tight`}>
+            Bulk Upload Tracks
+          </h1>
+          
+          <Button
+            variant="outline"
+            onClick={handleExportTrackArtistData}
+            disabled={exportingData}
+            className={cn(
+              "flex items-center",
+              theme === 'dark' ? 'border-gray-700 hover:border-gray-600' : ''
+            )}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            {exportingData ? 'Exporting...' : 'Export Track & Artist Data'}
+          </Button>
+        </div>
         <p className={`text-sm md:text-base ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>
           Upload multiple audio files to create track entries with automatically extracted metadata
         </p>
@@ -317,6 +394,7 @@ export default function BulkUploadPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">File Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Track Title</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Artist</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Album</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Tempo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Audio Analysis</th>
@@ -385,6 +463,25 @@ export default function BulkUploadPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.artistName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {result.albumName ? (
+                        <span className={cn(
+                          "px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded",
+                          result.albumType === 'EP' 
+                            ? theme === 'dark' ? "bg-purple-900/30 text-purple-200" : "bg-purple-100 text-purple-800"
+                            : theme === 'dark' ? "bg-blue-900/30 text-blue-200" : "bg-blue-100 text-blue-800"
+                        )}>
+                          {result.albumName} ({result.albumType || 'ALBUM'})
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          "px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded",
+                          theme === 'dark' ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+                        )}>
+                          Single
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDuration(result.duration)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.tempo}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">

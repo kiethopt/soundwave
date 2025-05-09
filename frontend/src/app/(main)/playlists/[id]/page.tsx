@@ -764,7 +764,7 @@ export default function PlaylistPage() {
                 alt={playlist.user.name || playlist.user.username || 'Creator'}
                 width={24}
                 height={24}
-                className="rounded-full object-cover"
+                className="w-6 h-6 rounded-full object-cover aspect-square"
               />
               <Link href={`/profile/${playlist.user.id}`} className="text-white/90 hover:underline">
                 {playlist.user.name || playlist.user.username || 'Unknown User'}
@@ -900,7 +900,7 @@ export default function PlaylistPage() {
                 <div className="flex justify-center">#</div>
                 <div>Title</div>
                 <div>Album</div>
-                <div className="text-left">Genre</div>
+                <div className="text-left">Genre(s)</div>
                 <div className="flex items-center justify-start">
                   Date Added
                 </div>

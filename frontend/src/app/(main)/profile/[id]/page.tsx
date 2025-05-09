@@ -448,7 +448,7 @@ export default function UserProfilePage({
                 alt={user.name || "User avatar"}
                 width={192}
                 height={192}
-                className="w-32 h-32 md:w-48 md:h-48 rounded-full"
+                className="w-32 h-32 md:w-48 md:h-48 rounded-full object-cover"
                 priority
               />
 

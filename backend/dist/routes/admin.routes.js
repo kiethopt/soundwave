@@ -82,5 +82,7 @@ router.get('/label-registrations/:registrationId', auth_middleware_1.authenticat
 router.put('/label-registrations/:registrationId/approve', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveLabelRegistration);
 router.put('/label-registrations/:registrationId/reject', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectLabelRegistration);
 router.get("/artist-role-requests", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRoleRequestsHandler);
+router.get("/export/track-artist-data", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.exportTrackAndArtistData);
+router.post('/fix-album-track-types', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.fixAlbumTrackTypes);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

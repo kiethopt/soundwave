@@ -773,6 +773,22 @@ export const api = {
         token
       );
     },
+
+    // Add this new method for exporting track and artist data
+    async exportTrackArtistData(token: string): Promise<Blob> {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/export/track-artist-data`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+      
+      return response.blob();
+    },
   },
 
   user: {
@@ -1947,7 +1963,7 @@ export const api = {
       token: string,
       page: number = 1,
       limit: number = 10,
-      filters: { type?: string; status?: string } = {}
+      filters: { type?: string; status?: string; search?: string } = {}
     ) => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -1960,6 +1976,10 @@ export const api = {
 
       if (filters.status) {
         params.append("status", filters.status);
+      }
+      
+      if (filters.search) {
+        params.append("search", filters.search);
       }
 
       return fetchWithAuth(
@@ -1981,6 +2001,15 @@ export const api = {
           method: "PATCH",
           body: JSON.stringify(data),
         },
+        token
+      );
+    },
+    
+    // Admin only - delete a report
+    deleteReport: async (id: string, token: string) => {
+      return fetchWithAuth(
+        `/api/reports/${id}`,
+        { method: "DELETE" },
         token
       );
     },

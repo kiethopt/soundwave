@@ -12,9 +12,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, Eye } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Music, Album } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -219,31 +220,24 @@ export default function UserReportsPage() {
                       <th className="px-4 py-3 text-left">Status</th>
                       <th className="px-4 py-3 text-left">Content Reported</th>
                       <th className="px-4 py-3 text-left">Submitted</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${theme === 'light' ? 'divide-gray-200' : 'divide-neutral-700'}`}>
                     {reports.map((report) => (
                       <tr 
                         key={report.id} 
-                        className={`${theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-neutral-700 text-neutral-200'}`}
+                        onClick={() => handleViewDetails(report)}
+                        className={`cursor-pointer ${theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-neutral-700 text-neutral-200'} ${ 
+                          (report.status === 'RESOLVED' || report.status === 'REJECTED') && report.resolvedAt && 
+                          (new Date().getTime() - new Date(report.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) ? 
+                            (theme === 'light' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-blue-900/20 hover:bg-blue-800/30') : ''
+                        }`}
                       >
                         <td className="px-4 py-3">{getReportTypeBadge(report.type)}</td>
                         <td className="px-4 py-3">{getStatusBadge(report.status)}</td>
                         <td className="px-4 py-3">{getEntityTypeAndName(report)}</td>
                         <td className="px-4 py-3">
                           {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewDetails(report)}
-                            className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 hover:bg-neutral-600 text-neutral-50' : undefined}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -304,6 +298,88 @@ export default function UserReportsPage() {
                 </div>
               </div>
 
+              {/* Entity Details Section with Cover Image */}
+              {selectedReport.track && (
+                <div className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700'}`}>
+                  <h3 className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Reported Track</h3>
+                  <div className="flex gap-3 items-center">
+                    <div className={`w-16 h-16 rounded flex items-center justify-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                      {selectedReport.track.coverUrl ? (
+                        <img 
+                          src={selectedReport.track.coverUrl} 
+                          alt={selectedReport.track.title}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      ) : (
+                        <Music className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>
+                        {selectedReport.track.title}
+                      </div>
+                      <div className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>
+                        Track by {selectedReport.track.artist.artistName}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedReport.album && (
+                <div className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700'}`}>
+                  <h3 className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Reported Album</h3>
+                  <div className="flex gap-3 items-center">
+                    <div className={`w-16 h-16 rounded flex items-center justify-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                      {selectedReport.album.coverUrl ? (
+                        <img 
+                          src={selectedReport.album.coverUrl} 
+                          alt={selectedReport.album.title}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      ) : (
+                        <Album className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>
+                        {selectedReport.album.title}
+                      </div>
+                      <div className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>
+                        Album by {selectedReport.album.artist.artistName}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedReport.playlist && (
+                <div className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700'}`}>
+                  <h3 className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Reported Playlist</h3>
+                  <div className="flex gap-3 items-center">
+                    <div className={`w-16 h-16 rounded flex items-center justify-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                      {selectedReport.playlist.coverUrl ? (
+                        <img 
+                          src={selectedReport.playlist.coverUrl} 
+                          alt={selectedReport.playlist.name}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      ) : (
+                        <Music className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>
+                        {selectedReport.playlist.name}
+                      </div>
+                      <div className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>
+                        Playlist by {selectedReport.playlist.user.name || selectedReport.playlist.user.username}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h3 className={`text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Description</h3>
                 <p className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700 text-neutral-200'}`}>
@@ -331,9 +407,18 @@ export default function UserReportsPage() {
               {selectedReport.status !== 'PENDING' && selectedReport.resolution && (
                 <div>
                   <h3 className={`text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Resolution</h3>
-                  <p className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700 text-neutral-200'}`}>
+                  <p className={`rounded-md p-3 ${
+                    selectedReport.resolvedAt && (new Date().getTime() - new Date(selectedReport.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) ? 
+                      (theme === 'light' ? 'bg-blue-100/70 text-blue-900' : 'bg-blue-900/30 text-blue-100') :
+                      (theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700 text-neutral-200')
+                  }`}>
                     {selectedReport.resolution}
                   </p>
+                  {selectedReport.resolvedAt && (new Date().getTime() - new Date(selectedReport.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) && (
+                    <p className={`mt-2 text-xs italic ${theme === 'light' ? 'text-blue-700' : 'text-blue-300'}`}>
+                      This report was recently addressed by an admin
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -345,6 +430,21 @@ export default function UserReportsPage() {
                   </p>
                 </div>
               )}
+              
+              {/* Add Close button at the bottom */}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDetailOpen(false)}
+                  className={`${
+                    theme === 'dark' 
+                      ? 'bg-neutral-700 border-neutral-600 hover:bg-neutral-600 text-neutral-100' 
+                      : 'border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>

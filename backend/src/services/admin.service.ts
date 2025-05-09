@@ -1565,8 +1565,7 @@ export const getArtistClaimRequests = async (req: Request) => {
           },
           {
             claimingUser: {
-              username: { contains: trimmedSearch, mode: "insensitive" },
-            },
+              username: { contains: trimmedSearch, mode: "insensitive" } },
           },
           {
             artistProfile: {
@@ -2093,14 +2092,42 @@ export async function getOrCreateVerifiedArtistProfile(
   return artistProfile;
 }
 
+// Add this type definition at the top of the file, before the processBulkUpload function
+interface BulkUploadResult {
+  fileName: string;
+  title: string;
+  artistName: string;
+  artistId: string;
+  trackId?: string;
+  duration: number;
+  audioUrl: string;
+  coverUrl?: string;
+  tempo: number | null;
+  mood: string | null;
+  key: string | null;
+  scale: string | null;
+  danceability: number | null;
+  energy: number | null;
+  genreIds: string[];
+  genres: string[];
+  success: boolean;
+  error?: string;
+  albumName: string | null;
+  albumId?: string;
+  albumType?: 'SINGLE' | 'EP' | 'ALBUM' | undefined;
+}
+
 export const processBulkUpload = async (files: Express.Multer.File[]) => {
-  const results = [];
+  const results: BulkUploadResult[] = [];
+  // Track album mapping for batch processing
+  const albumTracks: { [albumName: string]: { tracks: any[], artistId: string, coverUrl?: string } } = {};
 
   for (const file of files) {
     let coverUrl: string | null = null;
     let title = file.originalname.replace(/\.[^/.]+$/, "");
     let derivedArtistName = "Unknown Artist";
     let duration = 0;
+    let albumName: string | null = null;
 
     try {
       console.log(`Processing file: ${file.originalname}`);
@@ -2115,6 +2142,11 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         duration = Math.round(metadata.format.duration || 0);
         if (metadata.common?.artist) derivedArtistName = metadata.common.artist;
         if (metadata.common?.title) title = metadata.common.title;
+        
+        // Extract album name from metadata if available
+        if (metadata.common?.album) {
+          albumName = metadata.common.album;
+        }
 
         // ---> START: Extract and Upload EMBEDDED cover art <---
         if (metadata.common?.picture && metadata.common.picture.length > 0) {
@@ -2223,8 +2255,13 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           mood: null,
           key: null,
           scale: null,
+          danceability: null,
+          energy: null,
           genreIds: [],
           genres: [],
+          albumName: albumName,
+          albumId: undefined,
+          albumType: albumName ? 'ALBUM' : 'SINGLE'
         });
         continue;
       }
@@ -2245,14 +2282,41 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         }
       }
 
-      // 7. Generate cover artwork IF NOT extracted/uploaded
+      // Determine album vs single
+      let albumTypeName: 'SINGLE' | 'EP' | 'ALBUM' = 'SINGLE';
+      let shouldAddToAlbum = false;
+      
+      // If there's an album name and it's different from the track title, add to an album
+      if (albumName && albumName !== title) {
+        shouldAddToAlbum = true;
+        albumTypeName = 'ALBUM';
+      } else {
+        // If no album name or album name equals track title, it's a single
+        albumTypeName = 'SINGLE';
+        albumName = null;
+      }
+
+      // 7. Generate cover artwork ONLY for singles or for the first track in an album
       if (!coverUrl) { 
-        try {
-          // Truyền mood vào hàm generateCoverArtwork nếu có
-          coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
-          console.log(`Generated fallback cover artwork for "${title}"`);
-        } catch (coverError) {
-          console.error("Error generating cover artwork:", coverError);
+        if (!shouldAddToAlbum) {
+          // This is a single track, generate cover
+          try {
+            coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+            console.log(`Generated cover artwork for single "${title}"`);
+          } catch (coverError) {
+            console.error("Error generating cover artwork for single:", coverError);
+          }
+        } else if (albumName && (!albumTracks[albumName] || albumTracks[albumName].tracks.length === 0)) {
+          // This is the first track of an album, generate album cover
+          try {
+            coverUrl = await generateCoverArtwork(albumName, derivedArtistName, mood);
+            console.log(`Generated cover artwork for album "${albumName}"`);
+          } catch (coverError) {
+            console.error(`Error generating cover artwork for album "${albumName}":`, coverError);
+          }
+        } else {
+          // This is not the first track of an album, don't generate cover
+          console.log(`Skipping cover generation for "${title}" as it will use album cover`);
         }
       }
 
@@ -2263,8 +2327,10 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         duration,
         releaseDate,
         audioUrl,
-        coverUrl, // Sử dụng coverUrl đã xác định
-        type: AlbumType.SINGLE,
+        coverUrl: coverUrl || undefined, // Convert null to undefined
+        type: albumTypeName === 'ALBUM' ? AlbumType.ALBUM : 
+              albumTypeName === 'SINGLE' ? AlbumType.SINGLE :
+              AlbumType.EP,
         isActive: true,
         tempo,
         mood,
@@ -2273,47 +2339,298 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         danceability,
         energy,
         artist: { connect: { id: artistId } },
+        // Album will be connected later
       };
 
       if (finalGenreIds.length > 0) {
         trackData.genres = { create: finalGenreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })) };
       }
 
-      const newTrack = await prisma.track.create({
-        data: trackData,
-        select: trackSelect,
-      });
+      // If track is part of an album, add to album tracks mapping
+      if (shouldAddToAlbum && albumName) {
+        if (!albumTracks[albumName]) {
+          albumTracks[albumName] = {
+            tracks: [],
+            artistId,
+            coverUrl: undefined
+          };
+        }
+        
+        // If this track has an embedded cover, prioritize it for the album
+        if (coverUrl && !albumTracks[albumName].coverUrl) {
+          console.log(`Using embedded cover from "${title}" for album "${albumName}"`);
+          albumTracks[albumName].coverUrl = coverUrl;
+        }
+        
+        // Add track data to album mapping
+        albumTracks[albumName].tracks.push({
+          trackData,
+          title,
+          duration,
+          fileName: file.originalname,
+          artistName: derivedArtistName,
+          artistId,
+          audioUrl,
+          coverUrl, // Keep track's own cover URL for reference, but it won't be used if the album has a cover
+          tempo,
+          mood,
+          key,
+          scale,
+          genreIds: finalGenreIds,
+          genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : []
+        });
+        
+        // Add to results for frontend display
+        results.push({
+          fileName: file.originalname,
+          title,
+          artistName: derivedArtistName,
+          artistId,
+          duration,
+          audioUrl,
+          coverUrl: coverUrl || undefined,
+          tempo,
+          mood,
+          key,
+          scale,
+          danceability,
+          energy,
+          genreIds: finalGenreIds,
+          genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : [],
+          success: true,
+          albumName,
+          albumId: undefined,
+          albumType: albumTypeName
+        });
+      } else {
+        // Single track, not part of an album - create directly
+        const newTrack = await prisma.track.create({
+          data: trackData,
+          select: trackSelect,
+        });
 
-      // 9. Add created track info to results
-      results.push({
-        trackId: newTrack.id,
-        title: newTrack.title,
-        artistName: derivedArtistName,
-        artistId: artistId,
-        duration: newTrack.duration,
-        audioUrl: newTrack.audioUrl,
-        coverUrl: newTrack.coverUrl, 
-        tempo: newTrack.tempo,
-        mood: newTrack.mood,
-        key: newTrack.key,
-        scale: newTrack.scale,
-        genreIds: finalGenreIds,
-        genres: newTrack.genres?.map((g) => g.genre.name),
-        fileName: file.originalname,
-        success: true,
-      });
+        results.push({
+          trackId: newTrack.id,
+          title: newTrack.title,
+          artistName: derivedArtistName,
+          artistId,
+          duration: newTrack.duration,
+          audioUrl: newTrack.audioUrl,
+          coverUrl: newTrack.coverUrl || undefined,
+          tempo: newTrack.tempo,
+          mood: newTrack.mood,
+          key: newTrack.key,
+          scale: newTrack.scale,
+          danceability: newTrack.danceability,
+          energy: newTrack.energy,
+          genreIds: finalGenreIds,
+          genres: newTrack.genres?.map((g) => g.genre.name),
+          fileName: file.originalname,
+          success: true,
+          albumName: null,
+          albumId: undefined,
+          albumType: 'SINGLE'
+        });
+      }
     } catch (error) {
       console.error(`Error processing file ${file.originalname}:`, error);
       results.push({
-        fileName: file.originalname, // Sử dụng title đã lấy được nếu có
+        fileName: file.originalname,
+        title,
+        artistName: derivedArtistName,
         error: error instanceof Error ? error.message : "Unknown error",
         success: false,
+        albumName: albumName,
+        albumId: undefined,
+        albumType: albumName ? 'ALBUM' : 'SINGLE',
+        artistId: '',
+        trackId: '',
+        duration: 0,
+        audioUrl: '',
+        coverUrl: undefined,
+        tempo: null,
+        mood: null,
+        key: null,
+        scale: null,
+        danceability: null,
+        energy: null,
+        genreIds: [],
+        genres: []
       });
+    }
+  }
+
+  // Process albums after all tracks are uploaded
+  for (const [albumName, albumData] of Object.entries(albumTracks)) {
+    try {
+      const { tracks, artistId, coverUrl } = albumData;
+      if (tracks.length === 0) continue;
+      
+      // Calculate total duration of newly added tracks
+      const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+      
+      // Check if album already exists for this artist
+      const existingAlbum = await prisma.album.findFirst({
+        where: {
+          title: albumName,
+          artistId: artistId
+        },
+        include: {
+          tracks: {
+            select: {
+              duration: true
+            }
+          }
+        }
+      });
+      
+      let album;
+      // Initialize with defaults
+      let albumTypeName: 'EP' | 'ALBUM' | 'SINGLE' = 'EP';
+      let albumType: AlbumType = AlbumType.EP;
+      
+      if (existingAlbum) {
+        console.log(`Album "${albumName}" already exists for this artist. Adding tracks to existing album.`);
+        
+        // Use existing album type instead of recalculating
+        albumType = existingAlbum.type;
+        // Derive string representation from enum
+        albumTypeName = existingAlbum.type === AlbumType.ALBUM ? 'ALBUM' : 
+                       existingAlbum.type === AlbumType.SINGLE ? 'SINGLE' : 'EP';
+        
+        // Calculate new total duration including existing tracks
+        const existingDuration = existingAlbum.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+        const newTotalDuration = existingDuration + totalDuration;
+        const newTotalTracks = existingAlbum.totalTracks + tracks.length;
+        
+        // Only change from EP to ALBUM if total duration exceeds 10 minutes
+        if (newTotalDuration >= 600 && existingAlbum.type === AlbumType.EP) {
+          albumType = AlbumType.ALBUM;
+          albumTypeName = 'ALBUM';
+          
+          // Update album type and data
+          await prisma.album.update({
+            where: { id: existingAlbum.id },
+            data: {
+              type: AlbumType.ALBUM,
+              duration: newTotalDuration,
+              totalTracks: newTotalTracks,
+              // Only update album cover if album has a better cover image and existing album has no cover
+              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
+            }
+          });
+          
+          // Update type of all tracks in the album to match the new album type
+          await prisma.track.updateMany({
+            where: { albumId: existingAlbum.id },
+            data: { type: AlbumType.ALBUM }
+          });
+          
+          console.log(`Album "${albumName}" type changed from EP to ALBUM as duration now exceeds 10 minutes. Updated type for all ${existingAlbum.totalTracks} existing tracks.`);
+        } else {
+          // Just update duration and track count
+          await prisma.album.update({
+            where: { id: existingAlbum.id },
+            data: {
+              duration: newTotalDuration,
+              totalTracks: newTotalTracks,
+              // Only update album cover if album has a better cover image and existing album has no cover
+              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
+            }
+          });
+        }
+        
+        album = await prisma.album.findUnique({
+          where: { id: existingAlbum.id }
+        });
+      } else {
+        // For new albums, determine type based on duration
+        // EP if total duration is less than 10 minutes (600 seconds)
+        albumTypeName = totalDuration < 600 ? 'EP' : 'ALBUM';
+        albumType = albumTypeName === 'EP' ? AlbumType.EP : AlbumType.ALBUM;
+        
+        // Create new album
+        album = await prisma.album.create({
+          data: {
+            title: albumName,
+            coverUrl: albumData.coverUrl, // Use the best cover URL determined earlier
+            releaseDate: new Date(),
+            duration: totalDuration,
+            totalTracks: tracks.length,
+            type: albumType,
+            isActive: true,
+            artist: { connect: { id: artistId } }
+          }
+        });
+        console.log(`Created new album "${albumName}" with ${tracks.length} tracks. Type: ${albumTypeName}`);
+      }
+      
+      // Create all tracks and connect to album
+      for (let i = 0; i < tracks.length; i++) {
+        const trackInfo = tracks[i];
+        
+        // Get the next track number (existing tracks count + 1 + index)
+        const trackNumber = existingAlbum 
+          ? existingAlbum.totalTracks + 1 + i 
+          : i + 1; // 1-based track numbering
+        
+        // Check if album is defined before using it
+        if (!album) {
+          console.error(`Album object is null when trying to create track "${trackInfo.title}"`);
+          continue; // Skip this track
+        }
+        
+        // Create track with album connection and track number
+        await prisma.track.create({
+          data: {
+            ...trackInfo.trackData,
+            // Use album's cover URL instead of track's own cover URL
+            coverUrl: album.coverUrl || trackInfo.trackData.coverUrl,
+            album: { connect: { id: album.id } },
+            trackNumber: trackNumber,
+            type: albumType // Use the possibly updated album type
+          }
+        });
+        
+        // Update results with album ID and type
+        const resultIndex = results.findIndex(
+          r => r.fileName === trackInfo.fileName && r.title === trackInfo.title
+        );
+        
+        if (resultIndex !== -1 && album) {
+          results[resultIndex].albumId = album.id;
+          // Ensure albumTypeName is correctly typed for the results array
+          results[resultIndex].albumType = albumTypeName as 'SINGLE' | 'EP' | 'ALBUM';
+          // Update the cover URL in results to match what was actually saved
+          results[resultIndex].coverUrl = album.coverUrl || results[resultIndex].coverUrl;
+        }
+      }
+    } catch (albumError) {
+      console.error(`Error creating/updating album "${albumName}":`, albumError);
     }
   }
 
   return results;
 };
+
+// Add this helper function near the beginning of the file, before processBulkUpload function
+// Helper function to get genre names from IDs
+async function getGenreNamesFromIds(genreIds: string[]): Promise<string[]> {
+  try {
+    const genres = await prisma.genre.findMany({
+      where: {
+        id: { in: genreIds }
+      },
+      select: {
+        name: true
+      }
+    });
+    return genres.map(g => g.name);
+  } catch (error) {
+    console.error("Error getting genre names:", error);
+    return [];
+  }
+}
 
 export const generateAndAssignAiPlaylistToUser = async (
   adminExecutingId: string,
@@ -3140,3 +3457,220 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
   };
 };
 // END NEW FUNCTION
+
+// --- Data Export Functions ---
+export const extractTrackAndArtistData = async () => {
+  try {
+    // Get artists with basic info
+    const artists = await prisma.artistProfile.findMany({
+      where: {
+        isActive: true,
+        isVerified: true
+      },
+      select: {
+        id: true,
+        artistName: true,
+        bio: true,
+        monthlyListeners: true,
+        createdAt: true,
+        isVerified: true,
+        userId: true,
+        label: {
+          select: {
+            name: true
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        tracks: {
+          select: {
+            id: true
+          }
+        }
+      },
+      orderBy: {
+        artistName: 'asc'
+      }
+    });
+
+    // Get tracks with detailed info
+    const tracks = await prisma.track.findMany({
+      where: {
+        isActive: true
+      },
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        releaseDate: true,
+        coverUrl: true,
+        audioUrl: true,
+        label: {
+          select: {
+            name: true
+          }
+        },
+        playCount: true,
+        tempo: true,
+        mood: true,
+        key: true,
+        scale: true,
+        danceability: true,
+        energy: true,
+        artist: {
+          select: {
+            artistName: true
+          }
+        },
+        album: {
+          select: {
+            title: true,
+            type: true
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        featuredArtists: {
+          select: {
+            artistProfile: {
+              select: {
+                artistName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        {
+          artist: {
+            artistName: 'asc'
+          }
+        },
+        {
+          releaseDate: 'desc'
+        }
+      ]
+    });
+
+    // Transform data for easier Excel processing
+    const artistsForExport = artists.map(artist => ({
+      id: artist.id,
+      artistName: artist.artistName,
+      bio: artist.bio || '',
+      userId: artist.userId || '',
+      monthlyListeners: artist.monthlyListeners,
+      verified: artist.isVerified,
+      label: artist.label?.name || '',
+      genres: artist.genres.map(g => g.genre.name).join(', '),
+      trackCount: artist.tracks.length,
+      createdAt: artist.createdAt.toISOString().split('T')[0]
+    }));
+
+    const tracksForExport = tracks.map(track => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist.artistName,
+      album: track.album?.title || '(Single)',
+      albumType: track.album?.type || 'SINGLE',
+      coverUrl: track.coverUrl,
+      audioUrl: track.audioUrl,
+      labelName: track.label?.name || '',
+      featuredArtistNames: track.featuredArtists?.map(fa => fa.artistProfile.artistName).join(', ') || '',
+      duration: track.duration,
+      releaseDate: track.releaseDate.toISOString().split('T')[0],
+      playCount: track.playCount,
+      tempo: track.tempo || null,
+      mood: track.mood || '',
+      key: track.key || '',
+      scale: track.scale || '',
+      danceability: track.danceability || null,
+      energy: track.energy || null,
+      genres: track.genres.map(g => g.genre.name).join(', ')
+    }));
+
+    return {
+      artists: artistsForExport,
+      tracks: tracksForExport,
+      exportDate: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error extracting track and artist data:', error);
+    throw error;
+  }
+};
+// --- End Data Export Functions ---
+
+// --- New function to fix inconsistent track types in albums ---
+export const fixAlbumTrackTypeConsistency = async () => {
+  try {
+    console.log('[Admin Service] Starting album track type consistency fix...');
+    
+    // Find all albums
+    const albums = await prisma.album.findMany({
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        tracks: {
+          select: {
+            id: true,
+            type: true
+          }
+        }
+      }
+    });
+    
+    console.log(`[Admin Service] Found ${albums.length} albums to check for track type consistency`);
+    
+    let fixedAlbums = 0;
+    let fixedTracks = 0;
+    
+    // Process each album
+    for (const album of albums) {
+      const inconsistentTracks = album.tracks.filter(track => track.type !== album.type);
+      
+      if (inconsistentTracks.length > 0) {
+        // Fix inconsistent tracks
+        await prisma.track.updateMany({
+          where: { 
+            albumId: album.id,
+            type: { not: album.type }
+          },
+          data: { type: album.type }
+        });
+        
+        fixedAlbums++;
+        fixedTracks += inconsistentTracks.length;
+        console.log(`[Admin Service] Fixed ${inconsistentTracks.length} tracks in album "${album.title}" (ID: ${album.id})`);
+      }
+    }
+    
+    return {
+      success: true,
+      message: `Fixed track types in ${fixedAlbums} albums, updating ${fixedTracks} tracks to match their album types.`,
+      fixedAlbums,
+      fixedTracks
+    };
+  } catch (error) {
+    console.error('[Admin Service] Error fixing album track type consistency:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+      error: true
+    };
+  }
+};

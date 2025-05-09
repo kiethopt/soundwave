@@ -224,8 +224,7 @@ async function main() {
           },
           requestedGenres: faker.helpers.arrayElements(genreNames, faker.number.int({ min: 1, max: 3 })),
           status: RequestStatus.PENDING,
-          requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records']),
-          idVerificationDocumentUrl: null,
+          requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records'])
         },
       });
       requestBar.increment();

@@ -13,5 +13,6 @@ router.get('/my-reports', auth_middleware_1.authenticate, report_controller_1.ge
 router.get('/:id', auth_middleware_1.authenticate, report_controller_1.getReportById);
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), report_controller_1.getReports);
 router.patch('/:id/resolve', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), report_controller_1.resolveReport);
+router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), report_controller_1.deleteReport);
 exports.default = router;
 //# sourceMappingURL=report.routes.js.map

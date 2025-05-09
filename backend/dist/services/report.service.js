@@ -168,7 +168,9 @@ class ReportService {
                 playlist: {
                     select: {
                         id: true,
-                        name: true
+                        name: true,
+                        isAIGenerated: true,
+                        userId: true
                     }
                 },
                 reporter: {
@@ -195,51 +197,82 @@ class ReportService {
             },
             select: prisma_selects_1.reportSelect,
         });
-        if (report.type === client_1.ReportType.COPYRIGHT_VIOLATION &&
-            data.status === client_1.ReportStatus.RESOLVED &&
-            report.trackId &&
-            report.track?.isActive) {
-            await prisma.track.update({
-                where: { id: report.trackId },
-                data: { isActive: false },
-            });
+        let entityName = 'content';
+        let entityType = 'unknown';
+        if (report.trackId && report.track) {
+            entityName = report.track.title || 'track';
+            entityType = 'track';
         }
-        else if (report.type === client_1.ReportType.COPYRIGHT_VIOLATION &&
-            data.status === client_1.ReportStatus.RESOLVED &&
-            report.albumId &&
-            report.album?.isActive) {
-            await prisma.album.update({
-                where: { id: report.albumId },
-                data: { isActive: false },
-            });
-            let entityName = 'content';
-            let entityType = 'unknown';
-            if (report.trackId && report.track) {
-                entityName = report.track.title || 'track';
-                entityType = 'track';
+        else if (report.albumId && report.album) {
+            entityName = report.album.title || 'album';
+            entityType = 'album';
+        }
+        else if (report.playlistId && report.playlist) {
+            entityName = report.playlist.name || 'playlist';
+            entityType = 'playlist';
+        }
+        if (data.status === client_1.ReportStatus.RESOLVED) {
+            if (report.trackId && report.track?.isActive) {
+                await prisma.track.update({
+                    where: { id: report.trackId },
+                    data: { isActive: false },
+                });
             }
-            else if (report.albumId && report.album) {
-                entityName = report.album.title || 'album';
-                entityType = 'album';
+            else if (report.albumId && report.album?.isActive) {
+                await prisma.album.update({
+                    where: { id: report.albumId },
+                    data: { isActive: false },
+                });
+                await prisma.track.updateMany({
+                    where: { albumId: report.albumId },
+                    data: { isActive: false },
+                });
             }
-            else if (report.playlistId && report.playlist) {
-                entityName = report.playlist.name || 'playlist';
-                entityType = 'playlist';
+        }
+        const statusText = data.status === client_1.ReportStatus.RESOLVED ? 'resolved' : 'rejected';
+        await prisma.notification.create({
+            data: {
+                type: client_1.NotificationType.REPORT_RESOLVED,
+                message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+                recipientType: client_1.RecipientType.USER,
+                userId: report.reporter.id,
+                senderId: adminId,
+                trackId: report.trackId,
+                albumId: report.albumId,
             }
-            const statusText = data.status === client_1.ReportStatus.RESOLVED ? 'resolved' : 'rejected';
+        });
+        if (data.status === client_1.ReportStatus.RESOLVED &&
+            report.type === client_1.ReportType.AI_GENERATION_ISSUE &&
+            report.playlistId &&
+            report.playlist?.isAIGenerated &&
+            report.playlist.userId) {
             await prisma.notification.create({
                 data: {
                     type: client_1.NotificationType.REPORT_RESOLVED,
-                    message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+                    message: `Based on user feedback, we'll be improving our AI playlist generation. Thank you for your patience.`,
                     recipientType: client_1.RecipientType.USER,
-                    userId: report.reporter.id,
+                    userId: report.playlist.userId,
                     senderId: adminId,
-                    trackId: report.trackId,
-                    albumId: report.albumId,
                 }
             });
-            return updatedReport;
         }
+        return updatedReport;
+    }
+    static async deleteReport(reportId, adminId) {
+        const adminUser = await prisma.user.findUnique({ where: { id: adminId } });
+        if (!adminUser || adminUser.role !== client_1.Role.ADMIN) {
+            throw new Error('Unauthorized: Only admins can delete reports.');
+        }
+        const report = await prisma.report.findUnique({
+            where: { id: reportId },
+        });
+        if (!report) {
+            throw new Error('Report not found');
+        }
+        await prisma.report.delete({
+            where: { id: reportId },
+        });
+        return { message: `Report ${reportId} deleted successfully by admin ${adminId}.` };
     }
 }
 exports.ReportService = ReportService;

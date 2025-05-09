@@ -34,6 +34,8 @@ import {
   approveLabelRegistration,
   rejectLabelRegistration,
   getArtistRoleRequestsHandler,
+  exportTrackAndArtistData,
+  fixAlbumTrackTypes,
 } from "../controllers/admin.controller";
 import * as genreController from "../controllers/genre.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
@@ -290,6 +292,22 @@ router.get(
   authenticate,
   authorize([Role.ADMIN]),
   getArtistRoleRequestsHandler
+);
+
+// New route for exporting track and artist data to Excel
+router.get(
+  "/export/track-artist-data",
+  authenticate,
+  authorize([Role.ADMIN]),
+  exportTrackAndArtistData
+);
+
+// Add this new route for fixing album track types
+router.post(
+  '/fix-album-track-types', 
+  authenticate, 
+  authorize([Role.ADMIN]), 
+  fixAlbumTrackTypes
 );
 
 export default router;

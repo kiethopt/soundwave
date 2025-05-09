@@ -16,7 +16,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 
 const SectionHeading = ({ icon: Icon, title }: { icon: React.ElementType, title: string }) => (
   <div className="flex items-center gap-3 mb-4">
@@ -30,10 +29,6 @@ interface SocialLink {
   url: string;
 }
 
-interface PortfolioLink {
-  url: string;
-}
-
 interface FormDataState {
   artistName: string;
   bio: string;
@@ -43,7 +38,6 @@ interface FormDataState {
   genres: string[];
   avatarFile: File | null;
   socialLinks: SocialLink[];
-  portfolioLinks: PortfolioLink[];
   agreements: {
     terms: boolean;
     accuracy: boolean;
@@ -63,7 +57,6 @@ export default function RequestArtistPage() {
     genres: [],
     avatarFile: null,
     socialLinks: [{ platform: '', url: '' }],
-    portfolioLinks: [{ url: '' }],
     agreements: {
       terms: false,
       accuracy: false,
