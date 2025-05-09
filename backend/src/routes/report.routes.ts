@@ -4,7 +4,8 @@ import {
   getReports,
   getUserReports,
   getReportById,
-  resolveReport
+  resolveReport,
+  deleteReport
 } from '../controllers/report.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -23,5 +24,6 @@ router.get('/:id', authenticate, getReportById);
 // Admin routes - require authentication and admin role
 router.get('/', authenticate, authorize([Role.ADMIN]), getReports);
 router.patch('/:id/resolve', authenticate, authorize([Role.ADMIN]), resolveReport);
+router.delete('/:id', authenticate, authorize([Role.ADMIN]), deleteReport);
 
 export default router; 

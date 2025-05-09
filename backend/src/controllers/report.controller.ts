@@ -192,4 +192,34 @@ export const resolveReport = async (req: Request, res: Response): Promise<void> 
     
     res.status(500).json({ message: error.message || 'Failed to process report' });
   }
+};
+
+// Delete a report (admin only)
+export const deleteReport = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const result = await ReportService.deleteReport(id, user.id);
+
+    res.json({ message: result.message });
+  } catch (error: any) {
+    console.error(`Error deleting report ${req.params.id}:`, error);
+
+    if (error.message === 'Report not found') {
+      res.status(404).json({ message: 'Report not found' });
+      return;
+    }
+    if (error.message.startsWith('Unauthorized')) {
+      res.status(403).json({ message: error.message });
+      return;
+    }
+
+    res.status(500).json({ message: error.message || 'Failed to delete report' });
+  }
 }; 

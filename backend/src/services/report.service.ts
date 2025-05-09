@@ -277,8 +277,14 @@ export class ReportService {
               data: { isActive: false },
             });
           } else if (report.albumId && report.album?.isActive) {
+            // Deactivate the album
             await prisma.album.update({
               where: { id: report.albumId },
+              data: { isActive: false },
+            });
+            // Also deactivate all tracks in that album
+            await prisma.track.updateMany({
+              where: { albumId: report.albumId },
               data: { isActive: false },
             });
           }
@@ -318,4 +324,25 @@ export class ReportService {
 
         return updatedReport;
     }
+
+  static async deleteReport(reportId: string, adminId: string) {
+    const adminUser = await prisma.user.findUnique({ where: { id: adminId } });
+    if (!adminUser || adminUser.role !== Role.ADMIN) {
+      throw new Error('Unauthorized: Only admins can delete reports.');
+    }
+
+    const report = await prisma.report.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new Error('Report not found');
+    }
+
+    await prisma.report.delete({
+      where: { id: reportId },
+    });
+
+    return { message: `Report ${reportId} deleted successfully by admin ${adminId}.` };
+  }
 }

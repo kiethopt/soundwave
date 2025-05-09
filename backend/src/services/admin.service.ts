@@ -3206,6 +3206,13 @@ export const extractTrackAndArtistData = async () => {
         title: true,
         duration: true,
         releaseDate: true,
+        coverUrl: true,
+        audioUrl: true,
+        label: {
+          select: {
+            name: true
+          }
+        },
         playCount: true,
         tempo: true,
         mood: true,
@@ -3232,7 +3239,7 @@ export const extractTrackAndArtistData = async () => {
               }
             }
           }
-        }
+        },
       },
       orderBy: [
         {
@@ -3265,6 +3272,9 @@ export const extractTrackAndArtistData = async () => {
       artist: track.artist.artistName,
       album: track.album?.title || '(Single)',
       albumType: track.album?.type || 'SINGLE',
+      coverUrl: track.coverUrl,
+      audioUrl: track.audioUrl,
+      labelName: track.label?.name || '',
       duration: track.duration,
       releaseDate: track.releaseDate.toISOString().split('T')[0],
       playCount: track.playCount,

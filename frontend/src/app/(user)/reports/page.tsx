@@ -226,7 +226,11 @@ export default function UserReportsPage() {
                     {reports.map((report) => (
                       <tr 
                         key={report.id} 
-                        className={`${theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-neutral-700 text-neutral-200'}`}
+                        className={`${theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-neutral-700 text-neutral-200'} ${ 
+                          (report.status === 'RESOLVED' || report.status === 'REJECTED') && report.resolvedAt && 
+                          (new Date().getTime() - new Date(report.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) ? 
+                            (theme === 'light' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-blue-900/20 hover:bg-blue-800/30') : ''
+                        }`}
                       >
                         <td className="px-4 py-3">{getReportTypeBadge(report.type)}</td>
                         <td className="px-4 py-3">{getStatusBadge(report.status)}</td>
@@ -331,9 +335,18 @@ export default function UserReportsPage() {
               {selectedReport.status !== 'PENDING' && selectedReport.resolution && (
                 <div>
                   <h3 className={`text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-neutral-300'}`}>Resolution</h3>
-                  <p className={`rounded-md p-3 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700 text-neutral-200'}`}>
+                  <p className={`rounded-md p-3 ${
+                    selectedReport.resolvedAt && (new Date().getTime() - new Date(selectedReport.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) ? 
+                      (theme === 'light' ? 'bg-blue-100/70 text-blue-900' : 'bg-blue-900/30 text-blue-100') :
+                      (theme === 'light' ? 'bg-gray-100' : 'bg-neutral-700 text-neutral-200')
+                  }`}>
                     {selectedReport.resolution}
                   </p>
+                  {selectedReport.resolvedAt && (new Date().getTime() - new Date(selectedReport.resolvedAt).getTime() < 7 * 24 * 60 * 60 * 1000) && (
+                    <p className={`mt-2 text-xs italic ${theme === 'light' ? 'text-blue-700' : 'text-blue-300'}`}>
+                      This report was recently addressed by an admin
+                    </p>
+                  )}
                 </div>
               )}
 

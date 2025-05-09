@@ -243,15 +243,15 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = async (notification: NotificationType) => {
-    const token = localStorage.getItem("userToken");
+    const token = localStorage.getItem('userToken');
     if (!token) {
-      toast.error("Authentication required.");
+      toast.error('Authentication required.');
       return;
     }
 
     const user = currentUser;
     if (!user) {
-      toast.error("Could not determine user context.");
+      toast.error('Could not determine user context.');
       return;
     }
 
@@ -280,6 +280,9 @@ export default function NotificationsPage() {
           } else {
             path = `/admin/labels?tab=requests`;
           }
+        } else if (notification.type === "NEW_REPORT_SUBMITTED" || notification.type === "REPORT_RESOLVED") {
+          // Handle admin report notifications - direct to admin reports page
+          path = `/admin/reports`;
         }
       } else {
         if (notification.type === "NEW_FOLLOW" && notification.senderId) {
@@ -332,6 +335,13 @@ export default function NotificationsPage() {
         } else if (notification.type === "LABEL_REGISTRATION_REJECTED") {
           toast.error(notification.message || 'Your label registration was rejected.');
           shouldNavigate = false;
+        } else if (notification.type === "NEW_REPORT_SUBMITTED" || notification.type === "REPORT_RESOLVED") {
+          // For report notifications, navigate to the reports page with the report ID
+          if (notification.reportId) {
+            path = `/reports?reportId=${notification.reportId}`;
+          } else {
+            path = `/reports`;
+          }
         }
       }
 
