@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 import { getIO, getUserSockets } from "../config/socket";
 import * as trackService from "../services/track.service";
+import ExcelJS from 'exceljs';
 
 // Define User type including adminLevel for controller scope
 type UserWithAdminLevel = PrismaUser;
@@ -948,3 +949,69 @@ export const getArtistRoleRequestsHandler = async (
   }
 };
 // END NEW CONTROLLER
+
+// --- Data Export Controllers ---
+export const exportTrackAndArtistData = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const data = await adminService.extractTrackAndArtistData();
+    
+    // Create a new Excel workbook and worksheets
+    const workbook = new ExcelJS.Workbook();
+    
+    // Add a worksheet for artists
+    const artistsSheet = workbook.addWorksheet('Artists');
+    artistsSheet.columns = [
+      { header: 'ID', key: 'id', width: 30 },
+      { header: 'Name', key: 'artistName', width: 30 },
+      { header: 'Bio', key: 'bio', width: 60 },
+      { header: 'Monthly Listeners', key: 'monthlyListeners', width: 15 },
+      { header: 'Verified', key: 'verified', width: 10 },
+      { header: 'Label', key: 'label', width: 25 },
+      { header: 'Genres', key: 'genres', width: 30 },
+      { header: 'Track Count', key: 'trackCount', width: 15 },
+      { header: 'Created At', key: 'createdAt', width: 15 }
+    ];
+    
+    // Add the data to the artists worksheet
+    artistsSheet.addRows(data.artists);
+    
+    // Add a worksheet for tracks
+    const tracksSheet = workbook.addWorksheet('Tracks');
+    tracksSheet.columns = [
+      { header: 'ID', key: 'id', width: 30 },
+      { header: 'Title', key: 'title', width: 40 },
+      { header: 'Artist', key: 'artist', width: 30 },
+      { header: 'Album', key: 'album', width: 40 },
+      { header: 'Album Type', key: 'albumType', width: 15 },
+      { header: 'Duration (sec)', key: 'duration', width: 15 },
+      { header: 'Release Date', key: 'releaseDate', width: 15 },
+      { header: 'Play Count', key: 'playCount', width: 15 },
+      { header: 'Tempo', key: 'tempo', width: 10 },
+      { header: 'Mood', key: 'mood', width: 20 },
+      { header: 'Key', key: 'key', width: 10 },
+      { header: 'Scale', key: 'scale', width: 10 },
+      { header: 'Danceability', key: 'danceability', width: 15 },
+      { header: 'Energy', key: 'energy', width: 15 },
+      { header: 'Genres', key: 'genres', width: 30 }
+    ];
+    
+    // Add the data to the tracks worksheet
+    tracksSheet.addRows(data.tracks);
+    
+    // Set the content type for Excel download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=soundwave_data_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+    // Write the workbook to the response
+    await workbook.xlsx.write(res);
+    
+    // End the response
+    res.end();
+  } catch (error) {
+    handleError(res, error, 'Export track and artist data');
+  }
+};
+// --- End Data Export Controllers ---

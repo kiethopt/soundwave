@@ -3154,3 +3154,137 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
   };
 };
 // END NEW FUNCTION
+
+// --- Data Export Functions ---
+export const extractTrackAndArtistData = async () => {
+  try {
+    // Get artists with basic info
+    const artists = await prisma.artistProfile.findMany({
+      where: {
+        isActive: true,
+        isVerified: true
+      },
+      select: {
+        id: true,
+        artistName: true,
+        bio: true,
+        monthlyListeners: true,
+        createdAt: true,
+        isVerified: true,
+        label: {
+          select: {
+            name: true
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        tracks: {
+          select: {
+            id: true
+          }
+        }
+      },
+      orderBy: {
+        artistName: 'asc'
+      }
+    });
+
+    // Get tracks with detailed info
+    const tracks = await prisma.track.findMany({
+      where: {
+        isActive: true
+      },
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        releaseDate: true,
+        playCount: true,
+        tempo: true,
+        mood: true,
+        key: true,
+        scale: true,
+        danceability: true,
+        energy: true,
+        artist: {
+          select: {
+            artistName: true
+          }
+        },
+        album: {
+          select: {
+            title: true,
+            type: true
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        {
+          artist: {
+            artistName: 'asc'
+          }
+        },
+        {
+          releaseDate: 'desc'
+        }
+      ]
+    });
+
+    // Transform data for easier Excel processing
+    const artistsForExport = artists.map(artist => ({
+      id: artist.id,
+      artistName: artist.artistName,
+      bio: artist.bio || '',
+      monthlyListeners: artist.monthlyListeners,
+      verified: artist.isVerified,
+      label: artist.label?.name || '',
+      genres: artist.genres.map(g => g.genre.name).join(', '),
+      trackCount: artist.tracks.length,
+      createdAt: artist.createdAt.toISOString().split('T')[0]
+    }));
+
+    const tracksForExport = tracks.map(track => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist.artistName,
+      album: track.album?.title || '(Single)',
+      albumType: track.album?.type || 'SINGLE',
+      duration: track.duration,
+      releaseDate: track.releaseDate.toISOString().split('T')[0],
+      playCount: track.playCount,
+      tempo: track.tempo || null,
+      mood: track.mood || '',
+      key: track.key || '',
+      scale: track.scale || '',
+      danceability: track.danceability || null,
+      energy: track.energy || null,
+      genres: track.genres.map(g => g.genre.name).join(', ')
+    }));
+
+    return {
+      artists: artistsForExport,
+      tracks: tracksForExport,
+      exportDate: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error extracting track and artist data:', error);
+    throw error;
+  }
+};
+// --- End Data Export Functions ---

@@ -34,6 +34,7 @@ import {
   approveLabelRegistration,
   rejectLabelRegistration,
   getArtistRoleRequestsHandler,
+  exportTrackAndArtistData,
 } from "../controllers/admin.controller";
 import * as genreController from "../controllers/genre.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
@@ -290,6 +291,14 @@ router.get(
   authenticate,
   authorize([Role.ADMIN]),
   getArtistRoleRequestsHandler
+);
+
+// New route for exporting track and artist data to Excel
+router.get(
+  "/export/track-artist-data",
+  authenticate,
+  authorize([Role.ADMIN]),
+  exportTrackAndArtistData
 );
 
 export default router;
