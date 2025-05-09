@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -42,7 +42,10 @@ export function ReportDialog({
   entityName,
   onReportSuccess
 }: ReportDialogProps) {
-  const [reportType, setReportType] = useState<ReportType>('COPYRIGHT_VIOLATION');
+  // For playlists, default to AI_GENERATION_ISSUE
+  const [reportType, setReportType] = useState<ReportType>(
+    entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION'
+  );
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isAuthenticated, handleProtectedAction } = useAuth();
@@ -50,8 +53,16 @@ export function ReportDialog({
   
   const isDarkTheme = theme === 'dark';
 
+  // Reset the form when the dialog opens with the appropriate default
+  useEffect(() => {
+    if (open) {
+      setReportType(entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION');
+      setDescription('');
+    }
+  }, [open, entityType]);
+
   const resetForm = () => {
-    setReportType('COPYRIGHT_VIOLATION');
+    setReportType(entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION');
     setDescription('');
   };
 
@@ -127,8 +138,42 @@ export function ReportDialog({
           <span className="font-medium">Important:</span> Copyright violation reports may result in content being removed. False reports may lead to account restrictions.
         </div>
       );
+    } else if (reportType === 'AI_GENERATION_ISSUE' && entityType === 'playlist') {
+      return (
+        <div className={cn(
+          "mt-4 p-3 rounded-md text-sm",
+          isDarkTheme 
+            ? "bg-blue-900/20 text-blue-300 border border-blue-700/30"
+            : "bg-blue-50 text-blue-800 border border-blue-200"
+        )}>
+          <span className="font-medium">Note:</span> Your feedback helps us improve our AI playlist generation. Please provide specific details about what you feel could be improved.
+        </div>
+      );
     }
     return null;
+  };
+
+  // Render different report type options based on entity type
+  const renderReportTypeOptions = () => {
+    if (entityType === 'playlist') {
+      return (
+        <SelectContent className={isDarkTheme ? "bg-neutral-600 border-neutral-500" : ""}>
+          <SelectItem value="AI_GENERATION_ISSUE">AI Generation Quality</SelectItem>
+          <SelectItem value="INAPPROPRIATE_CONTENT">Inappropriate Content</SelectItem>
+          <SelectItem value="OTHER">Other</SelectItem>
+        </SelectContent>
+      );
+    }
+    
+    // For tracks and albums
+    return (
+      <SelectContent className={isDarkTheme ? "bg-neutral-600 border-neutral-500" : ""}>
+        <SelectItem value="COPYRIGHT_VIOLATION">Copyright Violation</SelectItem>
+        <SelectItem value="INAPPROPRIATE_CONTENT">Inappropriate Content</SelectItem>
+        <SelectItem value="AI_GENERATION_ISSUE">AI Generation Issue</SelectItem>
+        <SelectItem value="OTHER">Other</SelectItem>
+      </SelectContent>
+    );
   };
 
   return (
@@ -163,7 +208,9 @@ export function ReportDialog({
                   "text-sm mt-1",
                   isDarkTheme ? "text-neutral-300" : "text-gray-600"
                 )}>
-                  Report inappropriate content or copyright infringement for "{entityName}"
+                  {entityType === 'playlist' 
+                    ? `Report issues with the AI-generated playlist "${entityName}"`
+                    : `Report inappropriate content or copyright infringement for "${entityName}"`}
                 </DialogDescription>
               </div>
             </div>
@@ -190,12 +237,7 @@ export function ReportDialog({
               )}>
                 <SelectValue placeholder="Select report type" />
               </SelectTrigger>
-              <SelectContent className={isDarkTheme ? "bg-neutral-600 border-neutral-500" : ""}>
-                <SelectItem value="COPYRIGHT_VIOLATION">Copyright Violation</SelectItem>
-                <SelectItem value="INAPPROPRIATE_CONTENT">Inappropriate Content</SelectItem>
-                <SelectItem value="AI_GENERATION_ISSUE">AI Generation Issue</SelectItem>
-                <SelectItem value="OTHER">Other</SelectItem>
-              </SelectContent>
+              {renderReportTypeOptions()}
             </Select>
           </div>
 
@@ -208,7 +250,9 @@ export function ReportDialog({
             </Label>
             <Textarea
               id="description"
-              placeholder="Please provide details about your report..."
+              placeholder={entityType === 'playlist' 
+                ? "Please describe what issues you found with this AI-generated playlist..." 
+                : "Please provide details about your report..."}
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}

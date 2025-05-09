@@ -218,7 +218,9 @@ export class ReportService {
             playlist: {
             select: {
                 id: true,
-                name: true
+                name: true,
+                isAIGenerated: true,
+                userId: true
             }
             },
             reporter: {
@@ -251,47 +253,42 @@ export class ReportService {
         select: reportSelect,
         });
 
-        // If it's a copyright violation that's being resolved as valid, deactivate the track
-        if (
-        report.type === ReportType.COPYRIGHT_VIOLATION &&
-        data.status === ReportStatus.RESOLVED &&
-        report.trackId &&
-        report.track?.isActive
-        ) {
-        await prisma.track.update({
-            where: { id: report.trackId },
-            data: { isActive: false },
-        });
-        } else if (
-        report.type === ReportType.COPYRIGHT_VIOLATION &&
-        data.status === ReportStatus.RESOLVED &&
-        report.albumId &&
-        report.album?.isActive
-        ) {
-        await prisma.album.update({
-            where: { id: report.albumId },
-            data: { isActive: false },
-        });
-
-        // Get entity name for notification
+        // Get entity name and type for notification
         let entityName = 'content';
         let entityType = 'unknown';
         
         if (report.trackId && report.track) {
-        entityName = report.track.title || 'track';
-        entityType = 'track';
+          entityName = report.track.title || 'track';
+          entityType = 'track';
         } else if (report.albumId && report.album) {
-        entityName = report.album.title || 'album';
-        entityType = 'album';
+          entityName = report.album.title || 'album';
+          entityType = 'album';
         } else if (report.playlistId && report.playlist) {
-        entityName = report.playlist.name || 'playlist';
-        entityType = 'playlist';
+          entityName = report.playlist.name || 'playlist';
+          entityType = 'playlist';
+        }
+
+        // Different handling based on entity type and report status
+        if (data.status === ReportStatus.RESOLVED) {
+          // For tracks and albums, hide them when report is resolved
+          if (report.trackId && report.track?.isActive) {
+            await prisma.track.update({
+              where: { id: report.trackId },
+              data: { isActive: false },
+            });
+          } else if (report.albumId && report.album?.isActive) {
+            await prisma.album.update({
+              where: { id: report.albumId },
+              data: { isActive: false },
+            });
+          }
+          // Note: For playlists, we don't hide them, just notify
         }
 
         // Create notification for the report submitter
         const statusText = data.status === ReportStatus.RESOLVED ? 'resolved' : 'rejected';
         await prisma.notification.create({
-        data: {
+          data: {
             type: NotificationType.REPORT_RESOLVED,
             message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
             recipientType: RecipientType.USER,
@@ -299,10 +296,26 @@ export class ReportService {
             senderId: adminId,
             trackId: report.trackId,
             albumId: report.albumId,
-        }
+          }
         });
+
+        // For AI Playlist reports that are resolved, send additional notification to the playlist owner
+        if (data.status === ReportStatus.RESOLVED && 
+            report.type === ReportType.AI_GENERATION_ISSUE && 
+            report.playlistId && 
+            report.playlist?.isAIGenerated &&
+            report.playlist.userId) {
+          await prisma.notification.create({
+            data: {
+              type: NotificationType.REPORT_RESOLVED,
+              message: `Based on user feedback, we'll be improving our AI playlist generation. Thank you for your patience.`,
+              recipientType: RecipientType.USER,
+              userId: report.playlist.userId,
+              senderId: adminId,
+            }
+          });
+        }
 
         return updatedReport;
     }
-}
 }

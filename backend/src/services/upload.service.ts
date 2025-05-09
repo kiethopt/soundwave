@@ -49,6 +49,8 @@ export interface AudioAnalysisResult {
   instrumentalness: number | null;
   acousticness: number | null;
   valence: number | null;
+  loudness: number | null;
+  speechiness: number | null;
   genreIds: string[]; // Danh sách ID các thể loại phù hợp
 }
 
@@ -104,6 +106,8 @@ export const analyzeAudioWithReccoBeats = async (
       instrumentalness: reccoFeatures.instrumentalness,
       acousticness: reccoFeatures.acousticness,
       valence: reccoFeatures.valence,
+      loudness: reccoFeatures.loudness,
+      speechiness: reccoFeatures.speechiness,
       genreIds
     };
   } catch (error) {
@@ -119,6 +123,8 @@ export const analyzeAudioWithReccoBeats = async (
       instrumentalness: null,
       acousticness: null,
       valence: null,
+      loudness: null,
+      speechiness: null,
       genreIds: []
     };
   }

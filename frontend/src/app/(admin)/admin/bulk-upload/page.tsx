@@ -25,6 +25,13 @@ interface UploadResult {
   genres?: string[];
   success: boolean;
   error?: string;
+  danceability?: number | null;
+  energy?: number | null;
+  instrumentalness?: number | null;
+  acousticness?: number | null;
+  loudness?: number | null;
+  speechiness?: number | null;
+  valence?: number | null;
 }
 
 export default function BulkUploadPage() {
@@ -123,7 +130,28 @@ export default function BulkUploadPage() {
     if (!results.length) return;
     
     // Create CSV headers
-    const headers = ['Status', 'File Name', 'Track Title', 'Artist', 'Duration', 'Tempo', 'Mood', 'Key', 'Scale', 'Genres', 'Cover URL', 'Track ID', 'Audio URL'];
+    const headers = [
+      'Status', 
+      'File Name', 
+      'Track Title', 
+      'Artist', 
+      'Duration', 
+      'Tempo', 
+      'Mood', 
+      'Key', 
+      'Scale', 
+      'Genres', 
+      'Cover URL', 
+      'Track ID', 
+      'Audio URL',
+      'Danceability',
+      'Energy',
+      'Instrumentalness',
+      'Acousticness',
+      'Loudness',
+      'Speechiness',
+      'Valence'
+    ];
     
     // Convert results to CSV rows
     const csvRows = results.map(result => {
@@ -141,6 +169,13 @@ export default function BulkUploadPage() {
         result.coverUrl || '',
         result.trackId || '',
         result.audioUrl || '',
+        result.danceability !== undefined ? result.danceability : '',
+        result.energy !== undefined ? result.energy : '',
+        result.instrumentalness !== undefined ? result.instrumentalness : '',
+        result.acousticness !== undefined ? result.acousticness : '',
+        result.loudness !== undefined ? result.loudness : '',
+        result.speechiness !== undefined ? result.speechiness : '',
+        result.valence !== undefined ? result.valence : '',
         result.error || ''
       ].join(',');
     });
