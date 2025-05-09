@@ -29,6 +29,11 @@ import {
   getUserAiPlaylistsHandler,
   getUserListeningHistoryHandler,
   reanalyzeTrackHandler,
+  getAllLabelRegistrations,
+  getLabelRegistrationById,
+  approveLabelRegistration,
+  rejectLabelRegistration,
+  getArtistRoleRequestsHandler,
 } from "../controllers/admin.controller";
 import * as genreController from "../controllers/genre.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
@@ -134,17 +139,27 @@ router.delete(
 );
 
 // Duyệt yêu cầu trở thành Artist
+// router.post(
+//   "/artist-requests/approve",
+//   authenticate,
+//   authorize([Role.ADMIN]),
+//   approveArtistRequest
+// );
+
+// Restore original APPROVE route
 router.post(
   "/artist-requests/approve",
   authenticate,
   authorize([Role.ADMIN]),
-  approveArtistRequest
+  approveArtistRequest // The actual controller
 );
+
+// Restore original REJECT route
 router.post(
   "/artist-requests/reject",
   authenticate,
   authorize([Role.ADMIN]),
-  rejectArtistRequest
+  rejectArtistRequest // The actual controller
 );
 
 // Cập nhật trạng thái model AI
@@ -238,5 +253,43 @@ router.post(
   reanalyzeTrackHandler
 );
 // --- End Track Re-analysis by Admin ---
+
+// --- Label Registration Management Routes (Admin) ---
+router.get(
+  '/label-registrations',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getAllLabelRegistrations
+);
+
+router.get(
+  '/label-registrations/:registrationId',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getLabelRegistrationById
+);
+
+router.put(
+  '/label-registrations/:registrationId/approve',
+  authenticate,
+  authorize([Role.ADMIN]),
+  approveLabelRegistration
+);
+
+router.put(
+  '/label-registrations/:registrationId/reject',
+  authenticate,
+  authorize([Role.ADMIN]),
+  rejectLabelRegistration
+);
+// --- End Label Registration Management Routes ---
+
+// New route for ArtistRequest model based requests
+router.get(
+  "/artist-role-requests",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getArtistRoleRequestsHandler
+);
 
 export default router;

@@ -220,6 +220,10 @@ export default function NewTrack() {
   const [copyrightInfo, setCopyrightInfo] = useState<CopyrightInfo | null>(null);
   const [uploaderArtistName, setUploaderArtistName] = useState<string | null>(null);
 
+  // State for label selection
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+
   // State to store the artist's default label name
   const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
 
@@ -233,11 +237,12 @@ export default function NewTrack() {
           return;
         }
 
-        // Fetch artists, genres, and profile in parallel
-        const [artistsResponse, genresResponse, profileResponse] = await Promise.all([
+        // Fetch artists, genres, profile, and selectable labels in parallel
+        const [artistsResponse, genresResponse, profileResponse, selectableLabelsResponse] = await Promise.all([
           api.artists.getAllArtistsProfile(token, 1, 500),
           api.genres.getAll(token, 1, 1000),
           api.auth.getMe(token),
+          api.labels.getSelectableByArtist(token) // Use the new API call
         ]);
 
         setAvailableArtists(
@@ -255,8 +260,14 @@ export default function NewTrack() {
           }))
         );
 
-        // Set Artist Label Name from profile
-        if (profileResponse?.artistProfile?.label?.name) {
+        // Set available labels for selection
+        if (selectableLabelsResponse && selectableLabelsResponse.data) { // Assuming response is { data: Label[] }
+          setAvailableLabels(selectableLabelsResponse.data.map((label: Label) => ({ id: label.id, name: label.name })));
+        }
+
+        // Set Artist Label Name from profile (could be used as a default for the new selector)
+        if (profileResponse?.artistProfile?.label?.id) {
+          setSelectedLabel(profileResponse.artistProfile.label.id); // Pre-select artist's own label
           setArtistLabelName(profileResponse.artistProfile.label.name);
         } else {
           setArtistLabelName(null);
@@ -542,6 +553,9 @@ export default function NewTrack() {
         else formData.append('featuredArtistNames[]', artist.name);
       });
       selectedGenres.forEach((genreId) => formData.append('genreIds[]', genreId));
+      if (selectedLabel) {
+        formData.append('labelId', selectedLabel);
+      }
 
       await api.tracks.create(formData, token);
       toast.success('Track created successfully');
@@ -787,8 +801,8 @@ export default function NewTrack() {
                 />
               </div>
 
-              {/* Display Artist's Default Label (Read-only) */}
-              {artistLabelName && (
+              {/* Display Artist's Default Label (Read-only) - TO BE REPLACED */}
+              {/* {artistLabelName && (
                 <div className="space-y-1.5">
                   <UILabel htmlFor="labelDisplay" className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label</UILabel>
                   <Input
@@ -804,11 +818,25 @@ export default function NewTrack() {
                     )}
                   />
                 </div>
-              )}
+              )} */}
+
+              {/* New Label Selector */}
+              <div className="space-y-1.5">
+                <UILabel className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label (Optional)</UILabel>
+                <SearchableSelect
+                  options={availableLabels.map(l => ({ id: l.id, name: l.name }))}
+                  value={selectedLabel ? [selectedLabel] : []}
+                  onChange={(selectedIds: string[]) => {
+                    setSelectedLabel(selectedIds.length > 0 ? selectedIds[0] : null);
+                  }}
+                  placeholder="Select a label..."
+                  multiple={false}
+                />
+              </div>
 
               {/* ADD Copyright Alert here */}
               {copyrightInfo && (
-                <div className="mt-4 md:mt-0"> {/* Add some top margin on mobile */}
+                <div className="mt-4 md:mt-0">
                   <CopyrightAlert copyright={copyrightInfo} theme={theme} />
                 </div>
               )}

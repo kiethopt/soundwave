@@ -38,23 +38,28 @@ enum RecipientType {
 // Include all necessary fields from base Notification + potential additions
 interface SocketNotification {
   id: string;
-  type: string; // Keep type flexible from base Notification if needed
+  type: string; 
   message: string;
   isRead: boolean;
-  // Allow USER/ARTIST + potential ADMIN as string, or undefined if not sent
   recipientType?: RecipientType | 'ADMIN' | string; 
   userId?: string; 
   artistId?: string; 
   senderId?: string; 
   createdAt: string; 
-  updatedAt: string; 
-  // Add other fields from base Notification if necessary (e.g., claimId)
   claimId?: string | null;
+  reportId?: string | null; // For report related notifications
+  labelId?: string | null; // For label related notifications
+  labelName?: string | null; // For label related notifications
+  rejectionReason?: string | null; // For rejection notifications
   sender?: { 
       id: string;
       name?: string | null;
       username?: string | null;
+      avatar?: string | null; // Added avatar for sender display
    } | null;
+   // For new track/album by followed artist
+   track?: { id: string; title: string; coverUrl?: string | null; artist?: { artistName?: string } };
+   album?: { id: string; title: string; coverUrl?: string | null; artist?: { artistName?: string } };
 }
 
 export default function Header({
@@ -154,11 +159,13 @@ export default function Header({
        const handleNotification = (data: SocketNotification) => { 
           console.log(`[Header] Received notification event`, data);
           const expectedUserId = user?.id;
+          const expectedArtistProfileId = user?.artistProfile?.id;
 
           let shouldProcess = false;
+          let toastMessage = data.message; // Default toast message
 
-          if (user?.role === 'ADMIN') { // Admin logic
-             if (data?.userId === expectedUserId) { 
+          if (user?.role === 'ADMIN') { 
+             if (data?.userId === expectedUserId && data.recipientType === RecipientType.USER) { // Admin specific system/user notifications
                 shouldProcess = true;
                 console.log(`[Header] Processing ADMIN notification for self:`, data); 
              }
@@ -166,20 +173,33 @@ export default function Header({
              if (data?.recipientType === RecipientType.USER && data?.userId === expectedUserId) {
                 shouldProcess = true;
                 console.log(`[Header] Processing USER notification:`, data);
-             } else if (data?.recipientType === RecipientType.ARTIST && data?.artistId === user?.artistProfile?.id) {
+             } else if (data?.recipientType === RecipientType.ARTIST && data?.artistId === expectedArtistProfileId) {
                 shouldProcess = true;
                 console.log(`[Header] Processing ARTIST notification:`, data);
              }
           }
 
+          // Specific toast messages for new notification types
           if (shouldProcess) {
-             setNotifications(prev => [data, ...prev].slice(0, 50)); 
+            if (data.type === 'LABEL_REGISTRATION_APPROVED') {
+              toastMessage = `Your label "${data.labelName || 'Unknown Label'}" has been approved!`;
+            } else if (data.type === 'LABEL_REGISTRATION_REJECTED') {
+              toastMessage = `Your label "${data.labelName || 'Unknown Label'}" was rejected. Reason: ${data.rejectionReason || 'Not specified'}`;
+            }
+
+             setNotifications(prev => [data, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50)); 
              if (!data.isRead) { 
                setHasUnread(true);
+               // Update notificationCount for immediate feedback
+               setNotificationCount(prevCount => {
+                 const newCount = prevCount + 1;
+                 localStorage.setItem('notificationCount', String(newCount));
+                 return newCount;
+               });
              }
-             toast(data.message || 'New notification'); 
+             toast.success(toastMessage || 'New notification'); 
           } else {
-             console.log(`[Header] Filtering: Ignoring notification. Data userId: ${data?.userId}, artistId: ${data?.artistId}, recipientType: ${data?.recipientType}. Expected User: ${expectedUserId}, Expected Artist: ${user?.artistProfile?.id}`);
+             console.log(`[Header] Filtering: Ignoring notification. Data userId: ${data?.userId}, artistId: ${data?.artistId}, recipientType: ${data?.recipientType}. Expected User: ${expectedUserId}, Expected Artist: ${expectedArtistProfileId}`);
           }
        };
 
@@ -351,6 +371,15 @@ export default function Header({
         } else {
           router.push('/reports');
         }
+      } else if (notification.type === 'LABEL_REGISTRATION_APPROVED') {
+        // Navigate to artist dashboard or a success page
+        // For now, just a toast, actual navigation can be decided later
+        toast.success(notification.message || 'Your label registration was approved!');
+        // Potentially navigate to the artist's label management section or dashboard
+        // router.push('/artist/dashboard'); 
+      } else if (notification.type === 'LABEL_REGISTRATION_REJECTED') {
+        toast.error(notification.message || 'Your label registration was rejected.');
+        // router.push('/profile/settings'); // Or some relevant page
       }
 
     } catch (error) {

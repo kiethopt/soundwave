@@ -428,7 +428,8 @@ export default function ClaimRequestDetail({
         onClose={() => setShowApproveModal(false)}
         onConfirm={handleApproveConfirm}
         theme={theme}
-        artistName={request?.artistProfile.artistName} // Hiển thị tên nghệ sĩ được claim
+        itemName={request?.artistProfile.artistName} // Pass artistName to itemName
+        itemType="artist claim" // Specify itemType
       />
     </div>
   );

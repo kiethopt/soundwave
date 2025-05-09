@@ -3,11 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
+exports.getSelectableLabelsForArtist = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.requestNewLabelRegistration = exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
+const client_1 = require("@prisma/client");
 const getAllLabels = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {};
@@ -228,4 +229,280 @@ const deleteLabel = async (id) => {
     });
 };
 exports.deleteLabel = deleteLabel;
+const requestNewLabelRegistration = async (userId, data, logoFile) => {
+    const errors = (0, handle_utils_1.runValidations)([
+        (0, handle_utils_1.validateField)(data.name, 'name', { required: true, minLength: 3, maxLength: 100 }),
+        (0, handle_utils_1.validateField)(data.description, 'description', { maxLength: 500 }),
+    ]);
+    if (errors.length > 0) {
+        throw { status: 400, message: 'Validation failed', errors };
+    }
+    const artistProfile = await db_1.default.artistProfile.findUnique({
+        where: { userId },
+    });
+    if (!artistProfile) {
+        throw { status: 403, message: 'User does not have an artist profile or is not an artist.' };
+    }
+    const existingPendingRequest = await db_1.default.labelRegistrationRequest.findFirst({
+        where: {
+            requestingArtistId: artistProfile.id,
+            requestedLabelName: data.name,
+            status: client_1.RequestStatus.PENDING,
+        },
+    });
+    if (existingPendingRequest) {
+        throw { status: 400, message: `You already have a pending registration request for the label "${data.name}".` };
+    }
+    const existingLabel = await db_1.default.label.findFirst({
+        where: { name: data.name }
+    });
+    if (existingLabel) {
+        throw { status: 400, message: `A label named "${data.name}" already exists.` };
+    }
+    let logoUrl;
+    if (logoFile) {
+        try {
+            const uploadResult = await (0, upload_service_1.uploadFile)(logoFile.buffer, 'label_logos', 'image');
+            logoUrl = uploadResult.secure_url;
+        }
+        catch (uploadError) {
+            console.error("Error uploading label logo:", uploadError);
+            throw { status: 500, message: 'Failed to upload label logo.' };
+        }
+    }
+    const registrationRequest = await db_1.default.labelRegistrationRequest.create({
+        data: {
+            requestedLabelName: data.name,
+            requestedLabelDescription: data.description,
+            requestedLabelLogoUrl: logoUrl,
+            requestingArtistId: artistProfile.id,
+            status: client_1.RequestStatus.PENDING,
+        },
+        include: {
+            requestingArtist: {
+                select: {
+                    artistName: true,
+                },
+            },
+        },
+    });
+    const admins = await db_1.default.user.findMany({ where: { role: 'ADMIN' } });
+    if (admins.length > 0) {
+        const notifications = admins.map(admin => ({
+            userId: admin.id,
+            recipientType: client_1.RecipientType.USER,
+            type: client_1.NotificationType.LABEL_REGISTRATION_SUBMITTED,
+            message: `Artist ${artistProfile.artistName} has requested to register a new label: "${data.name}".`,
+        }));
+        await db_1.default.notification.createMany({ data: notifications });
+    }
+    return registrationRequest;
+};
+exports.requestNewLabelRegistration = requestNewLabelRegistration;
+const getAllLabelRegistrations = async (req) => {
+    const { search, status, sortBy, sortOrder } = req.query;
+    const whereClause = {};
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { requestedLabelName: { contains: search, mode: 'insensitive' } },
+            { requestingArtist: { artistName: { contains: search, mode: 'insensitive' } } },
+        ];
+    }
+    if (status && typeof status === 'string' && Object.values(client_1.RequestStatus).includes(status)) {
+        whereClause.status = status;
+    }
+    const orderByClause = {};
+    const validSortKeys = ['submittedAt', 'requestedLabelName', 'status'];
+    const key = sortBy;
+    const order = sortOrder === 'desc' ? 'desc' : 'asc';
+    if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+        orderByClause[key] = order;
+    }
+    else {
+        orderByClause.submittedAt = 'desc';
+    }
+    const result = await (0, handle_utils_1.paginate)(db_1.default.labelRegistrationRequest, req, {
+        where: whereClause,
+        include: {
+            requestingArtist: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                },
+            },
+            reviewedByAdmin: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            createdLabel: {
+                select: {
+                    id: true,
+                    name: true,
+                }
+            }
+        },
+        orderBy: orderByClause,
+    });
+    return {
+        data: result.data,
+        pagination: result.pagination,
+    };
+};
+exports.getAllLabelRegistrations = getAllLabelRegistrations;
+const getLabelRegistrationById = async (registrationId) => {
+    const request = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+        include: {
+            requestingArtist: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                    user: { select: { email: true, name: true } },
+                },
+            },
+            reviewedByAdmin: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            createdLabel: {
+                select: {
+                    id: true,
+                    name: true,
+                    logoUrl: true,
+                }
+            }
+        },
+    });
+    if (!request) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    return request;
+};
+exports.getLabelRegistrationById = getLabelRegistrationById;
+const approveLabelRegistration = async (adminUserId, registrationId) => {
+    const registrationRequest = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+        include: { requestingArtist: true },
+    });
+    if (!registrationRequest) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
+        throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+    }
+    return db_1.default.$transaction(async (tx) => {
+        const newLabel = await tx.label.create({
+            data: {
+                name: registrationRequest.requestedLabelName,
+                description: registrationRequest.requestedLabelDescription,
+                logoUrl: registrationRequest.requestedLabelLogoUrl,
+            },
+            select: prisma_selects_1.labelSelect,
+        });
+        await tx.artistProfile.update({
+            where: { id: registrationRequest.requestingArtistId },
+            data: { labelId: newLabel.id },
+        });
+        const updatedRequest = await tx.labelRegistrationRequest.update({
+            where: { id: registrationId },
+            data: {
+                status: client_1.RequestStatus.APPROVED,
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId,
+                createdLabelId: newLabel.id,
+            },
+        });
+        if (registrationRequest.requestingArtist.userId) {
+            await tx.notification.create({
+                data: {
+                    userId: registrationRequest.requestingArtist.userId,
+                    recipientType: client_1.RecipientType.USER,
+                    type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
+                    message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+                },
+            });
+        }
+        return { updatedRequest, newLabel };
+    });
+};
+exports.approveLabelRegistration = approveLabelRegistration;
+const rejectLabelRegistration = async (adminUserId, registrationId, rejectionReason) => {
+    const errors = (0, handle_utils_1.runValidations)([
+        (0, handle_utils_1.validateField)(rejectionReason, 'rejectionReason', { required: true, minLength: 10, maxLength: 500 }),
+    ]);
+    if (errors.length > 0) {
+        throw { status: 400, message: 'Validation failed for rejection reason', errors };
+    }
+    const registrationRequest = await db_1.default.labelRegistrationRequest.findUnique({
+        where: { id: registrationId },
+        include: { requestingArtist: true },
+    });
+    if (!registrationRequest) {
+        throw { status: 404, message: 'Label registration request not found.' };
+    }
+    if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
+        throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+    }
+    const updatedRequest = await db_1.default.labelRegistrationRequest.update({
+        where: { id: registrationId },
+        data: {
+            status: client_1.RequestStatus.REJECTED,
+            reviewedAt: new Date(),
+            reviewedByAdminId: adminUserId,
+            rejectionReason: rejectionReason,
+        },
+    });
+    if (registrationRequest.requestingArtist.userId) {
+        await db_1.default.notification.create({
+            data: {
+                userId: registrationRequest.requestingArtist.userId,
+                recipientType: client_1.RecipientType.USER,
+                type: client_1.NotificationType.LABEL_REGISTRATION_REJECTED,
+                message: `We regret to inform you that your request to register the label "${registrationRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+            },
+        });
+    }
+    return updatedRequest;
+};
+exports.rejectLabelRegistration = rejectLabelRegistration;
+const getSelectableLabelsForArtist = async (artistProfileId) => {
+    if (!artistProfileId) {
+        throw new Error('Artist profile ID is required to fetch selectable labels.');
+    }
+    const approvedRequests = await db_1.default.labelRegistrationRequest.findMany({
+        where: {
+            requestingArtistId: artistProfileId,
+            status: client_1.RequestStatus.APPROVED,
+            createdLabelId: {
+                not: null,
+            },
+        },
+        select: {
+            createdLabelId: true,
+        },
+    });
+    const ownedLabelIds = approvedRequests
+        .map(req => req.createdLabelId)
+        .filter((id) => id !== null);
+    let selectableLabels = [];
+    if (ownedLabelIds.length > 0) {
+        selectableLabels = await db_1.default.label.findMany({
+            where: {
+                id: { in: ownedLabelIds },
+            },
+            select: prisma_selects_1.labelSelect,
+            orderBy: {
+                name: 'asc',
+            },
+        });
+    }
+    return selectableLabels;
+};
+exports.getSelectableLabelsForArtist = getSelectableLabelsForArtist;
 //# sourceMappingURL=label.service.js.map

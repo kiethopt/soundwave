@@ -3,8 +3,8 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { ArrowLeft, Check, X } from 'lucide-react';
-import { ArtistRequest } from '@/types';
+import { ArrowLeft, Check, X, User, Link2 } from 'lucide-react';
+import { ArtistRequest, Genre } from '@/types';
 import toast from 'react-hot-toast';
 import { Facebook, Instagram } from '@/components/ui/Icons';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -21,29 +21,37 @@ export default function ArtistRequestDetail({
   const [request, setRequest] = useState<ArtistRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
 
   useEffect(() => {
-    const fetchRequestDetails = async () => {
+    const fetchDetailsAndGenres = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem('userToken');
         if (!token) {
           throw new Error('No authentication token found');
         }
-        const response = await api.admin.getArtistRequestDetail(requestId, token);
-        setRequest(response);
+        const [requestResponse, genresResponse] = await Promise.all([
+          api.admin.getArtistRequestDetail(requestId, token),
+          api.genres.getAll(token)
+        ]);
+
+        setRequest(requestResponse);
+        setAllGenres(genresResponse.genres || []);
+
       } catch (err) {
-        console.error('Error fetching request details:', err);
+        console.error('Error fetching data:', err);
         setError(
-          err instanceof Error ? err.message : 'Failed to fetch request details'
+          err instanceof Error ? err.message : 'Failed to fetch data'
         );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRequestDetails();
+    fetchDetailsAndGenres();
   }, [requestId]);
 
   const handleApproveClick = () => {
@@ -57,12 +65,8 @@ export default function ArtistRequestDetail({
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await api.admin.approveArtistRequest(request!.id, token);
-      if (response.hasPendingRequest === false) {
-        toast.success('Artist request approved successfully!');
-      } else {
-        toast.error('Failed to update request status');
-      }
+      await api.admin.approveArtistRequest(request!.id, token);
+      toast.success('Artist request approved successfully!');
       router.push('/admin/artist-requests');
     } catch (err) {
       toast.error(
@@ -87,11 +91,9 @@ export default function ArtistRequestDetail({
         reason,
         token
       );
-      if (response.hasPendingRequest === false) {
-        toast.success('Artist request rejected successfully!');
-      } else {
-        toast.error('Failed to update request status');
-      }
+
+      toast.success(response.message || 'Artist request rejected successfully!');
+      
       router.push('/admin/artist-requests');
     } catch (err) {
       toast.error(
@@ -177,14 +179,28 @@ export default function ArtistRequestDetail({
         >
           {/* Profile Header */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8">
-            {request.avatar && (
+            {request.avatarUrl ? (
               <img
-                src={request.avatar}
+                src={request.avatarUrl}
                 alt={request.artistName}
                 className={`w-32 h-32 sm:w-40 sm:h-40 rounded-2xl object-cover border-2 ${
                   theme === 'light' ? 'border-gray-200' : 'border-gray-400'
                 }`}
               />
+            ) : request.user?.avatar ? (
+              <img
+                src={request.user.avatar}
+                alt={`${request.artistName} (User Avatar)`}
+                className={`w-32 h-32 sm:w-40 sm:h-40 rounded-2xl object-cover border-2 ${
+                  theme === 'light' ? 'border-gray-200' : 'border-gray-400'
+                }`}
+              />
+            ) : (
+              <div className={`w-32 h-32 sm:w-40 sm:h-40 rounded-2xl border-2 ${
+                  theme === 'light' ? 'border-gray-200' : 'border-gray-400'
+                } flex items-center justify-center bg-gray-100 dark:bg-gray-700`}>
+                <User className={`w-16 h-16 ${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`} />
+              </div>
             )}
             <div className="space-y-2 text-center sm:text-left">
               <h1
@@ -256,136 +272,229 @@ export default function ArtistRequestDetail({
                     theme === 'light' ? 'text-gray-900' : 'text-white'
                   }`}
                 >
-                  Request Details
+                  Additional Details
                 </h3>
-                <dl className="space-y-3 text-xs sm:text-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
-                    <dt
-                      className={
-                        theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                      }
-                    >
-                      Request Date
-                    </dt>
-                    <dd className="font-medium">
-                      {new Date(
-                        request.verificationRequestedAt
-                      ).toLocaleDateString('vi-VN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </dd>
-                  </div>
-                  
-                  {/* Label Information */}
-                  {request.requestedLabelName && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
-                      <dt
-                        className={
-                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                        }
-                      >
-                        Requested Label
-                      </dt>
-                      <dd className="font-medium">
-                        {request.requestedLabelName}
-                      </dd>
-                    </div>
-                  )}
+                <dl className="space-y-3">
+                  <DetailItem
+                    label="Status"
+                    value={
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        request.status === 'PENDING' ? (theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800') :
+                        request.status === 'APPROVED' ? (theme === 'dark' ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800') :
+                        request.status === 'REJECTED' ? (theme === 'dark' ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800') :
+                        (theme === 'dark' ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800')
+                      }`}>
+                        {request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1).toLowerCase() : 'N/A'}
+                      </span>
+                    }
+                    theme={theme}
+                  />
 
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
-                    <dt
-                      className={
-                        theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  {request.requestedLabelName && (
+                    <DetailItem
+                      label="Requested Label Name"
+                      value={request.requestedLabelName}
+                      theme={theme}
+                    />
+                  )}
+                  {request.requestedGenres && request.requestedGenres.length > 0 && (
+                    <DetailItem
+                      label="Requested Genres"
+                      value={
+                        request.requestedGenres
+                          .map(genreId => allGenres.find(g => g.id === genreId)?.name || genreId)
+                          .join(', ')
                       }
-                    >
-                      Status
-                    </dt>
-                    <dd
-                      className="capitalize px-2 py-1 rounded-full text-center w-fit"
-                      style={{
-                        backgroundColor: request.isVerified
-                          ? 'rgba(16, 185, 129, 0.1)'
-                          : 'rgba(234, 179, 8, 0.1)',
-                        color: request.isVerified ? '#34d399' : '#eab308',
-                      }}
-                    >
-                      {request.isVerified ? 'approved' : 'pending'}
-                    </dd>
-                  </div>
+                      theme={theme}
+                    />
+                  )}
+                  {request.rejectionReason && request.status === 'REJECTED' && (
+                     <DetailItem
+                        label="Rejection Reason"
+                        value={request.rejectionReason}
+                        theme={theme}
+                      />
+                  )}
+                  {request.idVerificationDocumentUrl && (
+                    <DetailItem
+                      label="ID Verification Document"
+                      value={
+                        <a href={request.idVerificationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                          View Document
+                        </a>
+                      }
+                      theme={theme}
+                    />
+                  )}
                 </dl>
               </div>
             </div>
 
-            {/* Social Media Section */}
-            {request.socialMediaLinks && (
-              <div
-                className={`${
-                  theme === 'light'
-                    ? 'bg-gray-100 border border-gray-300'
-                    : 'bg-white/10'
-                } p-4 sm:p-6 rounded-xl h-fit`}
-              >
-                <h3
-                  className={`text-base sm:text-lg font-semibold mb-6 ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+            {/* Social Links and Portfolio Links Column */}
+            <div className="space-y-6">
+              {/* Social Media Section */}
+              {request.socialMediaLinks && (Object.keys(request.socialMediaLinks).length > 0 && (request.socialMediaLinks.facebook || request.socialMediaLinks.instagram || request.socialMediaLinks.twitter)) ? (
+                <div
+                  className={`${
+                    theme === 'light'
+                      ? 'bg-gray-100 border border-gray-300'
+                      : 'bg-white/10'
+                  } p-4 sm:p-6 rounded-xl h-fit`}
                 >
-                  Social Profiles
-                </h3>
-                <div className="space-y-3">
-                  {request.socialMediaLinks.facebook && (
-                    <a
-                      href={request.socialMediaLinks.facebook}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-4 p-4 ${
-                        theme === 'light'
-                          ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                          : 'bg-white/20 hover:bg-white/30'
-                      } rounded-lg text-xs sm:text-sm`}
-                    >
-                      <Facebook className="w-6 h-6 flex-shrink-0" />
-                      <div className="truncate">
-                        <p className="font-medium">Facebook</p>
-                        <p className="text-xs truncate">
-                          {request.socialMediaLinks.facebook}
-                        </p>
-                      </div>
-                    </a>
-                  )}
-
-                  {request.socialMediaLinks.instagram && (
-                    <a
-                      href={request.socialMediaLinks.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-4 p-4 ${
-                        theme === 'light'
-                          ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                          : 'bg-white/20 hover:bg-white/30'
-                      } rounded-lg text-xs sm:text-sm`}
-                    >
-                      <Instagram className="w-6 h-6 flex-shrink-0" />
-                      <div className="truncate">
-                        <p className="font-medium">Instagram</p>
-                        <p className="text-xs truncate">
-                          {request.socialMediaLinks.instagram}
-                        </p>
-                      </div>
-                    </a>
-                  )}
-
-                  {!request.socialMediaLinks.facebook &&
-                    !request.socialMediaLinks.instagram && (
-                      <div className="text-center py-8 text-gray-500 text-xs sm:text-sm">
-                        No social media links provided
-                      </div>
+                  <h3
+                    className={`text-base sm:text-lg font-semibold mb-6 ${
+                      theme === 'light' ? 'text-gray-900' : 'text-white'
+                    }`}
+                  >
+                    Social Profiles
+                  </h3>
+                  <div className="space-y-3">
+                    {request.socialMediaLinks.facebook && (
+                      <a
+                        href={request.socialMediaLinks.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-4 p-4 ${
+                          theme === 'light'
+                            ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                            : 'bg-white/20 hover:bg-white/30'
+                        } rounded-lg text-xs sm:text-sm`}
+                      >
+                        <Facebook className="w-6 h-6 flex-shrink-0" />
+                        <div className="truncate">
+                          <p className="font-medium">Facebook</p>
+                          <p className="text-xs truncate">
+                            {request.socialMediaLinks.facebook}
+                          </p>
+                        </div>
+                      </a>
                     )}
+                    {request.socialMediaLinks.instagram && (
+                      <a
+                        href={request.socialMediaLinks.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-4 p-4 ${
+                          theme === 'light'
+                            ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                            : 'bg-white/20 hover:bg-white/30'
+                        } rounded-lg text-xs sm:text-sm`}
+                      >
+                        <Instagram className="w-6 h-6 flex-shrink-0" />
+                        <div className="truncate">
+                          <p className="font-medium">Instagram</p>
+                          <p className="text-xs truncate">
+                            {request.socialMediaLinks.instagram}
+                          </p>
+                        </div>
+                      </a>
+                    )}
+                    {request.socialMediaLinks.twitter && (
+                       <a
+                        href={request.socialMediaLinks.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-4 p-4 ${
+                          theme === 'light'
+                            ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                            : 'bg-white/20 hover:bg-white/30'
+                        } rounded-lg text-xs sm:text-sm`}
+                      >
+                        <Link2 className="w-6 h-6 flex-shrink-0" /> 
+                        <div className="truncate">
+                          <p className="font-medium">Twitter</p>
+                          <p className="text-xs truncate">
+                            {request.socialMediaLinks.twitter}
+                          </p>
+                        </div>
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div
+                  className={`${
+                    theme === 'light'
+                      ? 'bg-gray-100 border border-gray-300'
+                      : 'bg-white/10'
+                  } p-4 sm:p-6 rounded-xl h-fit text-center text-gray-500 dark:text-gray-400`}
+                >
+                  No social media links provided.
+                </div>
+              )}
+
+              {request.portfolioLinks && Array.isArray(request.portfolioLinks) && request.portfolioLinks.length > 0 ? (
+                <div
+                  className={`${
+                    theme === 'light'
+                      ? 'bg-gray-100 border border-gray-300'
+                      : 'bg-white/10'
+                  } p-4 sm:p-6 rounded-xl h-fit mt-6`}
+                >
+                  <h3
+                    className={`text-base sm:text-lg font-semibold mb-6 ${
+                      theme === 'light' ? 'text-gray-900' : 'text-white'
+                    }`}
+                  >
+                    Portfolio Links
+                  </h3>
+                  <div className="space-y-3">
+                    {(request.portfolioLinks as Array<{ url: string }>).map((link: { url: string }, index: number) => (
+                      <a
+                        key={index}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-4 p-4 ${
+                          theme === 'light'
+                            ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                            : 'bg-white/20 hover:bg-white/30'
+                        } rounded-lg text-xs sm:text-sm`}
+                      >
+                        <Link2 className="w-6 h-6 flex-shrink-0" />
+                        <p className="truncate">{link.url}</p>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : request.portfolioLinks && typeof request.portfolioLinks === 'object' && Object.keys(request.portfolioLinks).length > 0 ? (
+                <div
+                  className={`${
+                    theme === 'light'
+                      ? 'bg-gray-100 border border-gray-300'
+                      : 'bg-white/10'
+                  } p-4 sm:p-6 rounded-xl h-fit mt-6`}
+                >
+                  <h3
+                    className={`text-base sm:text-lg font-semibold mb-6 ${
+                      theme === 'light' ? 'text-gray-900' : 'text-white'
+                    }`}
+                  >
+                    Portfolio Links
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(request.portfolioLinks).map(([key, value]) => (
+                      typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://')) ? (
+                        <a
+                          key={key}
+                          href={value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center gap-4 p-4 ${
+                            theme === 'light'
+                              ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                              : 'bg-white/20 hover:bg-white/30'
+                          } rounded-lg text-xs sm:text-sm`}
+                        >
+                          <Link2 className="w-6 h-6 flex-shrink-0" />
+                          <p className="truncate">{key}: {value}</p>
+                        </a>
+                      ) : null
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -402,8 +511,36 @@ export default function ArtistRequestDetail({
         onClose={() => setShowApproveModal(false)}
         onConfirm={handleApproveConfirm}
         theme={theme}
-        artistName={request?.artistName}
+        itemName={request?.artistName}
+        itemType="artist request"
       />
     </div>
   );
 }
+
+const DetailItem = ({
+  label,
+  value,
+  theme,
+}: {
+  label: string;
+  value: string | React.ReactNode;
+  theme: string;
+}) => (
+  <div className="flex flex-col sm:flex-row sm:justify-between">
+    <dt
+      className={`text-xs sm:text-sm font-medium ${
+        theme === 'light' ? 'text-gray-500' : 'text-white/50'
+      }`}
+    >
+      {label}
+    </dt>
+    <dd
+      className={`mt-1 text-xs sm:text-sm sm:mt-0 ${
+        theme === 'light' ? 'text-gray-900' : 'text-white'
+      }`}
+    >
+      {value}
+    </dd>
+  </div>
+);

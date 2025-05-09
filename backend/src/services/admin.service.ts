@@ -10,7 +10,9 @@ import {
   Playlist as PrismaPlaylist,
   ArtistProfile,
   History,
-  PlaylistType
+  PlaylistType,
+  LabelRegistrationRequest,
+  RequestStatus,
 } from "@prisma/client";
 import { Request } from "express";
 import prisma from "../config/db";
@@ -23,8 +25,9 @@ import {
   artistClaimRequestSelect,
   artistClaimRequestDetailsSelect,
   trackSelect,
+  labelSelect, // Added for approveLabelRegistration
 } from "../utils/prisma-selects";
-import { paginate, toBooleanValue } from "../utils/handle-utils";
+import { paginate, toBooleanValue, runValidations, validateField } from "../utils/handle-utils"; // Added runValidations, validateField
 import * as fs from "fs";
 import * as path from "path";
 import { SystemComponentStatus } from "../types/system.types";
@@ -38,8 +41,6 @@ import { getUserSockets } from "../config/socket";
 import { uploadFile, analyzeAudioWithReccoBeats } from "./upload.service";
 import * as mm from "music-metadata";
 import { Essentia, EssentiaWASM } from "essentia.js";
-// import { getOrCreateArtistProfile } from "./artist.service";
-// import { faker } from "@faker-js/faker";
 import { MPEGDecoder, MPEGDecodedAudio } from "mpg123-decoder";
 import * as aiService from "./ai.service";
 import { HttpError } from "../utils/errors";
@@ -194,27 +195,66 @@ export const getArtistRequests = async (req: Request) => {
 };
 
 export const getArtistRequestDetail = async (id: string) => {
-  let request = await prisma.artistProfile.findUnique({
+  let requestData: any = await prisma.artistProfile.findUnique({
     where: { id },
-    select: artistRequestDetailsSelect,
+    select: artistRequestDetailsSelect, 
   });
 
-  // Nếu không tìm thấy artist profile, thử tìm bằng userId
-  if (!request) {
-    request = await prisma.artistProfile.findFirst({
+  // Attempt 2: If not found by ArtistProfile ID, try finding by ArtistProfile UserID
+  if (!requestData) {
+    requestData = await prisma.artistProfile.findFirst({
       where: {
-        userId: id,
-        verificationRequestedAt: { not: null },
+        userId: id, 
+        verificationRequestedAt: { not: null }, 
       },
       select: artistRequestDetailsSelect,
     });
   }
 
-  if (!request) {
+  // Attempt 3: If still not found, try finding in ArtistRequest table (new request flow)
+  if (!requestData) {
+    const artistRoleRequest = await prisma.artistRequest.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        artistName: true,
+        bio: true,
+        status: true,
+        requestedLabelName: true,
+        rejectionReason: true,     // Make sure this is in your Prisma schema for ArtistRequest
+        socialMediaLinks: true,    // Assuming this is a Json field in ArtistRequest
+        avatarUrl: true,            // Added avatarUrl
+        idVerificationDocumentUrl: true, // Added idVerificationDocumentUrl
+        requestedGenres: true,      // Added requestedGenres
+        // createdAt: true,              // Or submittedAt, if you have it
+        user: {                     // Nested user data
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    if (artistRoleRequest) {
+      // If found in ArtistRequest, we need to structure it slightly differently
+      // to match what the frontend detail page might expect if it was originally
+      // designed for ArtistProfile structure. Or, the frontend needs to adapt.
+      // For now, let's assume the frontend can handle the ArtistRequest structure directly.
+      // Add a flag to distinguish if needed, or ensure frontend handles both structures.
+      return { ...artistRoleRequest, _sourceTable: 'ArtistRequest' };
+    }
+  }
+
+
+  if (!requestData) {
     throw new Error("Request not found");
   }
 
-  return request;
+  // If data came from ArtistProfile, add a source flag
+  return { ...requestData, _sourceTable: 'ArtistProfile' };
 };
 
 interface UpdateUserData {
@@ -868,94 +908,148 @@ export const deleteGenreById = async (id: string) => {
   return prisma.genre.delete({ where: { id } });
 };
 
-export const approveArtistRequest = async (requestId: string) => {
-  const artistProfile = await prisma.artistProfile.findFirst({
-    where: {
-      id: requestId,
-      verificationRequestedAt: { not: null },
-      isVerified: false,
-    },
+export const approveArtistRequest = async (adminUserId: string, artistRequestId: string) => {
+  const artistRequest = await prisma.artistRequest.findUnique({
+    where: { id: artistRequestId },
     select: {
       id: true,
       userId: true,
+      artistName: true,
+      bio: true,
+      avatarUrl: true,
+      socialMediaLinks: true, // Assuming this is Prisma.JsonValue
+      requestedGenres: true,  // Assuming this is string[]
       requestedLabelName: true,
+      status: true,
       user: { select: { id: true, email: true, name: true, username: true } },
     },
   });
 
-  if (!artistProfile) {
-    throw new Error("Artist request not found, already verified, or rejected.");
+  if (!artistRequest) {
+    throw new Error("Artist request not found.");
   }
 
-  const requestedLabelName = artistProfile.requestedLabelName;
-  const userForNotification = artistProfile.user;
+  if (artistRequest.status !== RequestStatus.PENDING) {
+    throw new Error(
+      `Artist request cannot be approved as it is already in '${artistRequest.status}' status.`
+    );
+  }
 
-  const updatedProfile = await prisma.$transaction(async (tx) => {
-    const verifiedProfile = await tx.artistProfile.update({
-      where: { id: requestId },
-      data: {
+  if (!artistRequest.userId) {
+    throw new Error("User ID missing from artist request, cannot create artist profile.");
+  }
+
+  const updatedData = await prisma.$transaction(async (tx) => {
+    // 1. Create or Update ArtistProfile
+    // We use upsert to handle cases where an ArtistProfile might already exist for the user but isn't verified
+    // or to create a new one if it doesn't exist at all.
+    const userArtistProfile = await tx.artistProfile.upsert({
+      where: { userId: artistRequest.userId }, // Use userId to find existing profile for this user
+      update: { // If ArtistProfile for this user exists, update it
+        artistName: artistRequest.artistName,
+        bio: artistRequest.bio,
+        avatar: artistRequest.avatarUrl, // Use avatarUrl from the request
+        socialMediaLinks: artistRequest.socialMediaLinks || Prisma.JsonNull,
+        // portfolioLinks: artistRequest.portfolioLinks || Prisma.JsonNull, // Add if portfolioLinks should be on ArtistProfile
+        isVerified: true,
+        verifiedAt: new Date(),
+        role: Role.ARTIST,
+        isActive: true, // Ensure the profile is active
+        verificationRequestedAt: null, // Clear old request flag if it was used
+        // requestedLabelName: null, // Clear if it was on ArtistProfile, now handled via ArtistRequest
+      },
+      create: { // If no ArtistProfile for this user, create a new one
+        userId: artistRequest.userId,
+        artistName: artistRequest.artistName,
+        bio: artistRequest.bio,
+        avatar: artistRequest.avatarUrl,
+        socialMediaLinks: artistRequest.socialMediaLinks || Prisma.JsonNull,
+        // portfolioLinks: artistRequest.portfolioLinks || Prisma.JsonNull,
         role: Role.ARTIST,
         isVerified: true,
         verifiedAt: new Date(),
-        verificationRequestedAt: null,
-        requestedLabelName: null,
+        isActive: true,
+        monthlyListeners: 0,
       },
-      select: { id: true },
+      select: { id: true, userId: true, artistName: true, labelId: true, user: { select: userSelect}, label:true }, 
     });
 
-    let finalLabelId: string | null = null;
+    // 2. Handle Label Creation and Assignment (if requestedLabelName exists)
+    let finalLabelId: string | null = userArtistProfile.labelId; // Preserve existing label if any
+    let createdLabelViaRequest = false;
 
-    if (requestedLabelName) {
+    if (artistRequest.requestedLabelName) {
       const labelRecord = await tx.label.upsert({
-        where: { name: requestedLabelName },
-        update: {},
-        create: { name: requestedLabelName },
+        where: { name: artistRequest.requestedLabelName },
+        update: {}, // If label exists, do nothing to it, just use its ID
+        create: { name: artistRequest.requestedLabelName, description: "Created via artist request" }, // Add a default description
         select: { id: true },
       });
       finalLabelId = labelRecord.id;
-    }
+      createdLabelViaRequest = true; // Mark that this request processed a label
 
-    if (finalLabelId) {
+      // Update the artist profile with this new/existing label ID
       await tx.artistProfile.update({
-        where: { id: verifiedProfile.id },
+        where: { id: userArtistProfile.id },
+        data: { labelId: finalLabelId },
+      });
+    }
+    
+    // 3. Create LabelRegistrationRequest if a label was processed by this artist request approval
+    if (createdLabelViaRequest && finalLabelId && artistRequest.requestedLabelName) {
+      await tx.labelRegistrationRequest.create({
         data: {
-          labelId: finalLabelId,
-        },
+          requestedLabelName: artistRequest.requestedLabelName,
+          requestingArtistId: userArtistProfile.id, // This is ArtistProfile.id
+          status: RequestStatus.APPROVED, 
+          submittedAt: new Date(), // Consider using the ArtistRequest submission time if available and desired
+          reviewedAt: new Date(),
+          reviewedByAdminId: adminUserId,
+          createdLabelId: finalLabelId,
+        }
       });
     }
 
-    const finalProfile = await tx.artistProfile.findUnique({
-      where: { id: verifiedProfile.id },
-      include: {
-        user: { select: userSelect },
-        label: true,
+    // 4. Update the original ArtistRequest status
+    const finalArtistRequest = await tx.artistRequest.update({
+      where: { id: artistRequestId },
+      data: {
+        status: RequestStatus.APPROVED,
+        // rejectionReason: null, // Optionally clear rejectionReason if it could have been set before
+        // reviewedAt: new Date(), // Optionally set reviewedAt for the ArtistRequest itself
+        // reviewedByAdminId: adminUserId, // Optionally set this too
       },
+      select: { id: true, status: true, userId: true, artistName: true } // Select necessary fields
     });
 
-    if (!finalProfile) {
-      throw new Error("Failed to retrieve updated profile after transaction.");
+    // Refetch the artist profile to include the potentially updated label
+    const finalPopulatedProfile = await tx.artistProfile.findUnique({
+        where: { id: userArtistProfile.id },
+        include: { user: {select: userSelect}, label: true }
+    });
+
+    if (!finalPopulatedProfile) {
+        throw new Error("Failed to retrieve final populated artist profile after transaction.");
     }
 
-    return finalProfile;
+    return { artistRequest: finalArtistRequest, artistProfile: finalPopulatedProfile };
   });
 
+  // --- Start Notification Logic ---
+  const userForNotification = artistRequest.user;
   if (userForNotification) {
-    prisma.notification
-      .create({
-        data: {
-          type: "ARTIST_REQUEST_APPROVE",
-          message: "Your request to become an Artist has been approved!",
-          recipientType: "USER",
-          userId: userForNotification.id,
-          artistId: updatedProfile.id,
-        },
-      })
-      .catch((err) =>
-        console.error(
-          "[Async Notify Error] Failed to create approval notification:",
-          err
-        )
-      );
+    prisma.notification.create({
+      data: {
+        type: "ARTIST_REQUEST_APPROVE",
+        message: `Congratulations! Your request to become artist '${artistRequest.artistName}' has been approved. Your artist profile is now active.`, 
+        recipientType: "USER",
+        userId: userForNotification.id, // Correct: Use userForNotification.id for the recipient User
+        artistId: updatedData.artistProfile.id, // Correct: Use the ID of the created/updated ArtistProfile
+        isRead: false,
+      },
+    }).catch((err) =>
+      console.error("[Service Notify Error] Failed to create approval notification:", err)
+    );
 
     if (userForNotification.email) {
       try {
@@ -963,19 +1057,11 @@ export const approveArtistRequest = async (requestId: string) => {
           userForNotification.email,
           userForNotification.name || userForNotification.username || "User"
         );
-        emailService
-          .sendEmail(emailOptions)
-          .catch((err) =>
-            console.error(
-              "[Async Email Error] Failed to send approval email:",
-              err
-            )
-          );
-      } catch (syncError) {
-        console.error(
-          "[Email Setup Error] Failed to create approval email options:",
-          syncError
+        emailService.sendEmail(emailOptions).catch((err) =>
+          console.error("[Service Email Error] Failed to send approval email:", err)
         );
+      } catch (syncError) {
+        console.error("[Email Setup Error] Failed to create approval email options:", syncError);
       }
     } else {
       console.warn(
@@ -983,40 +1069,109 @@ export const approveArtistRequest = async (requestId: string) => {
       );
     }
   } else {
-    console.error(
-      "[Approve Request] User data missing for notification/email."
-    );
+    console.error("[Approve Request Service] User data missing on ArtistRequest for notification/email.");
   }
+  // --- End Notification Logic ---
 
   return {
-    ...updatedProfile,
-    hasPendingRequest: false,
+    message: "Artist request approved successfully.",
+    data: updatedData, // Contains artistRequest and artistProfile
   };
 };
 
-export const rejectArtistRequest = async (requestId: string) => {
-  const artistProfile = await prisma.artistProfile.findFirst({
+export const rejectArtistRequest = async (artistRequestId: string, rejectionReason?: string) => {
+  const artistRequest = await prisma.artistRequest.findUnique({
     where: {
-      id: requestId,
-      verificationRequestedAt: { not: null },
-      isVerified: false,
+      id: artistRequestId,
     },
-    include: {
-      user: { select: userSelect },
+    select: {
+      id: true,
+      status: true,
+      userId: true,
+      artistName: true, // For notification message
+      user: { select: { id: true, email: true, name: true, username: true } } // For email and notification context
     },
   });
 
-  if (!artistProfile) {
-    throw new Error("Artist request not found, already verified, or rejected.");
+  if (!artistRequest) {
+    throw new Error("Artist request not found.");
   }
 
-  await prisma.artistProfile.delete({
-    where: { id: requestId },
+  if (artistRequest.status !== RequestStatus.PENDING) {
+    throw new Error(
+      `Artist request cannot be rejected as it is already in '${artistRequest.status}' status.`
+    );
+  }
+
+  const updatedRequest = await prisma.artistRequest.update({
+    where: { id: artistRequestId },
+    data: {
+      status: RequestStatus.REJECTED,
+      rejectionReason: rejectionReason || "No reason provided",
+      // reviewedAt: new Date(), // Optionally set reviewedAt, ensure reviewedByAdminId is also handled if needed
+    },
+    select: { 
+      id: true, 
+      userId: true, 
+      status: true, 
+      user: { select: { id:true, email:true, name:true, username:true } }, 
+      artistName:true, 
+      rejectionReason: true
+    }
   });
 
+  // --- Start Notification Logic (moved from controller) ---
+  if (updatedRequest.user) {
+    let notificationMessage =
+      `Your request to become artist '${updatedRequest.artistName}' has been rejected.`;
+    if (updatedRequest.rejectionReason && updatedRequest.rejectionReason !== "No reason provided") {
+      notificationMessage += ` Reason: ${updatedRequest.rejectionReason}`;
+    }
+
+    // Create notification for the user whose request was rejected
+    prisma.notification.create({
+      data: { // This 'data' key is correct for prisma.notification.create
+        type: "ARTIST_REQUEST_REJECT",
+        message: notificationMessage,
+        recipientType: "USER", 
+        userId: updatedRequest.user.id,
+        isRead: false,
+      },
+      select: { // This select should be at the top level of the create arguments, not nested under data
+        id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+        userId: true, // Keep if needed by socket logic, though recipientType + userId is the primary target
+        // artistId: true, // Not directly relevant for a user-facing rejection of their own request here
+        // senderId: true, // adminUserId would need to be passed if we want to log who rejected
+      }
+    }).catch(err => console.error("[Service Notify Error] Failed to create rejection notification:", err));
+
+    // Send email
+    if (updatedRequest.user.email) {
+      try {
+        const emailOptions = emailService.createArtistRequestRejectedEmail(
+          updatedRequest.user.email,
+          updatedRequest.user.name || updatedRequest.user.username || "User",
+          updatedRequest.rejectionReason || undefined // Ensure undefined if null for the email function
+        );
+        emailService.sendEmail(emailOptions).catch(err => console.error("[Service Email Error] Failed to send rejection email:", err));
+        console.log(`Artist rejection email sent to ${updatedRequest.user.email}`);
+      } catch (emailError) {
+        console.error("Failed to setup artist rejection email:", emailError);
+      }
+    } else {
+      console.warn(
+        `Could not send rejection email: No email found for user ${updatedRequest.user.id}`
+      );
+    }
+  }
+  // --- End Notification Logic ---
+
   return {
-    user: artistProfile.user,
-    hasPendingRequest: false,
+    message: "Artist request rejected successfully.",
+    request: updatedRequest,
+    // The concept of 'hasPendingRequest' on the user might need an update elsewhere
+    // if it was based on the ArtistProfile.verificationRequestedAt field.
+    // For now, this function focuses on the ArtistRequest itself.
   };
 };
 
@@ -1047,9 +1202,7 @@ export const getDashboardStats = async () => {
     prisma.artistProfile.count({
       where: { role: Role.ARTIST, isVerified: true },
     }),
-    prisma.artistProfile.count({
-      where: { verificationRequestedAt: { not: null }, isVerified: false },
-    }),
+    prisma.artistRequest.count({ where: { status: RequestStatus.PENDING } }),
     prisma.artistProfile.findMany({
       where: { role: Role.ARTIST, isVerified: true },
       orderBy: [{ monthlyListeners: "desc" }],
@@ -1409,8 +1562,7 @@ export const getArtistClaimRequests = async (req: Request) => {
           },
           {
             claimingUser: {
-              email: { contains: trimmedSearch, mode: "insensitive" },
-            },
+              email: { contains: trimmedSearch, mode: "insensitive" } },
           },
           {
             claimingUser: {
@@ -2608,3 +2760,384 @@ export const getUserListeningHistoryDetails = async (
     },
   };
 };
+
+// --- Label Registration Request Management (Admin) ---
+
+/**
+ * Admin gets all label registration requests.
+ */
+export const getAllLabelRegistrations = async (req: Request) => {
+  const { search, status, sortBy, sortOrder } = req.query;
+
+  const whereClause: Prisma.LabelRegistrationRequestWhereInput = {};
+
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { requestedLabelName: { contains: search, mode: 'insensitive' } },
+      { requestingArtist: { artistName: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+
+  if (status && typeof status === 'string' && Object.values(RequestStatus).includes(status as RequestStatus)) {
+    whereClause.status = status as RequestStatus;
+  } else {
+    // Default to PENDING if no status or invalid status is provided by admin panel
+    // This might need adjustment based on how admin panel filters are designed
+    // For now, let's fetch all non-archived or allow flexible status filtering
+    // If status is explicitly empty or "ALL", don't filter by status
+    if (status && status !== 'ALL') {
+        whereClause.status = status as RequestStatus;
+    } else if (!status) { // Default to PENDING if status is not provided at all
+        whereClause.status = RequestStatus.PENDING;
+    }
+  }
+
+
+  const orderByClause: Prisma.LabelRegistrationRequestOrderByWithRelationInput = {};
+  const validSortKeys = ['submittedAt', 'requestedLabelName', 'status'] as const;
+  type SortKey = typeof validSortKeys[number];
+  const key = sortBy as SortKey;
+  const order = sortOrder === 'desc' ? 'desc' : 'asc';
+
+  if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+    orderByClause[key] = order;
+  } else {
+    orderByClause.submittedAt = 'desc'; // Default sort
+  }
+
+  const result = await paginate<LabelRegistrationRequest>(prisma.labelRegistrationRequest, req, {
+    where: whereClause,
+    include: {
+      requestingArtist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+        },
+      },
+      reviewedByAdmin: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      createdLabel: {
+          select: {
+              id: true,
+              name: true,
+          }
+      }
+    },
+    orderBy: orderByClause,
+  });
+
+  return {
+    data: result.data,
+    pagination: result.pagination,
+  };
+};
+
+/**
+ * Get a specific label registration request by ID.
+ */
+export const getLabelRegistrationById = async (registrationId: string) => {
+  const request = await prisma.labelRegistrationRequest.findUnique({
+    where: { id: registrationId },
+    include: {
+      requestingArtist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+          user: { select: { email: true, name: true } }, // Include artist's user email for contact
+        },
+      },
+      reviewedByAdmin: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      createdLabel: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+        }
+      }
+    },
+  });
+
+  if (!request) {
+    throw { status: 404, message: 'Label registration request not found.' };
+  }
+  return request;
+};
+
+/**
+ * Admin approves a label registration request.
+ */
+export const approveLabelRegistration = async (adminUserId: string, registrationId: string) => {
+  const registrationRequest = await prisma.labelRegistrationRequest.findUnique({
+    where: { id: registrationId },
+    include: { requestingArtist: true }, // Need artist profile to update it
+  });
+
+  if (!registrationRequest) {
+    throw { status: 404, message: 'Label registration request not found.' };
+  }
+
+  if (registrationRequest.status !== RequestStatus.PENDING) {
+    throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+  }
+
+  // Transaction to ensure all operations succeed or fail together
+  return prisma.$transaction(async (tx) => {
+    // 1. Create the new Label
+    const newLabel = await tx.label.create({
+      data: {
+        name: registrationRequest.requestedLabelName,
+        description: registrationRequest.requestedLabelDescription,
+        logoUrl: registrationRequest.requestedLabelLogoUrl,
+      },
+      select: labelSelect, 
+    });
+
+    // 2. Update the ArtistProfile with the new labelId
+    await tx.artistProfile.update({
+      where: { id: registrationRequest.requestingArtistId },
+      data: { labelId: newLabel.id },
+    });
+
+    // 3. Update the LabelRegistrationRequest
+    const updatedRequest = await tx.labelRegistrationRequest.update({
+      where: { id: registrationId },
+      data: {
+        status: RequestStatus.APPROVED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        createdLabelId: newLabel.id,
+      },
+    });
+
+    // 4. Notify the artist
+    if (registrationRequest.requestingArtist.userId) { // Still need userId to know WHO to connect to via socket if they are online as a user
+      const notificationData = {
+        data: {
+          recipientType: RecipientType.ARTIST, 
+          artistId: registrationRequest.requestingArtistId, // Target the ArtistProfile
+          type: NotificationType.LABEL_REGISTRATION_APPROVED,
+          message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+          // senderId could be adminUserId if you want to track that
+          isRead: false,
+        },              
+        select: { 
+          id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+          artistId: true, // Ensure artistId is selected for the socket payload
+        }
+      };
+      const notification = await tx.notification.create(notificationData);
+
+      const io = getIO();
+      const targetUserSocketId = getUserSockets().get(registrationRequest.requestingArtist.userId);
+      if (targetUserSocketId) {
+        io.to(targetUserSocketId).emit('notification', {
+          ...notification, 
+          createdAt: notification.createdAt.toISOString(), 
+          labelName: newLabel.name, 
+          labelId: newLabel.id,
+        });
+        console.log(`[Socket Emit] Sent LABEL_REGISTRATION_APPROVED (to ArtistProfile ${notification.artistId}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`);
+      } else {
+        console.log(`[Socket Emit] User ${registrationRequest.requestingArtist.userId} (for ArtistProfile ${notification.artistId}) not connected for LABEL_REGISTRATION_APPROVED.`);
+      }
+    }
+    return { updatedRequest, newLabel };
+  });
+};
+
+
+export const rejectLabelRegistration = async (
+  adminUserId: string, 
+  registrationId: string, 
+  rejectionReason: string
+) => {
+  const errors = runValidations([
+    validateField(rejectionReason, 'rejectionReason', { required: true, minLength: 5, maxLength: 500 }),
+  ]);
+  if (errors.length > 0) {
+    console.warn(`[AdminService] Validation failed for rejection reason for request ${registrationId}, but proceeding with rejection.`);
+    // Potentially throw new Error(`Validation failed: ${errors.join(', ')}`); if strict validation is required before proceeding
+  }
+
+  const registrationRequest = await prisma.labelRegistrationRequest.findUnique({
+    where: { id: registrationId },
+    // No need to include requestingArtist here if only updating the request itself before notification logic
+  });
+
+  if (!registrationRequest) {
+    throw { status: 404, message: 'Label registration request not found.' };
+  }
+
+  if (registrationRequest.status !== RequestStatus.PENDING) {
+    console.warn(`[AdminService] Attempting to reject a request that is already ${registrationRequest.status.toLowerCase()}. ID: ${registrationId}`);
+    // Allow proceeding to ensure consistent state if somehow a request was processed without full completion.
+    // Or throw: throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+  }
+  
+  const updatedRequest = await prisma.labelRegistrationRequest.update({
+    where: { id: registrationId },
+    data: {
+      status: RequestStatus.REJECTED,
+      rejectionReason: rejectionReason,
+      reviewedAt: new Date(),
+      reviewedByAdminId: adminUserId,
+    },
+    select: { 
+        id: true,
+        requestedLabelName: true,
+        requestingArtistId: true, // This is the ArtistProfile.id
+        requestingArtist: { select: { userId: true } } // Need the userId for socket targeting
+    }
+  });
+  console.log(`[AdminService] Updated LabelRegistrationRequest ID: ${updatedRequest.id} to REJECTED`);
+
+  // Notify the artist
+  // Check if the artist has an associated user account for socket targeting
+  if (updatedRequest.requestingArtist?.userId) {
+    const artistUserIdForSocketTargeting = updatedRequest.requestingArtist.userId;
+    const notificationData = {
+      data: {
+        recipientType: RecipientType.ARTIST, // Target the ArtistProfile
+        artistId: updatedRequest.requestingArtistId, // The ID of the ArtistProfile
+        type: NotificationType.LABEL_REGISTRATION_REJECTED,
+        message: `We regret to inform you that your request to register the label "${updatedRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+        isRead: false,
+      },
+      select: { 
+        id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+        artistId: true, // Ensure artistId is selected for socket payload
+      }
+    };
+
+    prisma.notification.create(notificationData)
+      .then(createdNotification => {
+        const io = getIO();
+        const targetSocketId = getUserSockets().get(artistUserIdForSocketTargeting);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('notification', {
+            ...createdNotification, 
+            createdAt: createdNotification.createdAt.toISOString(),
+            rejectionReason: rejectionReason, 
+            labelName: updatedRequest.requestedLabelName, 
+          });
+          console.log(`[Socket Emit] Sent LABEL_REGISTRATION_REJECTED (to ArtistProfile ${createdNotification.artistId}) to user ${artistUserIdForSocketTargeting} via socket ${targetSocketId}`);
+        } else {
+          console.log(`[Socket Emit] User ${artistUserIdForSocketTargeting} (for ArtistProfile ${createdNotification.artistId}) not connected for LABEL_REGISTRATION_REJECTED.`);
+        }
+      })
+      .catch(err => {
+        console.error(`[AdminService] Failed to create or emit rejection notification for user ${artistUserIdForSocketTargeting} (Request ID: ${updatedRequest.id}):`, err);
+    });
+  } else {
+    console.warn(`[AdminService] Cannot send rejection notification for request ${updatedRequest.id} - requesting artist has no associated user ID for socket targeting.`);
+  }
+
+  return {
+      message: `Label registration request ${updatedRequest.id} rejected successfully.`,
+      rejectedRequestId: updatedRequest.id
+  };
+};
+// --- End Label Registration Request Management (Admin) ---
+
+// START NEW FUNCTION TO GET REQUESTS FROM ArtistRequest TABLE
+export const getPendingArtistRoleRequests = async (req: Request) => {
+  const { search, startDate, endDate, status } = req.query;
+
+  const where: Prisma.ArtistRequestWhereInput = {
+    status: RequestStatus.PENDING, // Default to PENDING
+  };
+
+  if (status && typeof status === 'string' && status !== 'ALL' && Object.values(RequestStatus).includes(status as RequestStatus)) {
+    where.status = status as RequestStatus;
+  } else if (status === 'ALL') {
+    // If status is 'ALL', remove the default PENDING filter
+    delete where.status;
+  }
+
+
+  const andConditions: Prisma.ArtistRequestWhereInput[] = [];
+
+  if (search && typeof search === 'string' && search.trim()) {
+    const trimmedSearch = search.trim();
+    andConditions.push({
+      OR: [
+        { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
+        { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { user: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { requestedLabelName: { contains: trimmedSearch, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  // Assuming ArtistRequest has a submission timestamp, e.g., 'createdAt' or 'submittedAt'
+  // Let's check the schema; ArtistRequest has no direct timestamp.
+  // We might need to sort by ID or add a timestamp to the model if date filtering is required.
+  // For now, date filtering will be omitted for ArtistRequest until schema is confirmed/updated.
+
+  if (andConditions.length > 0) {
+    if (where.AND) {
+       if(Array.isArray(where.AND)) {
+        where.AND.push(...andConditions);
+       } else {
+         where.AND = [where.AND, ...andConditions];
+       }
+    } else {
+      where.AND = andConditions;
+    }
+  }
+  
+  // Define a select object for ArtistRequest, similar to artistRequestSelect for ArtistProfile
+  const artistRoleRequestSelect = {
+    id: true,
+    artistName: true,
+    bio: true, // Include bio if needed for list view previews
+    status: true,
+    requestedLabelName: true,
+    // Add any other fields from ArtistRequest model you want to display in the list
+    user: { // Include basic user info
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+      },
+    },
+    // If ArtistRequest model had a submission date like 'createdAt', select it here
+    // createdAt: true, 
+  };
+
+  const options = {
+    where,
+    select: artistRoleRequestSelect,
+    // orderBy: { createdAt: 'desc' }, // If using a createdAt field
+    orderBy: { id: 'desc' }, // Fallback sorting if no date field
+  };
+
+  // Explicitly type the paginate result if item type is different from Prisma.ArtistRequestGetPayload
+  // For now, assuming the select matches a structure we can call 'ArtistRequestListItem' or similar
+  const result = await paginate<Prisma.ArtistRequestGetPayload<typeof options>>(
+    prisma.artistRequest,
+    req,
+    options
+  );
+
+  return {
+    // Ensure the returned data structure matches what the frontend expects
+    // The old 'requests' field might be expected.
+    requests: result.data, 
+    pagination: result.pagination,
+  };
+};
+// END NEW FUNCTION

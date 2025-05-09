@@ -5,6 +5,12 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
+  requestNewLabelRegistration,
+  // getAllLabelRegistrations, // MOVED
+  // getLabelRegistrationById, // MOVED
+  // approveLabelRegistration, // MOVED
+  // rejectLabelRegistration, // MOVED
+  getSelectableLabels,
 } from '../controllers/label.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -39,5 +45,27 @@ router.put(
 );
 
 router.delete('/:id', authenticate, authorize([Role.ADMIN]), deleteLabel);
+
+// === LABEL REGISTRATION ROUTES ===
+
+// Artist: Request new label registration
+router.post(
+  '/registrations',
+  authenticate,
+  authorize([Role.ARTIST]), // Only artists can request
+  upload.single('logoFile'),
+  handleUploadError,
+  requestNewLabelRegistration
+);
+
+// Admin routes for label registration are MOVED to admin.routes.ts
+
+// Artist: Get labels selectable by the current artist
+router.get(
+  '/selectable/by-artist',
+  authenticate,
+  authorize([Role.ARTIST]),
+  getSelectableLabels
+);
 
 export default router;

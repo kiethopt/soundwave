@@ -1,4 +1,4 @@
-import { PrismaClient, Role, AlbumType, FollowingType, HistoryType } from '@prisma/client';
+import { PrismaClient, Role, AlbumType, FollowingType, HistoryType, RequestStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import * as cliProgress from 'cli-progress';
@@ -211,29 +211,22 @@ async function main() {
           },
       });
 
-      const requestDate = faker.date.between({ from: userCreatedAt, to: endDate }); // Request date after user creation
-      // Create the corresponding ArtistProfile representing the request
-      await prisma.artistProfile.upsert({
-          where: { userId: requestingUser.id },
-          update: {}, // No update needed if somehow exists
-          create: {
-              userId: requestingUser.id,
-              artistName: artistName,
-              bio: faker.lorem.paragraph(),
-              // Use DiceBear for the requested artist avatar as well
-              avatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${artistName.replace(/\s+/g, '_')}&backgroundColor=transparent`,
-              socialMediaLinks: {
-                  facebook: `https://facebook.com/${username}`,
-                  instagram: `https://instagram.com/${username}`,
-              },
-              role: Role.ARTIST, // The profile *type* is ARTIST
-              isVerified: false, // Not verified yet
-              isActive: true, // Schema default, admin decides on approval
-              verificationRequestedAt: requestDate, // Simulate request time within range
-              requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records']), // Add requested label name (can be null)
-              createdAt: requestDate, // Profile created when request is made
-              updatedAt: requestDate,
+      // Create the ArtistRequest record
+      await prisma.artistRequest.create({
+        data: {
+          userId: requestingUser.id,
+          artistName: artistName,
+          bio: faker.lorem.paragraph(),
+          avatarUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${artistName.replace(/\s+/g, '_')}&backgroundColor=transparent`,
+          socialMediaLinks: {
+              facebook: `https://facebook.com/${username}`,
+              instagram: `https://www.instagram.com/${username}`,
           },
+          requestedGenres: faker.helpers.arrayElements(genreNames, faker.number.int({ min: 1, max: 3 })),
+          status: RequestStatus.PENDING,
+          requestedLabelName: faker.helpers.arrayElement([null, faker.company.name() + ' Records']),
+          idVerificationDocumentUrl: null,
+        },
       });
       requestBar.increment();
     }

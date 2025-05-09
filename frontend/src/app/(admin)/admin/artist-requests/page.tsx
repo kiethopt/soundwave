@@ -80,7 +80,8 @@ export default function ArtistRequestManagement() {
       }
       
       const filters: any = {
-        search: searchTerm
+        search: searchTerm,
+        // status: RequestStatus.PENDING // Example if we want to send status filter
       };
       
       if (dateFrom) {
@@ -91,9 +92,13 @@ export default function ArtistRequestManagement() {
         filters.endDate = dateTo;
       }
     
-      
-      const response = await api.admin.getArtistRequests(token, page, limit, filters);
-      setRequests(response.requests);
+      // Use the new API endpoint for artist role requests
+      const response = await api.admin.getArtistRoleRequests(token, page, limit, filters);
+      // Assuming the response structure is { requests: ArtistRequest[], pagination: { totalPages: number } }
+      // The type ArtistRequest in frontend/src/types/index.ts might need an update
+      // to match the fields selected by getPendingArtistRoleRequests in admin.service.ts
+      // (id, artistName, bio, status, requestedLabelName, user)
+      setRequests(response.requests as ArtistRequest[]); // Cast for now, ensure type alignment
       setTotalPages(response.pagination.totalPages);
       setActiveSearchTerm(searchTerm);
     } catch (err: any) {
@@ -454,7 +459,8 @@ export default function ArtistRequestManagement() {
                   </th>
                   <th className="py-3 px-6 text-left font-medium">Artist Name</th>
                   <th className="py-3 px-6 text-left font-medium">Email</th>
-                  <th className="py-3 px-6 text-left font-medium rounded-tr-md">Requested At</th>
+                  <th className="py-3 px-6 text-left font-medium">Requested Label</th>
+                  <th className="py-3 px-6 text-left font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -491,7 +497,17 @@ export default function ArtistRequestManagement() {
                         {request.artistName}
                       </td>
                       <td className="py-4 px-6">{request.user?.email || 'N/A'}</td>
-                      <td className="py-4 px-6">{formatDate(request.verificationRequestedAt)}</td>
+                      <td className="py-4 px-6">{request.requestedLabelName || 'N/A'}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          request.status === 'PENDING' ? (theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800') :
+                          request.status === 'APPROVED' ? (theme === 'dark' ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800') :
+                          request.status === 'REJECTED' ? (theme === 'dark' ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800') :
+                          (theme === 'dark' ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800')
+                        }`}>
+                          {request.status ? request.status.toLowerCase() : 'N/A'}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -555,7 +571,8 @@ export default function ArtistRequestManagement() {
             }}
             onConfirm={handleApproveConfirm}
             theme={theme}
-            artistName={requestToApprove?.artistName}
+            itemName={requestToApprove?.artistName}
+            itemType="artist request"
           />
           <ConfirmDeleteModal
             isOpen={isDeleteModalOpen}
@@ -711,7 +728,8 @@ export default function ArtistRequestManagement() {
             }}
             onConfirm={handleClaimApproveConfirm}
             theme={theme}
-            artistName={claimRequestToApprove?.artistProfile.artistName}
+            itemName={claimRequestToApprove?.artistProfile.artistName}
+            itemType="artist claim"
           />
           <ConfirmDeleteModal
             isOpen={isDeleteModalOpen}

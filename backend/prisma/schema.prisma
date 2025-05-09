@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -8,32 +9,34 @@ datasource db {
 }
 
 model User {
-  id                   String          @id @default(cuid())
-  email                String          @unique
-  username             String?         @unique
-  password             String
-  name                 String?
-  avatar               String?
-  role                 Role            @default(USER)
-  currentProfile       String          @default("USER")
-  isActive             Boolean         @default(true)
-  followVisibility     Boolean         @default(true)
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  lastLoginAt          DateTime?
-  passwordResetToken   String?
-  passwordResetExpires DateTime?
-  artistProfile        ArtistProfile?
-  history              History[]
-  notifications        Notification[]  @relation("UserNotifications")
-  playlists            Playlist[]
-  followed             UserFollow[]    @relation("Follower")
-  followers            UserFollow[]    @relation("FollowingUser")
-  likedTracks          UserLikeTrack[]
-  submittedClaims      ArtistClaimRequest[] @relation("ClaimingUser")
-  reviewedClaims       ArtistClaimRequest[] @relation("ReviewingAdmin")
-  submittedReports     Report[]        @relation("UserReports")
-  resolvedReports      Report[]        @relation("AdminResolutions")
+  id                    String                     @id @default(cuid())
+  email                 String                     @unique
+  username              String?                    @unique
+  password              String
+  name                  String?
+  avatar                String?
+  role                  Role                       @default(USER)
+  currentProfile        String                     @default("USER")
+  isActive              Boolean                    @default(true)
+  followVisibility      Boolean                    @default(true)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  lastLoginAt           DateTime?
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+  artistProfile         ArtistProfile?
+  history               History[]
+  notifications         Notification[]             @relation("UserNotifications")
+  playlists             Playlist[]
+  followed              UserFollow[]               @relation("Follower")
+  followers             UserFollow[]               @relation("FollowingUser")
+  likedTracks           UserLikeTrack[]
+  submittedClaims       ArtistClaimRequest[]       @relation("ClaimingUser")
+  reviewedClaims        ArtistClaimRequest[]       @relation("ReviewingAdmin")
+  submittedReports      Report[]                   @relation("UserReports")
+  resolvedReports       Report[]                   @relation("AdminResolutions")
+  reviewedLabelRequests LabelRegistrationRequest[] @relation("AdminReviewedLabelRequests")
+  artistRequests        ArtistRequest[]
 
   @@unique([email, username])
   @@index([email])
@@ -45,32 +48,33 @@ model User {
 }
 
 model ArtistProfile {
-  id                      String         @id @default(cuid())
-  artistName              String         @unique
-  bio                     String?
-  avatar                  String?
-  artistBanner            String?
-  role                    Role           @default(ARTIST)
-  socialMediaLinks        Json?
-  monthlyListeners        Int            @default(0)
-  isVerified              Boolean        @default(false)
-  isActive                Boolean        @default(true)
-  verificationRequestedAt DateTime?
-  verifiedAt              DateTime?
-  requestedLabelName      String?
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
-  userId                  String?        @unique
-  labelId                 String?
-  albums                  Album[]
-  genres                  ArtistGenre[]
-  user                    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label                   Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull) // Relation to Label
-  notifications           Notification[] @relation("ArtistNotifications")
-  tracks                  Track[]
-  featuredInTracks        TrackArtist[] @relation("FeaturedArtistRelation")
-  followers               UserFollow[]   @relation("FollowingArtist")
-  claimRequests           ArtistClaimRequest[] @relation("ClaimedProfile")
+  id                        String                     @id @default(cuid())
+  artistName                String                     @unique
+  bio                       String?
+  avatar                    String?
+  artistBanner              String?
+  role                      Role                       @default(ARTIST)
+  socialMediaLinks          Json?
+  monthlyListeners          Int                        @default(0)
+  isVerified                Boolean                    @default(false)
+  isActive                  Boolean                    @default(true)
+  verificationRequestedAt   DateTime?
+  verifiedAt                DateTime?
+  requestedLabelName        String?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  userId                    String?                    @unique
+  labelId                   String?
+  albums                    Album[]
+  genres                    ArtistGenre[]
+  user                      User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label                     Label?                     @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  notifications             Notification[]             @relation("ArtistNotifications")
+  tracks                    Track[]
+  featuredInTracks          TrackArtist[]              @relation("FeaturedArtistRelation")
+  followers                 UserFollow[]               @relation("FollowingArtist")
+  claimRequests             ArtistClaimRequest[]       @relation("ClaimedProfile")
+  labelRegistrationRequests LabelRegistrationRequest[] @relation("LabelRequestsByArtist")
 
   @@index([artistName])
   @@index([isVerified])
@@ -93,38 +97,39 @@ model ArtistGenre {
 }
 
 model Label {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  logoUrl     String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tracks      Track[]
-  albums      Album[]
-  artists     ArtistProfile[] // Relation back to ArtistProfile
+  id                  String                    @id @default(cuid())
+  name                String                    @unique
+  logoUrl             String?
+  description         String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  tracks              Track[]
+  albums              Album[]
+  artists             ArtistProfile[]
+  registrationRequest LabelRegistrationRequest?
 
   @@map("labels")
 }
 
 model Album {
-  id          String        @id @default(cuid())
-  title       String
-  coverUrl    String?
-  releaseDate DateTime
-  duration    Int           @default(0)
-  totalTracks Int           @default(0)
-  type        AlbumType     @default(ALBUM)
-  isActive    Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  artistId    String
-  genres      AlbumGenre[]
-  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  tracks      Track[]
-  labelId     String?
-  label       Label?        @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  id            String         @id @default(cuid())
+  title         String
+  coverUrl      String?
+  releaseDate   DateTime
+  duration      Int            @default(0)
+  totalTracks   Int            @default(0)
+  type          AlbumType      @default(ALBUM)
+  isActive      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  artistId      String
+  genres        AlbumGenre[]
+  artist        ArtistProfile  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks        Track[]
+  labelId       String?
+  label         Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull)
   notifications Notification[]
-  reports     Report[]
+  reports       Report[]
 
   @@unique([title, artistId])
   @@index([title])
@@ -147,12 +152,12 @@ model Track {
   playCount       Int             @default(0)
   type            AlbumType       @default(SINGLE)
   isActive        Boolean         @default(false)
-  tempo           Int?            // Added tempo field
-  mood            String?         // Added mood field (e.g., Happy, Sad, Energetic)
-  key             String?         // e.g., "C#", "Fm"
-  scale           String?         // e.g., "major", "minor"
-  danceability    Float?          // Value indicating danceability
-  energy          Float?          // Value indicating perceived energy
+  tempo           Int? // Added tempo field
+  mood            String? // Added mood field (e.g., Happy, Sad, Energetic)
+  key             String? // e.g., "C#", "Fm"
+  scale           String? // e.g., "major", "minor"
+  danceability    Float? // Value indicating danceability
+  energy          Float? // Value indicating perceived energy
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   artistId        String
@@ -362,19 +367,19 @@ model UserLikeTrack {
 }
 
 model ArtistClaimRequest {
-  id                String        @id @default(cuid())
+  id                String      @id @default(cuid())
   claimingUserId    String
   artistProfileId   String
   proof             String[]
-  status            ClaimStatus   @default(PENDING) // PENDING, APPROVED, REJECTED
-  submittedAt       DateTime      @default(now())
+  status            ClaimStatus @default(PENDING) // PENDING, APPROVED, REJECTED
+  submittedAt       DateTime    @default(now())
   reviewedAt        DateTime?
-  reviewedByAdminId String?       // ID of the Admin who reviewed
+  reviewedByAdminId String?
   rejectionReason   String?
 
-  claimingUser      User          @relation("ClaimingUser", fields: [claimingUserId], references: [id], onDelete: Cascade)
-  artistProfile     ArtistProfile @relation("ClaimedProfile", fields: [artistProfileId], references: [id], onDelete: Cascade)
-  reviewedByAdmin   User?         @relation("ReviewingAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  claimingUser    User          @relation("ClaimingUser", fields: [claimingUserId], references: [id], onDelete: Cascade)
+  artistProfile   ArtistProfile @relation("ClaimedProfile", fields: [artistProfileId], references: [id], onDelete: Cascade)
+  reviewedByAdmin User?         @relation("ReviewingAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
   @@unique([claimingUserId, artistProfileId])
   @@index([status])
@@ -391,27 +396,27 @@ model Report {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   resolvedAt  DateTime?
-  
+
   // Who submitted the report
-  reporterId  String
-  reporter    User         @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
-  
+  reporterId String
+  reporter   User   @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
   // Who resolved the report (admin)
-  resolverId  String?
-  resolver    User?        @relation("AdminResolutions", fields: [resolverId], references: [id], onDelete: SetNull)
-  
+  resolverId String?
+  resolver   User?   @relation("AdminResolutions", fields: [resolverId], references: [id], onDelete: SetNull)
+
   // Resolution details
-  resolution  String?
-  
+  resolution String?
+
   // What entity is being reported
-  trackId     String?
-  track       Track?       @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  
-  playlistId  String?
-  playlist    Playlist?    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  
-  albumId     String?
-  album       Album?       @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  trackId String?
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  playlistId String?
+  playlist   Playlist? @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  albumId String?
+  album   Album?  @relation(fields: [albumId], references: [id], onDelete: Cascade)
 
   @@index([reporterId])
   @@index([resolverId])
@@ -424,6 +429,52 @@ model Report {
   @@map("reports")
 }
 
+model LabelRegistrationRequest {
+  id                        String  @id @default(cuid())
+  requestedLabelName        String
+  requestedLabelDescription String?
+  requestedLabelLogoUrl     String?
+
+  requestingArtistId String
+  requestingArtist   ArtistProfile @relation("LabelRequestsByArtist", fields: [requestingArtistId], references: [id], onDelete: Cascade)
+
+  status            RequestStatus @default(PENDING)
+  submittedAt       DateTime      @default(now())
+  reviewedAt        DateTime?
+  reviewedByAdminId String?
+  reviewedByAdmin   User?         @relation("AdminReviewedLabelRequests", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  rejectionReason   String?
+
+  createdLabelId String? @unique
+  createdLabel   Label?  @relation(fields: [createdLabelId], references: [id], onDelete: SetNull)
+
+  @@index([requestingArtistId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([reviewedByAdminId])
+  @@map("label_registration_requests")
+}
+
+model ArtistRequest {
+  id                        String        @id @default(cuid())
+  artistName                String
+  bio                       String?       @db.Text
+  avatarUrl                 String?
+  socialMediaLinks          Json?
+  idVerificationDocumentUrl String?
+  requestedGenres           String[]      @default([])
+  status                    RequestStatus @default(PENDING)
+  rejectionReason           String?       @db.Text
+  requestedLabelName        String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("artist_requests")
+}
+
 enum ClaimStatus {
   PENDING
   APPROVED
@@ -434,6 +485,12 @@ enum Role {
   USER
   ARTIST
   ADMIN
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum AlbumType {
@@ -472,6 +529,9 @@ enum NotificationType {
   CLAIM_REQUEST_REJECTED
   NEW_REPORT_SUBMITTED
   REPORT_RESOLVED
+  LABEL_REGISTRATION_SUBMITTED
+  LABEL_REGISTRATION_APPROVED
+  LABEL_REGISTRATION_REJECTED
 }
 
 enum FollowingType {

@@ -13,6 +13,10 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 const SectionHeading = ({ icon: Icon, title }: { icon: React.ElementType, title: string }) => (
   <div className="flex items-center gap-3 mb-4">
@@ -21,16 +25,50 @@ const SectionHeading = ({ icon: Icon, title }: { icon: React.ElementType, title:
   </div>
 );
 
+interface SocialLink {
+  platform: string;
+  url: string;
+}
+
+interface PortfolioLink {
+  url: string;
+}
+
+interface FormDataState {
+  artistName: string;
+  bio: string;
+  label: string;
+  facebookLink: string;
+  instagramLink: string;
+  genres: string[];
+  avatarFile: File | null;
+  socialLinks: SocialLink[];
+  portfolioLinks: PortfolioLink[];
+  agreements: {
+    terms: boolean;
+    accuracy: boolean;
+  };
+  requestedLabelName?: string;
+}
+
 export default function RequestArtistPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const { theme } = useTheme();
+  const [formData, setFormData] = useState<FormDataState>({
     artistName: '',
     bio: '',
     label: '',
     facebookLink: 'https://www.facebook.com/',
     instagramLink: 'https://www.instagram.com/',
-    genres: [] as string[],
-    avatarFile: null as File | null,
+    genres: [],
+    avatarFile: null,
+    socialLinks: [{ platform: '', url: '' }],
+    portfolioLinks: [{ url: '' }],
+    agreements: {
+      terms: false,
+      accuracy: false,
+    },
+    requestedLabelName: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,8 +177,11 @@ export default function RequestArtistPage() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target as HTMLInputElement;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const handleGenreChange = (selectedGenreIds: string[]) => {
@@ -220,8 +261,10 @@ export default function RequestArtistPage() {
       const submitFormData = new FormData();
       submitFormData.append('artistName', formData.artistName);
       submitFormData.append('bio', formData.bio);
-      submitFormData.append('label', formData.label);
       submitFormData.append('genres', formData.genres.join(','));
+      if (formData.requestedLabelName) {
+        submitFormData.append('requestedLabelName', formData.requestedLabelName);
+      }
 
       const socialMediaLinks = {
         ...(formData.facebookLink !== 'https://www.facebook.com/' && { facebook: formData.facebookLink }),
@@ -371,41 +414,32 @@ export default function RequestArtistPage() {
 
           <div className="space-y-6">
             <SectionHeading icon={User} title="Artist Details" />
-            <div>
-              <label
-                htmlFor="artistName"
-                className="block text-sm font-medium mb-2 text-white/70"
-              >
+            <div className="space-y-1.5">
+              <Label htmlFor="artistName" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>
                 Artist Name *
-              </label>
-              <input
+              </Label>
+              <Input
                 id="artistName"
                 name="artistName"
-                type="text"
                 value={formData.artistName}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
-                placeholder="Enter your artist name"
+                placeholder="Your stage name"
                 required
-              />
+                className="bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40 "
+                />
             </div>
-            <div>
-              <label
-                htmlFor="label"
-                className="block text-sm font-medium mb-2 text-white/70"
-              >
-                Label *
-              </label>
-              <input
-                id="label"
-                name="label"
-                type="text"
-                value={formData.label}
+            <div className="space-y-1.5">
+              <Label htmlFor="requestedLabelName" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>
+                Proposed Label Name (Optional)
+              </Label>
+              <Input
+                id="requestedLabelName"
+                name="requestedLabelName"
+                value={formData.requestedLabelName || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
-                placeholder="Your personal label name (e.g., 'My Music Records')"
-                required
-              />
+                placeholder="Your label name (if any)"
+                className="bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40 "
+                />
             </div>
             <div>
               <label
@@ -533,7 +567,7 @@ export default function RequestArtistPage() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile || !formData.label || !agreedToTerms}
+              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile || !agreedToTerms}
               className="flex items-center gap-2"
             >
               {isSubmitting ? (

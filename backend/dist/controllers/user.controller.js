@@ -55,7 +55,7 @@ const requestToBecomeArtist = async (req, res) => {
                     console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
                     io.to(targetSocketId).emit('artist_request_submitted', {
                         hasPendingRequest: true,
-                        artistProfileId: createdProfile.id
+                        artistProfileId: createdProfile.request.id
                     });
                 }
                 else {

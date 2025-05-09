@@ -32,15 +32,10 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
-const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
-const emailService = __importStar(require("../services/email.service"));
 const client_1 = require("@prisma/client");
 const trackService = __importStar(require("../services/track.service"));
 const getAllUsers = async (req, res) => {
@@ -324,45 +319,26 @@ exports.deleteGenre = deleteGenre;
 const approveArtistRequest = async (req, res) => {
     try {
         const { requestId } = req.body;
-        const updatedProfile = await adminService.approveArtistRequest(requestId);
-        if (updatedProfile?.user?.id) {
-            await db_1.default.notification.create({
-                data: {
-                    type: "ARTIST_REQUEST_APPROVE",
-                    message: "Your request to become an Artist has been approved!",
-                    recipientType: "USER",
-                    userId: updatedProfile.user.id,
-                    isRead: false,
-                },
-            });
+        const adminUserId = req.user?.id;
+        if (!adminUserId) {
+            res.status(401).json({ message: "Admin not authenticated or user ID not found." });
+            return;
         }
-        else {
-            console.warn(`[Approve Request] Cannot create notification: User data missing in updatedProfile.`);
+        if (!requestId) {
+            res.status(400).json({ message: "Request ID is required." });
+            return;
         }
-        if (updatedProfile?.user?.email) {
-            try {
-                const emailOptions = emailService.createArtistRequestApprovedEmail(updatedProfile.user.email, updatedProfile.user.name || updatedProfile.user.username || "User");
-                await emailService.sendEmail(emailOptions);
-                console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
-            }
-            catch (emailError) {
-                console.error("Failed to send artist approval email:", emailError);
-            }
-        }
-        else {
-            console.warn(`Could not send approval email: No email found for user ${updatedProfile?.user?.id ?? "unknown"}`);
-        }
+        const result = await adminService.approveArtistRequest(adminUserId, requestId);
         res.json({
-            message: "Artist role approved successfully",
-            user: updatedProfile.user,
-            hasPendingRequest: false,
+            message: result.message,
+            data: result.data,
         });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message.includes("not found, already verified, or rejected")) {
+            (error.message.includes("not found") || error.message.includes("cannot be approved") || error.message.includes("User ID missing"))) {
             res.status(404).json({
-                message: "Artist request not found, already verified, or rejected",
+                message: error.message,
             });
             return;
         }
@@ -371,51 +347,24 @@ const approveArtistRequest = async (req, res) => {
 };
 exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = async (req, res) => {
+    console.log("!!!!!!!! ORIGINAL rejectArtistRequest CONTROLLER HIT !!!!!!!!");
     try {
         const { requestId, reason } = req.body;
-        const result = await adminService.rejectArtistRequest(requestId);
-        let notificationMessage = "Your request to become an Artist has been rejected.";
-        if (reason && reason.trim() !== "") {
-            notificationMessage += ` Reason: ${reason.trim()}`;
+        if (!requestId) {
+            res.status(400).json({ message: "Request ID is required." });
+            return;
         }
-        if (result?.user?.id) {
-            await db_1.default.notification.create({
-                data: {
-                    type: "ARTIST_REQUEST_REJECT",
-                    message: notificationMessage,
-                    recipientType: "USER",
-                    userId: result.user.id,
-                    isRead: false,
-                },
-            });
-        }
-        else {
-            console.warn(`[Reject Request] Cannot create notification: User data missing in result.`);
-        }
-        if (result?.user?.email) {
-            try {
-                const emailOptions = emailService.createArtistRequestRejectedEmail(result.user.email, result.user.name || result.user.username || "User", reason);
-                await emailService.sendEmail(emailOptions);
-                console.log(`Artist rejection email sent to ${result.user.email}`);
-            }
-            catch (emailError) {
-                console.error("Failed to send artist rejection email:", emailError);
-            }
-        }
-        else {
-            console.warn(`Could not send rejection email: No email found for user ${result?.user?.id ?? "unknown"}`);
-        }
+        const result = await adminService.rejectArtistRequest(requestId, reason);
         res.json({
-            message: "Artist role request rejected successfully",
-            user: result.user,
-            hasPendingRequest: result.hasPendingRequest,
+            message: result.message,
+            request: result.request,
         });
     }
     catch (error) {
         if (error instanceof Error &&
-            error.message.includes("not found, already verified, or rejected")) {
+            (error.message.includes("not found") || error.message.includes("cannot be rejected"))) {
             res.status(404).json({
-                message: "Artist request not found, already verified, or rejected",
+                message: error.message,
             });
             return;
         }
@@ -728,4 +677,81 @@ const reanalyzeTrackHandler = async (req, res) => {
     }
 };
 exports.reanalyzeTrackHandler = reanalyzeTrackHandler;
+const getAllLabelRegistrations = async (req, res) => {
+    try {
+        const result = await adminService.getAllLabelRegistrations(req);
+        res.json({
+            data: result.data,
+            pagination: result.pagination,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Admin: Get all label registrations');
+    }
+};
+exports.getAllLabelRegistrations = getAllLabelRegistrations;
+const getLabelRegistrationById = async (req, res) => {
+    try {
+        const { registrationId } = req.params;
+        const request = await adminService.getLabelRegistrationById(registrationId);
+        res.json({ data: request });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Admin: Get label registration by ID');
+    }
+};
+exports.getLabelRegistrationById = getLabelRegistrationById;
+const approveLabelRegistration = async (req, res) => {
+    try {
+        const adminUserId = req.user?.id;
+        if (!adminUserId) {
+            res.status(401).json({ message: 'Admin not authenticated or user ID not found.' });
+            return;
+        }
+        const { registrationId } = req.params;
+        const result = await adminService.approveLabelRegistration(adminUserId, registrationId);
+        res.json({
+            message: 'Label registration approved successfully.',
+            data: result,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Admin: Approve label registration');
+    }
+};
+exports.approveLabelRegistration = approveLabelRegistration;
+const rejectLabelRegistration = async (req, res) => {
+    try {
+        const adminUserId = req.user?.id;
+        if (!adminUserId) {
+            res.status(401).json({ message: 'Admin not authenticated or user ID not found.' });
+            return;
+        }
+        const { registrationId } = req.params;
+        const { reason } = req.body;
+        if (!reason) {
+            res.status(400).json({ message: 'Rejection reason is required.' });
+            return;
+        }
+        const result = await adminService.rejectLabelRegistration(adminUserId, registrationId, reason);
+        res.json({
+            message: 'Label registration rejected successfully.',
+            data: result,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Admin: Reject label registration');
+    }
+};
+exports.rejectLabelRegistration = rejectLabelRegistration;
+const getArtistRoleRequestsHandler = async (req, res) => {
+    try {
+        const { requests, pagination } = await adminService.getPendingArtistRoleRequests(req);
+        res.json({ requests, pagination });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Get artist role requests");
+    }
+};
+exports.getArtistRoleRequestsHandler = getArtistRoleRequestsHandler;
 //# sourceMappingURL=admin.controller.js.map

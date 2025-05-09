@@ -1119,6 +1119,7 @@ export function EditArtistProfileModal({
   );
 }
 
+
 interface RegisterLabelModalProps {
   isOpen: boolean;
   onClose: () => void;

@@ -1760,7 +1760,8 @@ interface ApproveModalProps {
   onClose: () => void;
   onConfirm: () => void;
   theme?: "light" | "dark";
-  artistName?: string;
+  itemName?: string;    // Changed from artistName
+  itemType?: string;    // Added for context (e.g., "artist", "label request")
 }
 
 export function ApproveModal({
@@ -1768,9 +1769,16 @@ export function ApproveModal({
   onClose,
   onConfirm,
   theme = "light",
-  artistName,
+  itemName,
+  itemType = 'item' // Default itemType to 'item'
 }: ApproveModalProps) {
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
+
+  // Default title and description, can be customized further if needed
+  const title = `Approve ${itemType}`;
+  const description = `Are you sure you want to approve this ${itemType}${itemName ? ` "${itemName}"` : ''}?`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1817,18 +1825,16 @@ export function ApproveModal({
               ${theme === "dark" ? "text-white" : "text-gray-900"}
             `}
           >
-            Approve Artist Request
+            {title}
           </DialogTitle>
-          <p
+          <DialogDescription
             className={`
               mt-1 text-sm text-left
               ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
             `}
           >
-            {artistName
-              ? `Are you sure you want to approve "${artistName}"? This action will grant artist status to the user.`
-              : `Are you sure you want to approve this artist request? This action will grant artist status to the user.`}
-          </p>
+            {description}
+          </DialogDescription>
         </div>
 
         {/* ---------- Actions ---------- */}
@@ -1863,7 +1869,7 @@ export function ApproveModal({
             onClick={onConfirm}
           >
             <CheckCircle className="w-4 h-4 mr-2" />
-            Approve Artist
+            Approve {itemType}
           </Button>
         </div>
       </DialogContent>

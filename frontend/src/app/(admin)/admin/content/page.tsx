@@ -3,10 +3,9 @@
 import React, { useState } from 'react';
 import { AlbumManagement } from '@/components/admin/content/AlbumManagement';
 import { TrackManagement } from '@/components/admin/content/TrackManagement';
-import { SystemPlaylistManagement } from '@/components/admin/content/SystemPlaylistManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Album, Disc3, ListMusic } from 'lucide-react';
+import { Album, Disc3 } from 'lucide-react';
 
 export default function ContentManagement() {
   const { theme } = useTheme();
@@ -28,7 +27,7 @@ export default function ContentManagement() {
         onValueChange={setActiveTab} 
         className="w-full"
       >
-        <TabsList className={`grid w-full grid-cols-3 mb-6 ${theme === 'dark' ? 'bg-gray-800' : ''}`}>
+        <TabsList className={`grid w-full grid-cols-2 mb-6 ${theme === 'dark' ? 'bg-gray-800' : ''}`}>
           <TabsTrigger 
             value="albums"
             className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}
@@ -43,6 +42,7 @@ export default function ContentManagement() {
             <Disc3 className="h-4 w-4" />
             <span className="hidden sm:inline">Tracks</span>
           </TabsTrigger>
+          {/*
           <TabsTrigger 
             value="playlists"
             className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}
@@ -50,6 +50,7 @@ export default function ContentManagement() {
             <ListMusic className="h-4 w-4" />
             <span className="hidden sm:inline">System Playlists</span>
           </TabsTrigger>
+          */}
         </TabsList>
 
         <TabsContent value="albums" className="space-y-4">
@@ -60,9 +61,11 @@ export default function ContentManagement() {
           <TrackManagement theme={theme} />
         </TabsContent>
 
+        {/*
         <TabsContent value="playlists" className="space-y-4">
           <SystemPlaylistManagement theme={theme} />
         </TabsContent>
+        */}
       </Tabs>
     </div>
   );

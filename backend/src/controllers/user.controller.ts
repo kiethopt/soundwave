@@ -31,7 +31,7 @@ export const requestToBecomeArtist = async (
                 console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
                 io.to(targetSocketId).emit('artist_request_submitted', {
                     hasPendingRequest: true,
-                    artistProfileId: createdProfile.id 
+                    artistProfileId: createdProfile.request.id 
                 });
             } else {
                 console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
