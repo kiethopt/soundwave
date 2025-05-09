@@ -54,6 +54,8 @@ interface TrackContextType {
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   reorderQueue: (startIndex: number, endIndex: number) => void;
+  queueSourceId: string | null;
+  setQueueSourceId: (id: string | null) => void;
 }
 
 export const TrackContext = createContext<TrackContextType>({
@@ -83,6 +85,8 @@ export const TrackContext = createContext<TrackContextType>({
   removeFromQueue: () => {},
   clearQueue: () => {},
   reorderQueue: () => {},
+  queueSourceId: null,
+  setQueueSourceId: () => {},
 });
 
 export const TrackProvider = ({ children }: { children: ReactNode }) => {
@@ -99,6 +103,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [queue, setQueue] = useState<Track[]>([]);
+  const [queueSourceId, setQueueSourceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackQueueRef = useRef<Track[]>([]);
   const tabId = useRef(Math.random().toString(36).substring(2, 15)).current;
@@ -337,7 +342,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         if (currentToken) {
           try {
             console.log(
-              `[TrackContext DEBUG] Attempting to call api.tracks.recordPlay for track: ${trackToPlay.id}`
+              `[TrackContext DEBUG] Attempting to call api.tracks.recordPlay for track: ${trackToPlay.id}, Title: ${trackToPlay.title}, Artist: ${trackToPlay.artist?.artistName ?? 'N/A'}`
             );
             // Use trackToPlay.id which has the potentially fetched data
             await api.tracks.recordPlay(trackToPlay.id, currentToken);
@@ -858,6 +863,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         removeFromQueue,
         clearQueue,
         reorderQueue,
+        queueSourceId,
+        setQueueSourceId,
       }}
     >
       {children}

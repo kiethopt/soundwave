@@ -343,7 +343,7 @@ export default function SimpleTrackManagement() {
     if (target.closest('[role="checkbox"]') || target.closest('button')) {
       return;
     }
-    router.push(`/track/${track.id}`);
+    router.push(`/artist/tracks/${track.id}`);
   };
 
   const isAllSelected = tracks.length > 0 && selectedTrackIds.size === tracks.length;

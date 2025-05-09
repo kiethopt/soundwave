@@ -1277,14 +1277,13 @@ export function DeactivateModal({
 
 // Confirm Delete Modal
 interface ConfirmDeleteModalProps {
-  item: { id: string; name?: string | null; email?: string | null } | null; // Made email optional
+  item: { id: string; name?: string | null; email: string } | null;
   count?: number;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (ids: string[]) => void;
   theme?: "light" | "dark";
   entityType?: string;
-  isLoading?: boolean; // Added isLoading prop
 }
 
 export function ConfirmDeleteModal({
@@ -1293,107 +1292,121 @@ export function ConfirmDeleteModal({
   isOpen,
   onClose,
   onConfirm,
-  theme = "light", // Theme prop might be less relevant with AlertDialog's direct styling
+  theme = "light",
   entityType = "item",
-  // Add new props for AlertDialog if needed, e.g., title, description can be part of props
-  // For now, we'll try to keep the existing logic for generating title/description
-  isLoading, // Added isLoading prop
 }: ConfirmDeleteModalProps) {
-  const itemName =
-    count && count > 1
-      ? `${count} ${entityType}s`
-      : item?.name || item?.email || entityType;
-
-  // No need for explicit handleConfirm if using AlertDialogAction's default behavior,
-  // but we might need to pass a function to AlertDialogAction's onClick
-  // Or, if we want to keep the existing onConfirm logic:
-  const handleConfirmAction = () => {
-    if (item) {
-      onConfirm([item.id]);
-    } else if (count && count > 0) {
-      // item is null in this branch, representing bulk delete.
-      // The modal's onConfirm should signal a bulk confirmation,
-      // actual IDs are handled by the parent component.
-      onConfirm([]); 
-    }
-    // If neither item nor count is present, onConfirm is not called.
-  };
-
-  if (!isOpen) {
+  if (!isOpen || (!item && !count)) {
     return null;
   }
 
+  const isBulkDelete = count !== undefined && count > 0;
+  const title = isBulkDelete
+    ? `Delete ${count} ${entityType}(s)`
+    : `Delete ${entityType}`;
+  const itemName = item?.name || item?.email;
+  const description = isBulkDelete
+    ? `Are you sure you want to delete the selected ${count} ${entityType}(s)? This action cannot be undone.`
+    : `Are you sure you want to delete the ${entityType} ${
+        itemName ? `"${itemName}"` : "this item"
+      }? This action cannot be undone.`;
+
+  const handleConfirm = () => {
+    if (isBulkDelete && count) {
+      onConfirm([]);
+    } else if (item) {
+      onConfirm([item.id]);
+    }
+  };
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
-      {/* AlertDialogTrigger could be used by parent, not directly here if isOpen controls it */}
-      {/* <AlertDialogTrigger asChild>
-        <Button variant="outline">Show Dialog</Button>
-      </AlertDialogTrigger> */}
-      <AlertDialogContent className={cn(theme === "dark" ? "dark" : "")}>
-        {" "}
-        {/* Apply dark theme if needed */}
-        <AlertDialogHeader>
-          <div className="flex flex-col items-center text-center">
-            {" "}
-            {/* Centering icon and title */}
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full dark:bg-red-900/30">
-              <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`
+          sm:max-w-[400px] p-0 overflow-hidden
+          ${
+            theme === "dark"
+              ? "bg-gray-800 text-white border-gray-700"
+              : "bg-white"
+          }
+        `}
+      >
+        {/* ---------- Header ---------- */}
+        <div className="px-6 pt-6">
+          {/* Header with Trash icon and Close button aligned */}
+          <div className="flex items-center justify-between w-full">
+            {/* Trash icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-red-100">
+              <Trash2 className="w-7 h-7 text-red-600" strokeWidth={1.5} />
             </div>
-            <AlertDialogTitle className="text-lg font-semibold">
-              {/* Dynamically set title based on single or bulk delete */}
-              {count && count > 1
-                ? `Delete ${count} ${entityType}s?`
-                : `Delete ${item?.name || item?.email || entityType}?`}
-            </AlertDialogTitle>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-md flex items-center justify-center transition-colors
+                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
           </div>
-        </AlertDialogHeader>
-        <AlertDialogDescription className="text-center text-sm text-muted-foreground px-4">
-          {/* Dynamically set description */}
-          Are you sure you want to delete{" "}
-          {count && count > 1
-            ? `these ${count} ${entityType}s`
-            : `this ${entityType} named "${
-                item?.name || item?.email || "item"
-              }"`}
-          ? This action cannot be undone.
-        </AlertDialogDescription>
-        <AlertDialogFooter className="mt-4 sm:justify-end space-x-2">
-          {" "}
-          {/* Added spacing and alignment */}
-          <AlertDialogCancel
+
+          {/* ---------- Title & Description ---------- */}
+          <DialogTitle
+            className={`
+              mt-4 text-lg font-bold text-left
+              ${theme === "dark" ? "text-white" : "text-gray-900"}
+            `}
+          >
+            {title}
+          </DialogTitle>
+          <p
+            className={`
+              mt-1 text-sm text-left
+              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
+            `}
+          >
+            {description}
+          </p>
+        </div>
+
+        {/* ---------- Actions ---------- */}
+        <div
+          className={`
+          mt-6 px-6 py-4 flex gap-3 border-t
+          ${
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          }
+        `}
+        >
+          <Button
+            variant="outline"
+            className={`flex-1 text-center justify-center bg-white
+              ${
+                theme === "dark"
+                  ? "text-gray-900 hover:bg-gray-100 border-gray-300"
+                  : "hover:bg-gray-50 border-gray-300"
+              }`}
             onClick={onClose}
-            disabled={isLoading}
-            className={cn(
-              "border border-border hover:bg-muted", // Standard outline style
-              theme === "dark" &&
-                "text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white" // Dark mode adjustments
-            )}
           >
             Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleConfirmAction}
-            disabled={isLoading}
-            className={cn(
-              // Destructive button base styles (red)
-              "bg-red-600 text-white hover:bg-red-700",
-              // Dark mode destructive styles (slightly brighter red)
-              "dark:bg-red-600 dark:hover:bg-red-700 dark:text-white",
-              // Disabled state
-              isLoading && "opacity-50 cursor-not-allowed"
-            )}
+          </Button>
+          <Button
+            variant="destructive"
+            className={`flex-1 text-center justify-center ${
+              theme === "dark" ? "bg-red-700 hover:bg-red-600" : ""
+            }`}
+            onClick={handleConfirm}
           >
-            {isLoading ? (
-              <React.Fragment>
-                <Spinner className="mr-2 h-4 w-4 animate-spin" /> Deleting...
-              </React.Fragment>
-            ) : (
-              "Delete"
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            Delete {isBulkDelete ? `${count} ${entityType}(s)` : entityType}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

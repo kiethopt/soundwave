@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const client_1 = require("@prisma/client");
@@ -400,17 +400,6 @@ const getDashboardStats = async (req, res) => {
     }
 };
 exports.getDashboardStats = getDashboardStats;
-const handleCacheStatus = async (req, res) => {
-    try {
-        const { enabled } = req.method === "POST" ? req.body : {};
-        const result = await adminService.updateCacheStatus(enabled);
-        res.json(result);
-    }
-    catch (error) {
-        (0, handle_utils_1.handleError)(res, error, "Manage cache status");
-    }
-};
-exports.handleCacheStatus = handleCacheStatus;
 const handleAIModelStatus = async (req, res) => {
     try {
         if (req.method === "GET") {
@@ -566,7 +555,7 @@ const bulkUploadTracks = async (req, res) => {
         const results = await adminService.processBulkUpload(files);
         res.status(200).json({
             message: "Bulk upload process initiated.",
-            results,
+            createdTracks: results,
         });
     }
     catch (error) {

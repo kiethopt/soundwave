@@ -443,19 +443,6 @@ export const api = {
     deleteGenre: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/genres/${id}`, { method: "DELETE" }, token),
 
-    getCacheStatus: async (token: string) =>
-      fetchWithAuth("/api/admin/system/cache", { method: "GET" }, token),
-
-    updateCacheStatus: async (enabled: boolean, token: string) =>
-      fetchWithAuth(
-        "/api/admin/system/cache",
-        {
-          method: "POST",
-          body: JSON.stringify({ enabled }),
-        },
-        token
-      ),
-
     updateGlobalPlaylist: async (token: string) =>
       fetchWithAuth(
         "/api/admin/playlists/global/update",
@@ -1854,6 +1841,22 @@ export const api = {
         {
           method: "PATCH",
           body: JSON.stringify({ trackIds }), // Send the array of IDs
+        },
+        token
+      );
+    },
+
+    // --- NEW FUNCTION for Suggesting and Adding Tracks --- 
+    suggestAndAddTracksByPrompt: async (
+      playlistId: string,
+      prompt: string,
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/generate/playlist/${playlistId}/suggest-more`,
+        {
+          method: "POST",
+          body: JSON.stringify({ prompt }),
         },
         token
       );

@@ -17,7 +17,6 @@ import {
   deleteArtist,
   deleteArtistRequest,
   updateArtist,
-  handleCacheStatus,
   handleAIModelStatus,
   getSystemStatus,
   getAllArtistClaimRequests,
@@ -52,14 +51,6 @@ router.get(
   cacheMiddleware,
   getDashboardStats
 );
-
-// Cập nhật trạng thái cache
-router
-  .route("/system/cache")
-  .get(authenticate, authorize([Role.ADMIN]), handleCacheStatus)
-  .post(authenticate, authorize([Role.ADMIN]), handleCacheStatus);
-
-// Cập nhật trạng thái bảo trì - REMOVED
 
 // Quản lý người dùng
 router.get("/users", authenticate, authorize([Role.ADMIN]), getAllUsers);

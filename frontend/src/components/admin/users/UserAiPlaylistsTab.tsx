@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import type { Playlist, PlaylistTrack, Track, ArtistProfile } from "@/types"; // Assuming Playlist type is defined in @/types
+import type { Playlist, Track, ArtistProfile } from "@/types";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,12 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowUpDown, Eye, RefreshCw } from "lucide-react";
-import { PaginationControls } from "@/components/ui/PaginationControls"; // Assuming a Pagination component exists
-import { formatDistanceToNow } from "date-fns";
+import { PaginationControls } from "@/components/ui/PaginationControls"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Define the structure of the playlist data we expect from the API
-interface PlaylistWithPreview extends Playlist {
+interface PlaylistWithPreview extends Omit<Playlist, 'tracks'> {
   tracks: {
     track: Pick<Track, "id" | "title" | "coverUrl"> & {
       artist: Pick<ArtistProfile, "artistName"> | null;
@@ -48,22 +47,23 @@ interface SortConfig {
 
 interface UserAiPlaylistsTabProps {
   userId: string;
-  refreshTrigger?: number; // Optional trigger from parent to force refresh
+  refreshTrigger?: number;
 }
 
 export const UserAiPlaylistsTab = ({
   userId,
   refreshTrigger,
 }: UserAiPlaylistsTabProps) => {
-  const { theme } = useTheme();
   const [playlists, setPlaylists] = useState<PlaylistWithPreview[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null); // For toggle visibility action
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
   });
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "createdAt",

@@ -27,6 +27,7 @@ import {
   Globe,
   Clock,
   Sparkles,
+  Flag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -34,23 +35,15 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { RecommendedTrackList } from "@/components/user/track/RecommendedTrackList";
 import { Spinner } from "@/components/ui/Icons";
+import { GenerateAIPlaylistModal } from "@/components/ui/user-modals";
+import { ReportDialog } from "@/components/shared/ReportDialog";
+import Link from "next/link";
 
-// Import DND Kit components
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+// Import useSession
+import { useSession } from "@/contexts/SessionContext";
+
+// Replace with hello-pangea/dnd imports
+import { DropResult } from "@hello-pangea/dnd";
 
 // Helper function to format duration (seconds) into "X phút Y giây"
 const formatDuration = (totalSeconds: number): string => {
@@ -106,10 +99,13 @@ export default function PlaylistPage() {
   }>();
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
   const { dominantColor } = useDominantColor(playlist?.coverUrl);
+  const { user } = useSession(); // Get the current user
 
   // Check if this is a special system playlist
   const isFavoritePlaylist = playlist?.type === "FAVORITE";
@@ -128,21 +124,13 @@ export default function PlaylistPage() {
 
   const canEditPlaylist = playlist?.canEdit && playlist?.type === "NORMAL";
 
-  // Setup DND sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      // Require the mouse to move by 5 pixels before activating
-      // Require the user to hold for 150ms before activating
-      activationConstraint: {
-        distance: 5,
-        delay: 150,
-        tolerance: 0, // No additional tolerance needed with delay
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Determine if the current user is the owner
+  const isOwner = user?.id === playlist?.userId;
+
+  // Determine if recommendations should be shown (Normal or AI playlists AND user is owner)
+  const canShowRecommendations =
+    (isNormalPlaylist || playlist?.isAIGenerated === true) &&
+    playlist?.userId === user?.id;
 
   useEffect(() => {
     // Check if user is authenticated
@@ -320,7 +308,7 @@ export default function PlaylistPage() {
 
   // Function to fetch recommendations for the playlist
   const fetchRecommendations = useCallback(async () => {
-    if (!isNormalPlaylist || !id || !isAuthenticated) return;
+    if (!canShowRecommendations || !id || !isAuthenticated) return;
 
     try {
       setLoadingRecommendations(true);
@@ -342,64 +330,14 @@ export default function PlaylistPage() {
     } finally {
       setLoadingRecommendations(false);
     }
-  }, [isNormalPlaylist, id, isAuthenticated]);
+  }, [canShowRecommendations, id, isAuthenticated]);
 
   // Fetch recommendations after playlist is loaded
   useEffect(() => {
-    if (isNormalPlaylist && !recommendations) {
+    if (canShowRecommendations && !recommendations) {
       fetchRecommendations();
     }
-  }, [isNormalPlaylist, recommendations, fetchRecommendations]);
-
-  // Add the suggestMoreTracks handler
-  const suggestMoreTracks = async () => {
-    if (!id || !isAuthenticated) return;
-
-    try {
-      setIsSuggestionLoading(true);
-      const token = localStorage.getItem("userToken");
-      if (!token) return;
-
-      const response = await api.playlists.suggestMoreTracksForPlaylist(
-        id as string,
-        token,
-        5
-      );
-
-      if (response.success) {
-        // Add the suggested tracks to the playlist
-        const suggestedTracks = response.data;
-
-        // Add tracks one by one to playlist
-        let addedCount = 0;
-        for (const track of suggestedTracks) {
-          try {
-            await api.playlists.addTrack(id as string, track.id, token);
-            addedCount++;
-          } catch (error) {
-            console.error(
-              `Failed to add track ${track.id} to playlist:`,
-              error
-            );
-          }
-        }
-
-        // Show success message
-        toast.success(
-          `Added ${addedCount} new suggested tracks to your playlist!`
-        );
-
-        // Refresh the playlist to show new tracks
-        refreshPlaylistData();
-      } else {
-        toast.error(response.message || "Failed to get suggestions");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to add suggested tracks");
-    } finally {
-      setIsSuggestionLoading(false);
-    }
-  };
+  }, [canShowRecommendations, recommendations, fetchRecommendations]);
 
   const handleCoverClick = () => {
     if (!canEditPlaylist || isUploadingCover) return;
@@ -572,82 +510,73 @@ export default function PlaylistPage() {
   }, [refreshPlaylistData]);
 
   // --- DND Kit Drag End Handler ---
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setPlaylist((currentPlaylist) => {
-        if (!currentPlaylist || !currentPlaylist.tracks) {
-          return currentPlaylist;
-        }
-
-        const oldIndex = currentPlaylist.tracks.findIndex(
-          (track) => track.id === active.id
-        );
-        const newIndex = currentPlaylist.tracks.findIndex(
-          (track) => track.id === over.id
-        );
-
-        if (oldIndex === -1 || newIndex === -1) {
-          return currentPlaylist; // Should not happen if IDs are correct
-        }
-
-        const reorderedTracks = arrayMove(
-          currentPlaylist.tracks,
-          oldIndex,
-          newIndex
-        );
-
-        console.log(
-          "Reordered Tracks (Optimistic UI):",
-          reorderedTracks.map((t) => t.title)
-        );
-        console.log(
-          `Moved track ${active.id} from index ${oldIndex} to ${newIndex}`
-        );
-
-        // Call backend API to save the new order
-        const token = localStorage.getItem("userToken");
-        if (token && currentPlaylist.id) {
-          const newOrderTrackIds = reorderedTracks.map((t) => t.id);
-
-          api.playlists
-            .reorderTracks(currentPlaylist.id, newOrderTrackIds, token)
-            .then((response) => {
-              if (!response.success) {
-                console.error(
-                  "Failed to save reordered tracks:",
-                  response.message
-                );
-                toast.error("Failed to save new track order. Reverting.");
-                // Revert UI on failure - Refetch or revert state manually
-                // For simplicity, let's refetch the playlist data
-                refreshPlaylistData();
-              } else {
-                console.log("Successfully saved new track order.");
-                // Optionally show a success toast, but usually optimistic UI is enough
-              }
-            })
-            .catch((error) => {
-              console.error("Error calling reorder API:", error);
-              toast.error("Error saving new track order. Reverting.");
-              // Revert UI on failure - Refetch or revert state manually
-              refreshPlaylistData();
-            });
-        } else {
-          console.warn("Cannot save reorder: Missing token or playlist ID.");
-          toast.error("Could not save track order. Please try again.");
-          // Revert UI immediately if we know we can't save
-          refreshPlaylistData();
-        }
-
-        // Return updated playlist for optimistic UI update
-        return {
-          ...currentPlaylist,
-          tracks: reorderedTracks,
-        };
-      });
+  const handleDragEnd = (result: DropResult) => {
+    // If dropped outside the list or no destination
+    if (!result.destination) {
+      return;
     }
+
+    // If position didn't change
+    if (result.destination.index === result.source.index) {
+      return;
+    }
+
+    setPlaylist((currentPlaylist) => {
+      if (!currentPlaylist || !currentPlaylist.tracks) {
+        return currentPlaylist;
+      }
+
+      const oldIndex = result.source.index;
+      const newIndex = result.destination!.index;
+
+      const reorderedTracks = Array.from(currentPlaylist.tracks);
+      const [movedTrack] = reorderedTracks.splice(oldIndex, 1);
+      reorderedTracks.splice(newIndex, 0, movedTrack);
+
+      console.log(
+        "Reordered Tracks (Optimistic UI):",
+        reorderedTracks.map((t) => t.title)
+      );
+      console.log(
+        `Moved track ${movedTrack.id} from index ${oldIndex} to ${newIndex}`
+      );
+
+      // Call backend API to save the new order
+      const token = localStorage.getItem("userToken");
+      if (token && currentPlaylist.id) {
+        const newOrderTrackIds = reorderedTracks.map((t) => t.id);
+
+        api.playlists
+          .reorderTracks(currentPlaylist.id, newOrderTrackIds, token)
+          .then((response) => {
+            if (!response.success) {
+              console.error(
+                "Failed to save reordered tracks:",
+                response.message
+              );
+              toast.error("Failed to save new track order. Reverting.");
+              refreshPlaylistData();
+            } else {
+              console.log("Successfully saved new track order.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error calling reorder API:", error);
+            toast.error("Error saving new track order. Reverting.");
+            refreshPlaylistData();
+          });
+      } else {
+        console.warn("Cannot save reorder: Missing token or playlist ID.");
+        toast.error("Could not save track order. Please try again.");
+        refreshPlaylistData();
+      }
+
+      // Return updated playlist for optimistic UI update
+      return {
+        ...currentPlaylist,
+        tracks: reorderedTracks,
+      };
+    });
   };
 
   useEffect(() => {
@@ -792,9 +721,10 @@ export default function PlaylistPage() {
               <>
                 <Badge
                   variant="outline"
-                  className="bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 border-none text-white text-xs px-1.5 py-0.5 font-bold"
+                  className="bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 border-none text-white text-xs px-2 py-0.5 font-semibold flex items-center gap-1"
                 >
-                  AI
+                  <Sparkles className="w-3 h-3" />
+                  Beta
                 </Badge>
                 <Badge>Personalized</Badge>
               </>
@@ -826,6 +756,22 @@ export default function PlaylistPage() {
             </p>
           )}
 
+          {/* Display Creator Info for NORMAL playlists  */}
+          {playlist.type === "NORMAL" && playlist.user && (
+            <div className="flex items-center gap-2 text-sm mt-1">
+              <Image
+                src={playlist.user.avatar || '/images/user-default-avatar.png'}
+                alt={playlist.user.name || playlist.user.username || 'Creator'}
+                width={24}
+                height={24}
+                className="rounded-full object-cover"
+              />
+              <Link href={`/profile/${playlist.user.id}`} className="text-white/90 hover:underline">
+                {playlist.user.name || playlist.user.username || 'Unknown User'}
+              </Link>
+            </div>
+          )}
+
           {/* Updated Metadata Line - Only show track count and duration */}
           <div className="flex items-center gap-1.5 text-sm text-white/70 flex-wrap mt-1">
             {playlist.totalTracks > 0 && (
@@ -849,21 +795,30 @@ export default function PlaylistPage() {
             {canEditPlaylist && (
               <Button
                 size="default"
-                onClick={suggestMoreTracks}
+                onClick={() => handleProtectedAction(() => setIsSuggestModalOpen(true))}
                 disabled={isSuggestionLoading}
                 className="text-sm font-medium flex items-center gap-1.5 bg-[#A57865] text-white hover:bg-[#8a6353] disabled:opacity-50 rounded-full transition-colors duration-200 ease-in-out"
               >
-                {isSuggestionLoading ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div>
-                    <span>Suggesting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>Suggest More</span>
-                  </>
-                )}
+                <Sparkles className="h-4 w-4" />
+                <span>Suggest More</span>
+              </Button>
+            )}
+
+            {/* Report Button - Only shown to the owner */}
+            {isOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={`rounded-full text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 transition-colors duration-200 ease-in-out ${
+                  theme === 'light'
+                    ? 'bg-white/90 border-gray-300 text-gray-800 hover:bg-gray-100 hover:text-gray-900'
+                    : 'bg-neutral-700/90 border-neutral-600 text-white/90 hover:bg-neutral-600 hover:text-white'
+                }`}
+                onClick={() => setIsReportDialogOpen(true)}
+                title="Report this playlist"
+              >
+                <Flag className="h-4 w-4" />
+                <span>Report</span>
               </Button>
             )}
 
@@ -922,7 +877,7 @@ export default function PlaylistPage() {
       </div>
 
       <Card
-        className={`m-6 rounded-xl border backdrop-blur-sm ${
+        className={`m-6 rounded-xl border ${
           theme === "light"
             ? "bg-white/80 border-gray-200"
             : "bg-black/20 border-white/10"
@@ -940,11 +895,12 @@ export default function PlaylistPage() {
               }`}
             >
               <div
-                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_60px] gap-4 items-center text-sm font-medium`}
+                className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_1fr_40px_100px_60px] gap-4 items-center text-sm font-medium`}
               >
                 <div className="flex justify-center">#</div>
                 <div>Title</div>
                 <div>Album</div>
+                <div className="text-left">Genre</div>
                 <div className="flex items-center justify-start">
                   Date Added
                 </div>
@@ -962,36 +918,16 @@ export default function PlaylistPage() {
                 theme === "light" ? "divide-gray-200" : "divide-white/10"
               }`}
             >
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={playlist.tracks.map((track) => track.id)} // Pass track IDs for SortableContext
-                  strategy={verticalListSortingStrategy}
-                >
-                  <TrackList
-                    tracks={playlist.tracks}
-                    allowRemove={
-                      !!playlist &&
-                      playlist.canEdit === true &&
-                      playlist.type === "NORMAL"
-                    }
-                    onRemove={handleRemoveTrack}
-                    requiresAuth={!isAuthenticated}
-                    playlists={userPlaylists}
-                    favoriteTrackIds={favoriteTrackIds}
-                    theme={theme}
-                    // Pass down necessary props for drag-and-drop
-                    isDraggable={
-                      !!playlist &&
-                      playlist.canEdit === true &&
-                      playlist.type === "NORMAL"
-                    }
-                  />
-                </SortableContext>
-              </DndContext>
+              <TrackList
+                tracks={playlist.tracks}
+                onRemove={handleRemoveTrack}
+                allowRemove={canEditPlaylist}
+                playlists={userPlaylists}
+                favoriteTrackIds={favoriteTrackIds}
+                theme={theme}
+                isDraggable={!!canEditPlaylist}
+                onDragEnd={canEditPlaylist ? handleDragEnd : undefined}
+              />
             </div>
           </>
         ) : (
@@ -1025,10 +961,10 @@ export default function PlaylistPage() {
         )}
       </Card>
 
-      {/* Recommendations Section - Only show for normal playlists */}
-      {isNormalPlaylist && (
+      {/* Recommendations Section - Use the new condition */}
+      {canShowRecommendations && (
         <Card
-          className={`mx-6 mb-6 rounded-xl border backdrop-blur-sm ${
+          className={`mx-6 mb-6 rounded-xl border ${
             theme === "light"
               ? "bg-white/80 border-gray-200"
               : "bg-black/20 border-white/10"
@@ -1105,7 +1041,27 @@ export default function PlaylistPage() {
         playlistName={playlist.name}
       />
 
+      {/* Render the ReportDialog */}
+      {playlist && (
+        <ReportDialog
+          open={isReportDialogOpen}
+          onOpenChange={setIsReportDialogOpen}
+          entityType="playlist"
+          entityId={playlist.id}
+          entityName={playlist.name}
+        />
+      )}
+
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      {/* Render the modal for suggesting tracks */}
+      <GenerateAIPlaylistModal
+        isOpen={isSuggestModalOpen}
+        onClose={() => setIsSuggestModalOpen(false)}
+        onPlaylistCreated={refreshPlaylistData}
+        playlistId={playlist.id}
+        currentPlaylistName={playlist.name}
+      />
     </div>
   );
 }

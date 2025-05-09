@@ -93,68 +93,94 @@ export default function ArtistProfilePage({
 
     setLoading(true);
     try {
-      const [
-        artistData,
-        followingResponse,
-        albumsResponse,
-        tracksResponse,
-        singlesResponse,
-        relatedArtistsResponse,
-        genresResponse
-      ] = await Promise.all([
-        api.artists.getProfile(id, token),
-        api.user.getUserFollowing(userData.id, token),
-        api.artists.getAlbumByArtistId(id, token),
-        api.artists.getTrackByArtistId(id, token),
-        api.artists.getTrackByArtistId(id, token, "SINGLE"),
-        api.artists.getRelatedArtists(id, token),
-        api.genres.getAll(token, 1, 500)
-      ]);
-
+      // First fetch core artist profile data that any user should be able to access
+      const artistData = await api.artists.getProfile(id, token);
       setArtist(artistData);
       setFollowerCount(artistData.monthlyListeners || 0);
+      
+      // Check if current user is the owner of this artist profile
+      const isOwner = userData.artistProfile?.id === id;
+      setIsOwner(isOwner);
 
-      if (followingResponse) {
-        const isFollowing = followingResponse.some(
-          (following: any) =>
-            (following.type === 'ARTIST' && following.id === id) ||
-            (following.followingArtistId === id)
+      // Next, fetch follow status in a separate try block
+      try {
+        const followingResponse = await api.user.getUserFollowing(userData.id, token);
+        if (followingResponse) {
+          const isFollowing = followingResponse.some(
+            (following: any) =>
+              (following.type === 'ARTIST' && following.id === id) ||
+              (following.followingArtistId === id)
+          );
+          setFollow(isFollowing);
+        }
+      } catch (followError) {
+        console.error("Error checking follow status:", followError);
+        // Don't let this error block rendering
+      }
+
+      // Fetch albums and tracks
+      try {
+        const albumsResponse = await api.artists.getAlbumByArtistId(id, token);
+        setAlbums(albumsResponse.albums || []);
+      } catch (albumsError) {
+        console.error("Error fetching artist albums:", albumsError);
+        setAlbums([]);
+      }
+
+      try {
+        const tracksResponse = await api.artists.getTrackByArtistId(id, token);
+        const sortedTracks = (tracksResponse.tracks || []).sort(
+          (a: any, b: any) => b.playCount - a.playCount
         );
-
-        console.log('Is following:', isFollowing);
-        const isOwner = userData.artistProfile?.id === id;
-        setFollow(isFollowing);
-        setIsOwner(isOwner);
+        setTracks(sortedTracks);
+      } catch (tracksError) {
+        console.error("Error fetching artist tracks:", tracksError);
+        setTracks([]);
       }
 
-      if (genresResponse && genresResponse.genres) {
-        setAvailableGenres(genresResponse.genres);
-      } else {
-        console.error("Error fetching genres or genres not found in response");
-        setAvailableGenres([]);
-      }
-
-      setAlbums(albumsResponse.albums);
-
-      const sortedTracks = tracksResponse.tracks.sort(
-        (a: any, b: any) => b.playCount - a.playCount
-      );
-      setTracks(sortedTracks);
-
-      const singleAndEPs = singlesResponse.tracks.filter(
-        (track: Track) => !track.album
-      );
-      setStandaloneReleases(singleAndEPs);
-
-      setRelatedArtists(relatedArtistsResponse);
-
-      if (relatedArtistsResponse?.length > 0) {
-        const tracksMap = await fetchRelatedArtistTracks(
-          relatedArtistsResponse
+      try {
+        const singlesResponse = await api.artists.getTrackByArtistId(id, token, "SINGLE");
+        const singleAndEPs = (singlesResponse.tracks || []).filter(
+          (track: Track) => !track.album
         );
-        setArtistTracksMap(tracksMap);
+        setStandaloneReleases(singleAndEPs);
+      } catch (singlesError) {
+        console.error("Error fetching artist singles:", singlesError);
+        setStandaloneReleases([]);
       }
 
+      // Fetch related artists in a separate try block
+      try {
+        const relatedArtistsResponse = await api.artists.getRelatedArtists(id, token);
+        setRelatedArtists(relatedArtistsResponse || []);
+        
+        if (relatedArtistsResponse?.length > 0) {
+          const tracksMap = await fetchRelatedArtistTracks(
+            relatedArtistsResponse
+          );
+          setArtistTracksMap(tracksMap);
+        }
+      } catch (relatedError) {
+        console.error("Error fetching related artists:", relatedError);
+        setRelatedArtists([]);
+      }
+
+      // Only fetch genres if the user is the owner of this artist profile
+      if (isOwner) {
+        try {
+          const genresResponse = await api.genres.getAll(token, 1, 500);
+          if (genresResponse && genresResponse.genres) {
+            setAvailableGenres(genresResponse.genres);
+          } else {
+            setAvailableGenres([]);
+          }
+        } catch (genresError) {
+          console.error("Error fetching genres:", genresError);
+          setAvailableGenres([]);
+        }
+      }
+
+      // Fetch playlists and favorites
       const fetchPlaylists = async () => {
         if (!token) return;
         try {
@@ -1028,21 +1054,18 @@ export default function ArtistProfilePage({
     toast.loading(`Submitting request for label "${labelName || 'New Label'}"...`, { id: 'register-label' });
 
     try {
-      // Gọi API backend
-      const response = await api.labels.requestRegistration(formData, token);
+      await api.labels.requestRegistration(formData, token);
       
       toast.success(`Request for label "${labelName || 'New Label'}" submitted successfully!`, {
         id: 'register-label',
       });
-      setIsRegisterLabelModalOpen(false); // Đóng modal sau khi thành công
-      // Bạn có thể không cần fetchData() ở đây vì request sẽ được xử lý bởi admin
+      setIsRegisterLabelModalOpen(false);
 
     } catch (error: any) {
       console.error("Failed to submit label registration:", error);
       toast.error(error.message || "Failed to submit label registration.", {
         id: 'register-label',
       });
-      // Không đóng modal khi có lỗi để người dùng có thể thử lại
     }
   };
 
@@ -1100,7 +1123,7 @@ export default function ArtistProfilePage({
                   onClick={() => router.back()}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === "light"
                       ? "bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow"
-                      : "bg-black/20 hover:bg-black/30 text-white/80 hover:text-white"
+                      : "bg-white/10 hover:bg-white/20 text-white"
                     }`}
                 >
                   <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
@@ -1134,23 +1157,19 @@ export default function ArtistProfilePage({
               <div>
                 <div className="flex items-center space-x-2">
                   {artist.isVerified && <Verified className="w-6 h-6" />}
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ lineHeight: "1.1", color: textColor }}
-                  >
-                    {artist.isVerified 
-                      ? "Verified Artist" 
-                      : (artist as any).verificationStatus === 'pending' 
-                      ? "Verification Pending" 
-                      : (artist as any).verificationStatus === 'rejected'
-                      ? `Verification Rejected ${((artist as any).verificationRejectionReason ? `- ${(artist as any).verificationRejectionReason}` : '')}`
-                      : "Not Verified"}
-                  </span>
+                  {artist.isVerified && (
+                    <span
+                      className="text-sm font-semibold"
+                      style={{ lineHeight: "1.1", color: textColor }}
+                    >
+                      Verified Artist
+                    </span>
+                  )}
                 </div>
                 <h1
-                  className={`text-6xl w-fit font-bold uppercase py-4 ${isOwner ? 'cursor-pointer' : ''}`}
+                  className={`text-6xl w-fit font-bold uppercase py-4 ${(isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified) ? 'cursor-pointer' : ''}`}
                   style={{ lineHeight: '1.1', color: textColor }}
-                  onClick={isOwner ? () => setIsEditModalOpen(true) : undefined}
+                  onClick={(isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified) ? () => setIsEditModalOpen(true) : undefined}
                 >
                   {artist.artistName}
                 </h1>

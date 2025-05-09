@@ -557,7 +557,7 @@ const getUserFollowing = async (userId) => {
 };
 exports.getUserFollowing = getUserFollowing;
 const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDocumentFileDirect) => {
-    const { artistName, bio, socialMediaLinks: socialMediaLinksString, portfolioLinks: portfolioLinksString, requestedLabelName, genres: genresString, } = data;
+    const { artistName, bio, socialMediaLinks: socialMediaLinksString, requestedLabelName, genres: genresString, } = data;
     if (!artistName?.trim()) {
         throw { status: 400, message: 'Artist name is required.' };
     }
@@ -592,16 +592,6 @@ const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDoc
             throw { status: 400, message: 'Invalid format for social media links.' };
         }
     }
-    let portfolioLinksJson = undefined;
-    if (portfolioLinksString) {
-        try {
-            portfolioLinksJson = JSON.parse(portfolioLinksString);
-        }
-        catch (e) {
-            console.error("Error parsing portfolioLinksString:", e);
-            throw { status: 400, message: 'Invalid format for portfolio links.' };
-        }
-    }
     let avatarUrl = null;
     if (avatarFileDirect) {
         try {
@@ -632,7 +622,6 @@ const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDoc
             bio: bio?.trim(),
             avatarUrl: avatarUrl,
             socialMediaLinks: socialMediaLinksJson || client_1.Prisma.JsonNull,
-            portfolioLinks: portfolioLinksJson || client_1.Prisma.JsonNull,
             idVerificationDocumentUrl: idVerificationDocumentUrl,
             requestedGenres: requestedGenresArray,
             requestedLabelName: requestedLabelName?.trim() || null,
@@ -814,6 +803,29 @@ const getUserProfile = async (id) => {
             avatar: true,
             role: true,
             isActive: true,
+            playlists: {
+                where: {
+                    privacy: 'PUBLIC',
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    coverUrl: true,
+                    type: true,
+                    totalTracks: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                take: 20,
+            },
         },
     });
     if (!user) {

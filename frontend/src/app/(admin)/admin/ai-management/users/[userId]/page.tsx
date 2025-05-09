@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation";
 import React, { useEffect, useState, useCallback } from "react";
-// Shadcn UI imports
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -11,9 +10,7 @@ import type { User } from "@/types";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
-// Import the newly created tab component
 import { UserAiPlaylistsTab } from "@/components/admin/users/UserAiPlaylistsTab";
-// Import the new history tab component
 import { UserListeningHistoryTab } from "@/components/admin/users/UserListeningHistoryTab";
 
 export default function UserDetailPageAiManagement() {

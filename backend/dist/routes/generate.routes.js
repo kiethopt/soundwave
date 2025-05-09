@@ -41,5 +41,6 @@ const generateController = __importStar(require("../controllers/generate.control
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = express_1.default.Router();
 router.post('/playlist', auth_middleware_1.authenticate, generateController.generatePlaylist);
+router.post('/playlist/:playlistId/suggest-more', auth_middleware_1.authenticate, generateController.suggestMoreTracks);
 exports.default = router;
 //# sourceMappingURL=generate.routes.js.map

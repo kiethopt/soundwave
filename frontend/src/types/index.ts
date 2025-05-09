@@ -378,6 +378,12 @@ export interface Playlist {
   updatedAt: string;
   tracks: Track[];
   canEdit?: boolean;
+  user?: {
+    id: string;
+    name?: string | null;
+    username?: string | null;
+    avatar?: string | null;
+  };
   basedOnMood?: string;
   basedOnGenre?: string;
   basedOnArtist?: string;

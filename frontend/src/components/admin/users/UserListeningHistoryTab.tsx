@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import type { History, Track, ArtistProfile, Album } from "@/types"; // Adjust types as needed
+import type { History, ArtistProfile, Album } from "@/types";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -14,21 +14,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Loader2,
   ArrowUpDown,
-  Search,
   RefreshCw,
   Info,
   Sparkles,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { formatDistanceToNow, format } from "date-fns";
-import Image from "next/image"; // Use Next.js Image for optimization
+import Image from "next/image"; 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrackDetailsModal } from "./TrackDetailsModal"; // Import the modal
+import { TrackDetailsModal } from "./TrackDetailsModal";
 import {
   Dialog,
   DialogContent,
@@ -37,12 +35,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"; // Use Dialog components
-import { Progress } from "@/components/ui/progress"; // Import Progress component
-import { cn } from "@/lib/utils"; // <--- ADD THIS IMPORT
-// import { DateRangePicker } from "@/components/ui/DateRangePicker"; // Assuming a DateRangePicker component exists
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils"; 
 
-// Define the structure of the history data we expect, ensuring Track has audio features
 interface HistoryWithDetails extends Omit<History, "track" | "user"> {
   track: {
     id: string;
@@ -422,8 +417,8 @@ export const UserListeningHistoryTab = ({
   if (!loading && !error && historyItems.length === 0) {
     return (
       <div className="text-center py-10 text-muted-foreground">
-        <p className="text-lg">Không tìm thấy lịch sử nghe</p>
-        <p>Người dùng này chưa có lịch sử nghe nhạc nào.</p>
+        <p className="text-lg">No Listening History Found</p>
+        <p>This user does not have any listening history yet.</p>
       </div>
     );
   }

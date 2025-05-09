@@ -1,4 +1,3 @@
-import { Request } from 'express';
 import prisma from '../config/db';
 import { FollowingType, HistoryType, Role, User, ClaimStatus, NotificationType, RecipientType, RequestStatus, Prisma } from '@prisma/client';
 import { uploadFile } from './upload.service';
@@ -7,7 +6,6 @@ import {
   searchTrackSelect,
   userSelect,
 } from '../utils/prisma-selects';
-import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import * as emailService from './email.service';
 import { getUserSockets, getIO } from '../config/socket';
@@ -605,12 +603,11 @@ export const getUserFollowing = async (userId: string) => {
 
 // Gửi yêu cầu trở thành Artist
 export const requestArtistRole = async (
-  user: User,
+  user: Pick<User, 'id' | 'role'>,
   data: {
     artistName: string;
     bio?: string;
     socialMediaLinks?: string;
-    portfolioLinks?: string;
     requestedLabelName?: string;
     genres?: string;
   },
@@ -621,7 +618,6 @@ export const requestArtistRole = async (
     artistName,
     bio,
     socialMediaLinks: socialMediaLinksString,
-    portfolioLinks: portfolioLinksString,
     requestedLabelName,
     genres: genresString,
   } = data;
@@ -667,17 +663,6 @@ export const requestArtistRole = async (
       throw { status: 400, message: 'Invalid format for social media links.' };
     }
   }
-  
-  // Xử lý portfolioLinks từ chuỗi JSON (nếu có)
-  let portfolioLinksJson: Prisma.JsonValue | undefined = undefined;
-  if (portfolioLinksString) {
-    try {
-      portfolioLinksJson = JSON.parse(portfolioLinksString);
-    } catch (e) {
-      console.error("Error parsing portfolioLinksString:", e);
-      throw { status: 400, message: 'Invalid format for portfolio links.' };
-    }
-  }
 
   let avatarUrl: string | null = null;
   if (avatarFileDirect) {
@@ -712,7 +697,6 @@ export const requestArtistRole = async (
       bio: bio?.trim(),
       avatarUrl: avatarUrl,
       socialMediaLinks: socialMediaLinksJson || Prisma.JsonNull,
-      portfolioLinks: portfolioLinksJson || Prisma.JsonNull,
       idVerificationDocumentUrl: idVerificationDocumentUrl,
       requestedGenres: requestedGenresArray,
       requestedLabelName: requestedLabelName?.trim() || null,
@@ -924,6 +908,29 @@ export const getUserProfile = async (id: string) => {
       avatar: true,
       role: true,
       isActive: true,
+      playlists: {
+        where: {
+          privacy: 'PUBLIC',
+        },
+        select: {
+          id: true,
+          name: true,
+          coverUrl: true,
+          type: true,
+          totalTracks: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 20,
+      },
     },
   });
 
