@@ -660,29 +660,29 @@ export const deleteUserById = async (
     throw new Error("Permission denied: Admins cannot delete other admins.");
   }
 
-  if (userToDelete.email) {
-    try {
-      const userName = userToDelete.name || userToDelete.username || "User";
-      const emailOptions = emailService.createAccountDeletedEmail(
-        userToDelete.email,
-        userName,
-        reason
-      );
-      emailService
-        .sendEmail(emailOptions)
-        .catch((err) =>
-          console.error(
-            "[Async Email Error] Failed to send account deletion email:",
-            err
-          )
-        );
-    } catch (syncError) {
-      console.error(
-        "[Email Setup Error] Failed to create deletion email options:",
-        syncError
-      );
-    }
-  }
+  // if (userToDelete.email) {
+  //   try {
+  //     const userName = userToDelete.name || userToDelete.username || "User";
+  //     const emailOptions = emailService.createAccountDeletedEmail(
+  //       userToDelete.email,
+  //       userName,
+  //       reason
+  //     );
+  //     emailService
+  //       .sendEmail(emailOptions)
+  //       .catch((err) =>
+  //         console.error(
+  //           "[Async Email Error] Failed to send account deletion email:",
+  //           err
+  //         )
+  //       );
+  //   } catch (syncError) {
+  //     console.error(
+  //       "[Email Setup Error] Failed to create deletion email options:",
+  //       syncError
+  //     );
+  //   }
+  // }
 
   await prisma.user.delete({ where: { id } });
 

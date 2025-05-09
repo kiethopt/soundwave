@@ -231,7 +231,7 @@ async function main() {
     }
 
     // === 4.2 Seed Regular User Accounts ===
-    const regularUserCount = 10;
+    const regularUserCount = 500;
     const userBar = multibar.create(regularUserCount, 0, { task: 'Seeding regular users' });
     const regularUserIds: string[] = [];
 

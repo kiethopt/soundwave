@@ -1,0 +1,441 @@
+{
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "User Authentication": {
+                "name": "User Authentication",
+                "path": "::User Authentication",
+                "id": "694b90cda3960197291443c0d1418402",
+                "groups": {},
+                "checks": {
+                        "login successful": {
+                            "fails": 0,
+                            "name": "login successful",
+                            "path": "::User Authentication::login successful",
+                            "id": "68771d5ee25de651e9e62f494c45a329",
+                            "passes": 60
+                        },
+                        "auth token received": {
+                            "id": "e84fce88aee830c831b94f1c90752cd9",
+                            "passes": 60,
+                            "fails": 0,
+                            "name": "auth token received",
+                            "path": "::User Authentication::auth token received"
+                        }
+                    }
+            },
+            "Create Playlist": {
+                "name": "Create Playlist",
+                "path": "::Create Playlist",
+                "id": "7bc899e399b3d64d649e6be9f8205d06",
+                "groups": {},
+                "checks": {
+                        "playlist created successfully": {
+                            "name": "playlist created successfully",
+                            "path": "::Create Playlist::playlist created successfully",
+                            "id": "189c8a4c0787a8d8e1dc9d7a7b921032",
+                            "passes": 60,
+                            "fails": 0
+                        },
+                        "playlist ID received": {
+                            "name": "playlist ID received",
+                            "path": "::Create Playlist::playlist ID received",
+                            "id": "a1208db528261953707d799b2852b739",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Get Playlist by ID": {
+                "groups": {},
+                "checks": {
+                        "get playlist successful": {
+                            "id": "19e76bd67dbb02a838f2f67aed78bce7",
+                            "passes": 60,
+                            "fails": 0,
+                            "name": "get playlist successful",
+                            "path": "::Get Playlist by ID::get playlist successful"
+                        },
+                        "playlist data is correct": {
+                            "name": "playlist data is correct",
+                            "path": "::Get Playlist by ID::playlist data is correct",
+                            "id": "17ed66757091030afc51e4990af2b761",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    },
+                "name": "Get Playlist by ID",
+                "path": "::Get Playlist by ID",
+                "id": "8fcbb03019c8efb641c9d047c0de6664"
+            },
+            "Update Playlist": {
+                "groups": {},
+                "checks": {
+                        "playlist updated successfully": {
+                            "path": "::Update Playlist::playlist updated successfully",
+                            "id": "7efd4a4a09926daa2708a4935c627c2b",
+                            "passes": 60,
+                            "fails": 0,
+                            "name": "playlist updated successfully"
+                        },
+                        "playlist name updated": {
+                            "name": "playlist name updated",
+                            "path": "::Update Playlist::playlist name updated",
+                            "id": "8914189f2de338b5c89aa2d3cf72e8d6",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    },
+                "name": "Update Playlist",
+                "path": "::Update Playlist",
+                "id": "cb7ca20244ce595bf4966aa1563082cb"
+            },
+            "Add Tracks to Playlist": {
+                "groups": {},
+                "checks": {
+                        "track 1 added successfully": {
+                            "name": "track 1 added successfully",
+                            "path": "::Add Tracks to Playlist::track 1 added successfully",
+                            "id": "043d3cbc1e1a5ce726d6fe89f8b962b1",
+                            "passes": 60,
+                            "fails": 0
+                        },
+                        "track 2 added successfully": {
+                            "name": "track 2 added successfully",
+                            "path": "::Add Tracks to Playlist::track 2 added successfully",
+                            "id": "e9d428e5d5a6ff42def1f356656185d4",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    },
+                "name": "Add Tracks to Playlist",
+                "path": "::Add Tracks to Playlist",
+                "id": "714e5001749566f9d80771d9a2f11551"
+            },
+            "Reorder Tracks": {
+                "name": "Reorder Tracks",
+                "path": "::Reorder Tracks",
+                "id": "9f765835902e632729ba22639a92ba6c",
+                "groups": {},
+                "checks": {
+                        "tracks reordered successfully": {
+                            "name": "tracks reordered successfully",
+                            "path": "::Reorder Tracks::tracks reordered successfully",
+                            "id": "7c0b92a16bcb921757d24818c7abb06e",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Remove Track from Playlist": {
+                "name": "Remove Track from Playlist",
+                "path": "::Remove Track from Playlist",
+                "id": "b5e15afa6a0dbc3ebdd1869f7967f470",
+                "groups": {},
+                "checks": {
+                        "track removed successfully": {
+                            "name": "track removed successfully",
+                            "path": "::Remove Track from Playlist::track removed successfully",
+                            "id": "c9bd1e3ffdca8291d109fae1b6a0836b",
+                            "passes": 60,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Delete Playlist": {
+                "path": "::Delete Playlist",
+                "id": "edd1a347026adcb50f561fb4426c723b",
+                "groups": {},
+                "checks": {
+                        "playlist deleted successfully": {
+                            "id": "f01f3d4bbb03432feac373a4d8d0456a",
+                            "passes": 60,
+                            "fails": 0,
+                            "name": "playlist deleted successfully",
+                            "path": "::Delete Playlist::playlist deleted successfully"
+                        }
+                    },
+                "name": "Delete Playlist"
+            },
+            "User Logout": {
+                "checks": {
+                    "logout successful": {
+                        "name": "logout successful",
+                        "path": "::User Logout::logout successful",
+                        "id": "4d2853da765bfa50e0ab390790c8a536",
+                        "passes": 60,
+                        "fails": 0
+                    }
+                },
+                "name": "User Logout",
+                "path": "::User Logout",
+                "id": "a83f85faa6949000631822a3c8baaa9a",
+                "groups": {}
+            }
+        },
+        "checks": {},
+        "name": ""
+    },
+    "metrics": {
+        "get_playlist_by_id_duration": {
+            "max": 23.4255,
+            "p(90)": 17.223390000000002,
+            "p(95)": 19.82791,
+            "avg": 12.135656666666668,
+            "min": 0.6817,
+            "med": 10.7208,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "create_playlist_duration": {
+            "p(95)": 9.26121,
+            "avg": 5.589585000000001,
+            "min": 0.5145,
+            "med": 5.3893,
+            "max": 10.5545,
+            "p(90)": 8.87252,
+            "thresholds": {
+                "p(95)<600": false
+            }
+        },
+        "http_reqs": {
+            "count": 600,
+            "rate": 6.499245313050286
+        },
+        "playlist_creation_success_rate": {
+            "fails": 0,
+            "passes": 60,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "vus_max": {
+            "value": 5,
+            "min": 5,
+            "max": 5
+        },
+        "delete_playlist_duration": {
+            "avg": 11.869003333333332,
+            "min": 0.2753,
+            "med": 9.0512,
+            "max": 143.2523,
+            "p(90)": 14.85384,
+            "p(95)": 15.404969999999999,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "reorder_tracks_duration": {
+            "avg": 15.311984999999998,
+            "min": 0.6554,
+            "med": 15.053149999999999,
+            "max": 34.609,
+            "p(90)": 22.53566,
+            "p(95)": 24.825224999999996,
+            "thresholds": {
+                "p(95)<600": false
+            }
+        },
+        "vus": {
+            "value": 3,
+            "min": 3,
+            "max": 5
+        },
+        "http_req_waiting": {
+            "min": 0.1271,
+            "med": 9.5279,
+            "max": 143.0984,
+            "p(90)": 40.794460000000136,
+            "p(95)": 60.949964999999985,
+            "avg": 14.755461666666646
+        },
+        "checks": {
+            "passes": 840,
+            "fails": 0,
+            "value": 1
+        },
+        "remove_track_success_rate": {
+            "passes": 60,
+            "fails": 0,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "http_req_duration": {
+            "p(90)": 41.131120000000216,
+            "p(95)": 61.828835000000005,
+            "avg": 15.916595999999984,
+            "min": 0.2098,
+            "med": 10.49465,
+            "max": 143.2523,
+            "thresholds": {
+                "p(95)<800": false
+            }
+        },
+        "reorder_tracks_success_rate": {
+            "passes": 60,
+            "fails": 0,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "add_track_success_rate": {
+            "passes": 120,
+            "fails": 0,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "http_req_sending": {
+            "p(95)": 0.01622999999999988,
+            "avg": 0.011531333333333333,
+            "min": 0,
+            "med": 0,
+            "max": 0.5101,
+            "p(90)": 0
+        },
+        "add_track_to_playlist_duration": {
+            "avg": 11.557454999999996,
+            "min": 0.2098,
+            "med": 10.85795,
+            "max": 35.6462,
+            "p(90)": 16.24811,
+            "p(95)": 17.583329999999997,
+            "thresholds": {
+                "p(95)<550": false
+            }
+        },
+        "successful_requests_total": {
+            "count": 600,
+            "rate": 6.499245313050286
+        },
+        "iterations": {
+            "count": 60,
+            "rate": 0.6499245313050287
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.0043033333333333335,
+            "min": 0,
+            "med": 0,
+            "max": 0.5164,
+            "p(90)": 0
+        },
+        "http_req_receiving": {
+            "max": 15.1894,
+            "p(90)": 4.0314000000000005,
+            "p(95)": 6.474004999999992,
+            "avg": 1.149603,
+            "min": 0,
+            "med": 0.0701
+        },
+        "data_received": {
+            "count": 710226,
+            "rate": 7693.2216695107545
+        },
+        "http_req_blocked": {
+            "avg": 0.06522499999999999,
+            "min": 0,
+            "med": 0,
+            "max": 15.6697,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "failed_login_rate": {
+            "fails": 60,
+            "passes": 0,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "update_playlist_duration": {
+            "p(95)": 13.8473,
+            "avg": 9.283501666666668,
+            "min": 0.5516,
+            "med": 9.389949999999999,
+            "max": 16.2798,
+            "p(90)": 13.0824,
+            "thresholds": {
+                "p(95)<600": false
+            }
+        },
+        "group_duration": {
+            "avg": 74.3433746296296,
+            "min": 0.4954,
+            "med": 12.0925,
+            "max": 538.3259,
+            "p(90)": 518.29553,
+            "p(95)": 524.2261199999999
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 600,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "remove_track_from_playlist_duration": {
+            "avg": 11.985483333333336,
+            "min": 0.2738,
+            "med": 11.4038,
+            "max": 34.4098,
+            "p(90)": 18.1081,
+            "p(95)": 18.223599999999994,
+            "thresholds": {
+                "p(95)<550": false
+            }
+        },
+        "playlist_update_success_rate": {
+            "fails": 0,
+            "passes": 60,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "playlist_deletion_success_rate": {
+            "passes": 60,
+            "fails": 0,
+            "thresholds": {
+                "rate>0.95": false
+            },
+            "value": 1
+        },
+        "iteration_duration": {
+            "p(95)": 7705.77952,
+            "avg": 7673.57300333333,
+            "min": 7635.1185,
+            "med": 7665.1591,
+            "max": 7786.4802,
+            "p(90)": 7701.8732
+        },
+        "data_sent": {
+            "count": 242876,
+            "rate": 2630.851174420669
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 0.2098,
+            "med": 10.49465,
+            "max": 143.2523,
+            "p(90)": 41.131120000000216,
+            "p(95)": 61.828835000000005,
+            "avg": 15.916595999999984
+        }
+    }
+}
