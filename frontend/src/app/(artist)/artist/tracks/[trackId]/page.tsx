@@ -21,7 +21,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Verified } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
+import { EditTrackModal } from '@/components/ui/artist-modals';
 
 interface TrackDetails extends Omit<Track, 'album' | 'artist' | 'featuredArtists'> {
   artist: ArtistProfile & { avatar: string | null; isVerified?: boolean };
@@ -50,9 +50,6 @@ export default function ArtistTrackDetailsPage() {
   const [availableArtists, setAvailableArtists] = useState<{ id: string; name: string }[]>([]);
   const [availableGenres, setAvailableGenres] = useState<{ id: string; name: string }[]>([]);
   const [availableLabels, setAvailableLabels] = useState<{ id: string; name: string }[]>([]);
-  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<string[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
   const fetchTrackDetails = useCallback(async () => {
     if (!trackId) {
@@ -96,9 +93,6 @@ export default function ArtistTrackDetailsPage() {
   const fetchMetadata = useCallback(async () => {
     if (!track) return;
     setIsMetadataLoading(true);
-    setSelectedFeaturedArtists([]);
-    setSelectedGenres([]);
-    setSelectedLabelId(null);
 
     try {
       const token = localStorage.getItem('userToken');
@@ -126,12 +120,6 @@ export default function ArtistTrackDetailsPage() {
       setAvailableArtists(artists);
       setAvailableGenres(genres);
       setAvailableLabels(labels);
-
-      setSelectedFeaturedArtists(
-        track.featuredArtists?.map((fa) => fa.artistProfile.id) || []
-      );
-      setSelectedGenres(track.genres?.map((g) => g.genre.id) || []);
-      setSelectedLabelId(track.label?.id || null);
 
     } catch (error) {
       console.error('Failed to fetch metadata for editing:', error);
@@ -312,10 +300,6 @@ export default function ArtistTrackDetailsPage() {
               <span className={`flex items-center gap-1.5 whitespace-nowrap ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}>
                  {track.playCount !== null && track.playCount !== undefined ? track.playCount.toLocaleString() : '0'} plays
               </span>
-              <span className={`flex items-center gap-1.5 whitespace-nowrap ${track.isActive ? 'text-green-500' : (theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}`}>
-                <Eye className="w-3.5 h-3.5" /> {' '}
-                {track.isActive ? 'Visible' : 'Hidden'}
-              </span>
             </div>
             {genres.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
@@ -336,14 +320,15 @@ export default function ArtistTrackDetailsPage() {
 
         <div className="mt-8 overflow-x-auto">
           <div className={`rounded-md border backdrop-blur-sm ${theme === 'dark' ? 'border-gray-700 bg-black/20' : 'border-gray-200 bg-white/60'}`}>
-            <div className="grid grid-cols-[20px_1.5fr_1fr_auto] items-center gap-4 px-4 py-2 text-xs font-medium border-b text-muted-foreground">
+            <div className="grid grid-cols-[20px_3fr_2fr_1fr_minmax(50px,auto)] items-center gap-4 px-4 py-2 text-xs font-medium border-b text-muted-foreground">
               <span className="text-center">#</span>
               <span>Title</span>
               <span>Artist</span>
+              <span className="text-center">Status</span>
               <span className="text-right">Edit</span>
             </div>
 
-            <div className="grid grid-cols-[20px_1.5fr_1fr_auto] items-center gap-4 px-4 py-3 text-sm">
+            <div className="grid grid-cols-[20px_3fr_2fr_1fr_minmax(50px,auto)] items-center gap-4 px-4 py-3 text-sm">
               <span className="text-muted-foreground font-medium text-center">1</span>
               <span className={`font-medium truncate ${ theme === 'dark' ? 'text-white' : 'text-gray-900' }`}>
                 {track.title}
@@ -351,6 +336,12 @@ export default function ArtistTrackDetailsPage() {
               <span className={`truncate ${ theme === 'dark' ? 'text-white/80' : 'text-gray-700' }`}>
                 {allArtists.map((a) => a.artistName).join(', ')}
               </span>
+              <div className="flex items-center justify-center">
+                <span className={`flex items-center gap-1 text-xs ${track.isActive ? (theme === 'dark' ? 'text-green-400' : 'text-green-600') : (theme === 'dark' ? 'text-gray-500' : 'text-gray-400')}`}>
+                  <Eye className="w-3 h-3" />
+                  {track.isActive ? 'Visible' : 'Hidden'}
+                </span>
+              </div>
               <div className="flex items-center justify-end">
                  <Button
                     variant="ghost"
@@ -370,17 +361,12 @@ export default function ArtistTrackDetailsPage() {
         {isEditModalOpen && track && (
             <EditTrackModal
                 track={track}
+                isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
                 onSubmit={handleUpdateTrack}
                 availableArtists={availableArtists}
                 availableGenres={availableGenres}
                 availableLabels={availableLabels}
-                selectedFeaturedArtists={selectedFeaturedArtists}
-                setSelectedFeaturedArtists={setSelectedFeaturedArtists}
-                selectedGenres={selectedGenres}
-                setSelectedGenres={setSelectedGenres}
-                selectedLabelId={selectedLabelId}
-                setSelectedLabelId={setSelectedLabelId}
                 theme={theme}
             />
         )}

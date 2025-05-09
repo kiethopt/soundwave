@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { LabelRegistrationRequest, ArtistProfile, User as AdminUser, RequestStatus } from '@/types';
+import { RejectModal } from '@/components/ui/admin-modals';
 
 interface LabelRequestDetail extends LabelRegistrationRequest {
   requestingArtist: Pick<ArtistProfile, 'id' | 'artistName' | 'avatar'> & {
@@ -129,7 +130,7 @@ export default function LabelRequestDetailPage() {
       await api.admin.approveLabelRegistration(token, requestDetail.id);
       toast.success('Label request approved successfully!', { id: 'approve-label' });
       setIsApproveModalOpen(false);
-      fetchRequestDetail();
+      router.push('/admin/labels?tab=requests');
     } catch (error: any) {
       toast.error(error.message || 'Failed to approve label request.', { id: 'approve-label' });
     } finally {
@@ -137,8 +138,9 @@ export default function LabelRequestDetailPage() {
     }
   };
 
-  const handleReject = async () => {
-    if (!requestDetail || !rejectionReason.trim()) {
+  const handleReject = async (reason: string) => {
+    if (!requestDetail) return;
+    if (!reason.trim()) {
       toast.error("Rejection reason is required.");
       return;
     }
@@ -150,11 +152,11 @@ export default function LabelRequestDetailPage() {
     setActionLoading(true);
     toast.loading('Rejecting request...', { id: 'reject-label' });
     try {
-      await api.admin.rejectLabelRegistration(token, requestDetail.id, rejectionReason);
+      await api.admin.rejectLabelRegistration(token, requestDetail.id, reason);
       toast.success('Label request rejected successfully.', { id: 'reject-label' });
       setIsRejectModalOpen(false);
       setRejectionReason('');
-      fetchRequestDetail();
+      router.push('/admin/labels?tab=requests');
     } catch (error: any) {
       toast.error(error.message || 'Failed to reject label request.', { id: 'reject-label' });
     } finally {
@@ -232,9 +234,12 @@ export default function LabelRequestDetailPage() {
   return (
     <div className={`min-h-screen p-4 md:p-6 lg:p-8 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <div className="max-w-5xl mx-auto">
-        <Button onClick={() => router.push('/admin/labels')} variant="ghost" className={`mb-6 group ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}`}>
-          <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
-          Back to Label Management
+        <Button 
+          onClick={() => router.back()} 
+          variant="ghost" 
+          className={`mb-6 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${theme === 'dark' ? 'bg-white/10 hover:bg-white/15 text-white' : 'bg-gray-100 hover:bg-gray-200 text-black'}`}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
         </Button>
 
         <header className="mb-8">
@@ -314,7 +319,7 @@ export default function LabelRequestDetailPage() {
                       alt={requestDetail.requestingArtist.artistName || 'Artist Avatar'}
                       width={36}
                       height={36}
-                      className="rounded-full mr-2.5 border border-opacity-20"
+                      className="rounded-full object-cover mr-2.5 border border-opacity-20"
                     />
                   )}
                   <div>
@@ -383,28 +388,12 @@ export default function LabelRequestDetailPage() {
         confirmVariant="default" // Green button will be handled by className prop for Button
       />
 
-      <ConfirmationModal
+      <RejectModal
         isOpen={isRejectModalOpen}
         onClose={() => setIsRejectModalOpen(false)}
         onConfirm={handleReject}
-        title="Reject Label Request"
-        message={<p>Are you sure you want to reject the request for label <strong className="font-semibold">{requestDetail?.requestedLabelName}</strong>?</p>}
-        confirmText="Confirm Reject"
         theme={theme}
-        confirmVariant="destructive"
-      >
-        <div className="mt-4">
-            <label htmlFor="rejectionReason" className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Reason for Rejection (Required)</label>
-            <textarea
-                id="rejectionReason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                rows={3}
-                className={`w-full p-2 border rounded shadow-sm text-sm ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'border-slate-300 text-slate-900 placeholder-slate-500'}`}
-                placeholder="Provide a clear reason..."
-            />
-        </div>
-      </ConfirmationModal>
+      />
     </div>
   );
 }

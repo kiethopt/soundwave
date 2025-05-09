@@ -49,6 +49,7 @@ export default function AlbumDetailPage() {
       trackNumber: number;
       releaseDate: string;
       genres: string[];
+      labelId?: string | null;
     };
   }>({});
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -112,7 +113,6 @@ export default function AlbumDetailPage() {
       }
 
       const data = await api.albums.getById(extractedAlbumId, token);
-      console.log('[AlbumDetailPage] API response for album:', data);
       setAlbum(data);
     } catch (err) {
       console.error('Error fetching album:', err);
@@ -128,17 +128,18 @@ export default function AlbumDetailPage() {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        // Fetch Artists
-        const artistResponse = await api.artists.getAllArtistsProfile(token, 1, 100);
+        // Fetch Artists & Genres (removed label fetching from here)
+        const [artistResponse, genreResponse] = await Promise.all([
+          api.artists.getAllArtistsProfile(token, 1, 100),
+          api.genres.getAll(token),
+        ]);
+
         const verifiedArtists = artistResponse.artists.filter(
           (artist: ArtistProfile) =>
             artist.isVerified && artist.role === 'ARTIST'
         );
         setArtists(verifiedArtists);
 
-        // Fetch Genres
-        const genreResponse = await api.genres.getAll(token);
-        console.log('API Genre Response:', genreResponse);
         setAvailableGenres(genreResponse?.genres || []);
 
       } catch (err) {
@@ -175,7 +176,6 @@ export default function AlbumDetailPage() {
   };
 
   const handleEditTrack = async (track: Track) => {
-    console.log("Editing Track Object (for Modal):", JSON.stringify(track, null, 2));
     setEditingTrack(track);
     setIsEditModalOpen(true);
     setActiveTrackMenu(null);
@@ -288,12 +288,18 @@ export default function AlbumDetailPage() {
         if (details.genres && details.genres.length > 0) {
           formData.append(`genreIds[${index}]`, JSON.stringify(details.genres));
         }
+
+        // Append labelId for the track
+        if (details.labelId) {
+          formData.append(`labelIds[${index}]`, details.labelId);
+        } else {
+          formData.append(`labelIds[${index}]`, ''); // Send empty string if no label selected for this track
+        }
       });
 
       // Append indexed release date
       formData.append('releaseDate', album?.releaseDate || new Date().toISOString().split('T')[0]);
 
-      console.log('FormData - genres being sent:', formData.getAll('genres'));
 
       const response = await api.albums.uploadTracks(
         extractedAlbumId,
@@ -345,11 +351,22 @@ export default function AlbumDetailPage() {
             releaseDate:
               album?.releaseDate || new Date().toISOString().split('T')[0],
             genres: [],
+            labelId: album?.labelId || null, // Default to album's label
           };
         }
       });
       setTrackDetails(newTrackDetails);
     }
+  };
+
+  const handleRemoveTrackFile = (fileNameToRemove: string) => {
+    setNewTracks(prevTracks => prevTracks.filter(file => file.name !== fileNameToRemove));
+    setTrackDetails(prevDetails => {
+      const newDetails = { ...prevDetails };
+      delete newDetails[fileNameToRemove];
+      return newDetails;
+    });
+    toast.success(`Removed track: ${fileNameToRemove}`);
   };
 
   // Add this handler for the modal's onSubmit prop
@@ -750,6 +767,8 @@ export default function AlbumDetailPage() {
               availableArtists={artists.map(a => ({ id: a.id, name: a.artistName }))}
               availableGenres={availableGenres}
               existingTrackCount={album.tracks?.length || 0}
+              uploaderArtistName={album.artist.artistName}
+              onRemoveTrackFile={handleRemoveTrackFile}
             />
           </div>
         </div>
@@ -942,7 +961,6 @@ export default function AlbumDetailPage() {
             availableGenres={availableGenres}
             // Pass available artists (assuming 'artists' state holds the correct data)
             availableArtists={artists.map(a => ({ id: a.id, name: a.artistName }))}
-            // availableLabels={availableLabels} // No longer needed if modal handles label internally
           />
         )}
       </div>

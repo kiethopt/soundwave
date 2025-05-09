@@ -185,6 +185,8 @@ export default function Header({
               toastMessage = `Your label "${data.labelName || 'Unknown Label'}" has been approved!`;
             } else if (data.type === 'LABEL_REGISTRATION_REJECTED') {
               toastMessage = `Your label "${data.labelName || 'Unknown Label'}" was rejected. Reason: ${data.rejectionReason || 'Not specified'}`;
+            } else if (data.type === 'ARTIST_REQUEST_SUBMITTED') {
+              toastMessage = `${data.sender?.name || data.sender?.username || 'A user'} has requested to become an artist.`;
             }
 
              setNotifications(prev => [data, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50)); 
