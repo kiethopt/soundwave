@@ -244,6 +244,14 @@ async function determineGenresFromReccoFeatures(
   
   const isRemix = title && title.toLowerCase().includes('remix');
   const isHouseRemix = isRemix && title && title.toLowerCase().includes('house');
+  const isTechnoRemix = isRemix && title && title.toLowerCase().includes('techno');
+  const isLofiTrack = title && title.toLowerCase().includes('lo-fi') || title?.toLowerCase().includes('lofi');
+  const isKpopTrack = title && title.toLowerCase().includes('k-pop') || artistName?.toLowerCase().includes('k-pop');
+  const isClassical = title && (
+    title.toLowerCase().includes('sonata') || 
+    title.toLowerCase().includes('symphony') || 
+    title.toLowerCase().includes('concerto')
+  );
   
   if (isVietnameseSong) {
     // Nhạc Việt Nam indie
@@ -262,10 +270,21 @@ async function determineGenresFromReccoFeatures(
       addGenreIfExists('dance', genreMap, selectedGenres);
       addGenreIfExists('v-pop', genreMap, selectedGenres);
     }
+    // Techno remix Việt Nam
+    else if (isTechnoRemix) {
+      addGenreIfExists('techno', genreMap, selectedGenres);
+      addGenreIfExists('electronic', genreMap, selectedGenres);
+      addGenreIfExists('v-pop', genreMap, selectedGenres);
+    }
     // Remix Việt Nam thông thường
     else if (isRemix) {
       addGenreIfExists('dance', genreMap, selectedGenres);
       addGenreIfExists('electronic', genreMap, selectedGenres);
+      addGenreIfExists('v-pop', genreMap, selectedGenres);
+    }
+    // Bolero Việt Nam
+    else if (reccoFeatures.tempo <= 85 && reccoFeatures.acousticness > 0.7 && reccoFeatures.energy < 0.4) {
+      addGenreIfExists('bolero', genreMap, selectedGenres);
       addGenreIfExists('v-pop', genreMap, selectedGenres);
     }
     // Nhạc V-Pop thông thường
@@ -282,10 +301,123 @@ async function determineGenresFromReccoFeatures(
       }
     }
   }
+  // K-Pop
+  else if (isKpopTrack || (title && /^[ㄱ-ㅎ가-힣]+/.test(title)) || (artistName && /^[ㄱ-ㅎ가-힣]+/.test(artistName))) {
+    addGenreIfExists('k-pop', genreMap, selectedGenres);
+    
+    if (reccoFeatures.energy > 0.7 && reccoFeatures.danceability > 0.6) {
+      addGenreIfExists('dance', genreMap, selectedGenres);
+    } else if (reccoFeatures.energy < 0.4) {
+      addGenreIfExists('ballad', genreMap, selectedGenres);
+    }
+  }
+  // Classical music
+  else if (isClassical || (reccoFeatures.instrumentalness > 0.9 && reccoFeatures.acousticness > 0.9)) {
+    addGenreIfExists('classical', genreMap, selectedGenres);
+    
+    if (title?.toLowerCase().includes('orchestra') || reccoFeatures.loudness > -10) {
+      addGenreIfExists('orchestral', genreMap, selectedGenres);
+    }
+    if (title?.toLowerCase().includes('opera')) {
+      addGenreIfExists('opera', genreMap, selectedGenres);
+    }
+  }
+  // Lo-fi
+  else if (isLofiTrack || (reccoFeatures.energy < 0.4 && reccoFeatures.acousticness > 0.3 && 
+           reccoFeatures.instrumentalness > 0.7 && reccoFeatures.tempo < 95)) {
+    addGenreIfExists('lo-fi', genreMap, selectedGenres);
+    addGenreIfExists('instrumental', genreMap, selectedGenres);
+  }
   // Logic cho nhạc quốc tế (không phải Việt Nam)
   else {
+    // Jazz detection
+    if (reccoFeatures.instrumentalness > 0.6 && reccoFeatures.acousticness > 0.6 && 
+        reccoFeatures.tempo > 85 && reccoFeatures.tempo < 140) {
+      addGenreIfExists('jazz', genreMap, selectedGenres);
+    }
+    
+    // Blues detection
+    else if (reccoFeatures.acousticness > 0.5 && reccoFeatures.energy < 0.6 && 
+             reccoFeatures.energy > 0.3 && reccoFeatures.tempo < 100) {
+      addGenreIfExists('blues', genreMap, selectedGenres);
+    }
+    
+    // Country detection
+    else if (reccoFeatures.acousticness > 0.5 && reccoFeatures.instrumentalness < 0.4 && 
+             reccoFeatures.tempo > 70 && reccoFeatures.tempo < 130) {
+      addGenreIfExists('country', genreMap, selectedGenres);
+    }
+    
+    // Metal/Punk detection
+    else if (reccoFeatures.energy > 0.85 && reccoFeatures.loudness > -7) {
+      if (reccoFeatures.tempo > 140) {
+        addGenreIfExists('metal', genreMap, selectedGenres);
+      } else {
+        addGenreIfExists('punk', genreMap, selectedGenres);
+      }
+      addGenreIfExists('rock', genreMap, selectedGenres);
+    }
+    
+    // EDM and Techno detection
+    else if (reccoFeatures.instrumentalness > 0.6 && reccoFeatures.energy > 0.7 && 
+             reccoFeatures.danceability > 0.6 && reccoFeatures.tempo > 120) {
+      if (reccoFeatures.tempo > 140) {
+        addGenreIfExists('techno', genreMap, selectedGenres);
+      } else {
+        addGenreIfExists('edm', genreMap, selectedGenres);
+      }
+      addGenreIfExists('electronic', genreMap, selectedGenres);
+    }
+    
+    // Disco/New Wave detection
+    else if (reccoFeatures.danceability > 0.7 && reccoFeatures.energy > 0.6 && 
+             reccoFeatures.tempo > 110 && reccoFeatures.tempo < 130) {
+      if (reccoFeatures.acousticness < 0.3) {
+        addGenreIfExists('disco', genreMap, selectedGenres);
+      } else {
+        addGenreIfExists('new wave', genreMap, selectedGenres);
+      }
+      addGenreIfExists('dance', genreMap, selectedGenres);
+    }
+    
+    // Reggae detection
+    else if (reccoFeatures.tempo > 60 && reccoFeatures.tempo < 100 && 
+             reccoFeatures.energy > 0.4 && reccoFeatures.energy < 0.7 &&
+             reccoFeatures.valence > 0.6) {
+      addGenreIfExists('reggae', genreMap, selectedGenres);
+    }
+    
+    // R&B detection
+    else if (reccoFeatures.tempo > 60 && reccoFeatures.tempo < 110 && 
+             reccoFeatures.energy > 0.3 && reccoFeatures.energy < 0.7 && 
+             reccoFeatures.valence > 0.3 && reccoFeatures.acousticness < 0.6) {
+      addGenreIfExists('r&b', genreMap, selectedGenres);
+      addGenreIfExists('soul', genreMap, selectedGenres);
+    }
+    
+    // Singer-Songwriter / Folk
+    else if (reccoFeatures.acousticness > 0.7 && reccoFeatures.instrumentalness < 0.5) {
+      addGenreIfExists('singer-songwriter', genreMap, selectedGenres);
+      if (reccoFeatures.energy < 0.4) {
+        addGenreIfExists('folk', genreMap, selectedGenres);
+      }
+    }
+    
+    // Trap detection
+    else if (reccoFeatures.tempo > 130 && reccoFeatures.energy > 0.6 && 
+             reccoFeatures.instrumentalness < 0.4 && reccoFeatures.valence < 0.5) {
+      addGenreIfExists('trap', genreMap, selectedGenres);
+      addGenreIfExists('hip-hop', genreMap, selectedGenres);
+    }
+    
+    // Experimental
+    else if ((reccoFeatures.instrumentalness > 0.7 && reccoFeatures.acousticness < 0.3 && 
+              reccoFeatures.energy > 0.5) || reccoFeatures.speechiness > 0.7) {
+      addGenreIfExists('experimental', genreMap, selectedGenres);
+    }
+    
     // Ưu tiên Hip-Hop/Rap nếu các chỉ số phù hợp
-    if (
+    else if (
       reccoFeatures.instrumentalness < 0.7 && // Không phải là nhạc không lời hoàn toàn
       reccoFeatures.danceability > 0.5 &&     // Có độ "dance" nhất định
       reccoFeatures.tempo >= 70 && reccoFeatures.tempo <= 170 && // Tempo trong khoảng của Hip-Hop
@@ -353,6 +485,28 @@ async function determineGenresFromReccoFeatures(
         addGenreIfExists('soul', genreMap, selectedGenres);
       }
     }
+  }
+  
+  // Genre World cho các bài nhạc có đặc điểm từ các nền văn hóa khác
+  if (title && (
+    title.toLowerCase().includes('world') || 
+    title.toLowerCase().includes('ethnic') ||
+    title.toLowerCase().includes('latin')
+  ) && selectedGenres.length < 3) {
+    if (title.toLowerCase().includes('latin')) {
+      addGenreIfExists('latin', genreMap, selectedGenres);
+    } else {
+      addGenreIfExists('world', genreMap, selectedGenres);
+    }
+  }
+  
+  // Gospel detection
+  if (title && (
+    title.toLowerCase().includes('gospel') || 
+    title.toLowerCase().includes('worship') || 
+    title.toLowerCase().includes('spiritual')
+  ) && selectedGenres.length < 3) {
+    addGenreIfExists('gospel', genreMap, selectedGenres);
   }
   
   if (selectedGenres.length === 0) {

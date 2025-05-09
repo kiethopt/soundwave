@@ -1,4 +1,5 @@
 import { AlbumType } from '@prisma/client';
+import { Album } from '../../../frontend/src/types/index';
 
 // Track data structure for use within albums
 export interface TrackData {
@@ -1111,7 +1112,7 @@ export const albums: AlbumData[] = [
     artistName: 'Sơn Tùng M-TP',
     title: 'SKY DECADE',
     coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745720896/skydecade_y0e9e2.jpg',
-    type: AlbumType.EP,
+    type: AlbumType.ALBUM,
     labelName: 'M-TP Entertainment',
     genreNames: ['V-Pop', 'Pop'],
     releaseDate: new Date('2023-12-01'),
@@ -1120,110 +1121,217 @@ export const albums: AlbumData[] = [
         title: 'Cơn Mưa Ngang Qua',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721272/C%C6%A1n_M%C6%B0a_Ngang_Qua_j6fwmt.mp3',
         trackNumber: 1,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 128,
+        mood: 'Energetic',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.80
       },
       {
         title: 'Anh Sai Rồi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721282/Anh_Sai_R%E1%BB%93i_drr2vl.mp3',
         trackNumber: 2,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 82,
+        mood: 'Regretful',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.62,
+        energy: 0.55
       },
       {
         title: 'Nắng Ấm Xa Dần',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/N%E1%BA%AFng_%E1%BA%A4m_Xa_D%E1%BA%A7n_formje.mp3',
         trackNumber: 3,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 95,
+        mood: 'Melancholic',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.70,
+        energy: 0.65
       },
       {
         title: 'Em Của Ngày Hôm Qua',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721273/Em_C%E1%BB%A7a_Ng%C3%A0y_H%C3%B4m_Qua_awezus.mp3',
         trackNumber: 4,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 125,
+        mood: 'Nostalgic',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.72
       },
       {
         title: 'Chắc Ai Đó Sẽ Về',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721273/Ch%E1%BA%AFc_Ai_%C4%90%C3%B3_S%E1%BA%BD_V%E1%BB%81_ygjdiq.mp3',
         trackNumber: 5,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 75,
+        mood: 'Sad',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.55,
+        energy: 0.48
       },
       {
         title: 'Không Phải Dạng Vừa Đâu',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721272/Kh%C3%B4ng_Ph%E1%BA%A3i_D%E1%BA%A1ng_V%E1%BB%ABa_%C4%90%C3%A2u_cygu7r.mp3',
         trackNumber: 6,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 140,
+        mood: 'Confident',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.88,
+        energy: 0.92
       },
       {
         title: 'Thái Bình Mồ Hôi Rơi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721283/Th%C3%A1i_B%C3%ACnh_M%E1%BB%93_H%C3%B4i_R%C6%A1i_pxt49y.mp3',
         trackNumber: 7,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 130,
+        mood: 'Determined',
+        key: 'F#',
+        scale: 'minor',
+        danceability: 0.82,
+        energy: 0.78
       },
-
       {
         title: 'Khuôn Mặt Đáng Thương',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721271/Khu%C3%B4n_M%E1%BA%B7t_%C4%90%C3%A1ng_Th%C6%B0%C6%A1ng_ulstlp.mp3',
         trackNumber: 8,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 85,
+        mood: 'Tender',
+        key: 'B',
+        scale: 'minor',
+        danceability: 0.65,
+        energy: 0.55
       },
       {
         title: 'Tiến Lên Việt Nam Ơi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721271/Ti%E1%BA%BFn_L%C3%AAn_Vi%E1%BB%87t_Nam_%C6%A0i_eojbzk.mp3',
         trackNumber: 9,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 130,
+        mood: 'Patriotic',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.90,
+        energy: 0.95
       },
       {
         title: 'Ấn Nút Nhớ... Thả Giấc Mơ',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721272/%E1%BA%A4n_N%C3%BAt_Nh%E1%BB%9B..._Th%E1%BA%A3_Gi%E1%BA%A5c_M%C6%A1_xdffps.mp3',
         trackNumber: 10,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 80,
+        mood: 'Dreamy',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.60,
+        energy: 0.52
       },
       {
         title: 'Âm Thầm Bên Em',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721273/%C3%82m_Th%E1%BA%A7m_B%C3%AAn_Em_irif9v.mp3',
         trackNumber: 11,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 110,
+        mood: 'Romantic',
+        key: 'A',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.68
       },
       {
         title: 'Buông Đôi Tay Nhau Ra',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721271/Bu%C3%B4ng_%C4%90%C3%B4i_Tay_Nhau_Ra_sjwdvv.mp3',
         trackNumber: 12,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 95,
+        mood: 'Heartbroken',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.68,
+        energy: 0.62
       },
       {
         title: 'Như Ngày Hôm Qua',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721271/Nh%C6%B0_Ng%C3%A0y_H%C3%B4m_Qua_vytwoj.mp3',
         trackNumber: 13,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 120,
+        mood: 'Upbeat',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.82,
+        energy: 0.75
       },
       {
         title: 'Remember Me - SlimV Remix',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/Remember_Me_-_SlimV_Remix_g1xgkr.mp3',
         trackNumber: 14,
-        featuredArtists: ['SlimV']
+        featuredArtists: ['SlimV'],
+        tempo: 140,
+        mood: 'Electronic',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.95,
+        energy: 0.90
       },
       {
         title: 'Một Năm Mới Bình An',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/M%E1%BB%99t_N%C4%83m_M%E1%BB%9Bi_B%C3%ACnh_An_flycac.mp3',
         trackNumber: 15,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 100,
+        mood: 'Festive',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.80
       },
       {
         title: 'Chúng Ta Không Thuộc Về Nhau',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/Ch%C3%BAng_Ta_Kh%C3%B4ng_Thu%E1%BB%99c_V%E1%BB%81_Nhau_z9tbg2.mp3',
         trackNumber: 16,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 125,
+        mood: 'Defiant',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.82
       },
       {
         title: 'Lạc Trôi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/L%E1%BA%A1c_Tr%C3%B4i_drsopi.mp3',
         trackNumber: 17,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 115,
+        mood: 'Mysterious',
+        key: 'C#',
+        scale: 'minor',
+        danceability: 0.82,
+        energy: 0.78
       },
       {
         title: 'Nơi Này Có Anh',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745721270/N%C6%A1i_N%C3%A0y_C%C3%B3_Anh_frmpnq.mp3',
         trackNumber: 18,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 110,
+        mood: 'Romantic',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.88,
+        energy: 0.75
       },
     ],
   },
