@@ -966,6 +966,7 @@ export const exportTrackAndArtistData = async (
     artistsSheet.columns = [
       { header: 'ID', key: 'id', width: 30 },
       { header: 'Name', key: 'artistName', width: 30 },
+      { header: 'User ID', key: 'userId', width: 30 },
       { header: 'Bio', key: 'bio', width: 60 },
       { header: 'Monthly Listeners', key: 'monthlyListeners', width: 15 },
       { header: 'Verified', key: 'verified', width: 10 },
@@ -984,9 +985,9 @@ export const exportTrackAndArtistData = async (
       { header: 'ID', key: 'id', width: 30 },
       { header: 'Title', key: 'title', width: 40 },
       { header: 'Artist', key: 'artist', width: 30 },
-      { header: 'Cover URL', key: 'coverUrl', width: 40 },
+      { header: 'Album', key: 'album', width: 30 },
       { header: 'Audio URL', key: 'audioUrl', width: 40 },
-      { header: 'Label Name', key: 'labelName', width: 40 },
+      { header: 'Label Name', key: 'labelName', width: 30 },
       { header: 'Featured Artist Names', key: 'featuredArtistNames', width: 40 },
       { header: 'Album', key: 'album', width: 40 },
       { header: 'Album Type', key: 'albumType', width: 15 },
@@ -1002,21 +1003,6 @@ export const exportTrackAndArtistData = async (
       { header: 'Genres', key: 'genres', width: 30 }
     ];
 
-    // artistName: 'Dương Domic',
-    // title: 'Là Em, Chính Em',
-    // coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745731659/laemlachinhem_wzepft.jpg',
-    // audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731671/L%C3%A0_Em_Ch%C3%ADnh_Em_ki38w0.mp3',
-    // genreNames: ['V-Pop', 'Ballad'],
-    // labelName: 'DAO Entertainment',
-    // featuredArtistNames: [],
-    // playCount: 25,
-    // tempo: 80,
-    // mood: 'Romantic',
-    // key: 'Bb',
-    // scale: 'major',
-    // danceability: 0.60,
-    // energy: 0.55
-    
     // Add the data to the tracks worksheet
     tracksSheet.addRows(data.tracks);
     
@@ -1034,3 +1020,19 @@ export const exportTrackAndArtistData = async (
   }
 };
 // --- End Data Export Controllers ---
+
+// Add this new endpoint for fixing album track types
+export const fixAlbumTrackTypes = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const result = await adminService.fixAlbumTrackTypeConsistency();
+    res.json({
+      message: 'Album track types fixed successfully.',
+      data: result,
+    });
+  } catch (error) {
+    handleError(res, error, 'Fix album track types');
+  }
+};

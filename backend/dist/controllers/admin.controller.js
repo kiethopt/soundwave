@@ -32,12 +32,16 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.fixAlbumTrackTypes = exports.exportTrackAndArtistData = exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateUserAiPlaylistHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const client_1 = require("@prisma/client");
 const trackService = __importStar(require("../services/track.service"));
+const exceljs_1 = __importDefault(require("exceljs"));
 const getAllUsers = async (req, res) => {
     try {
         if (!req.user) {
@@ -754,4 +758,68 @@ const getArtistRoleRequestsHandler = async (req, res) => {
     }
 };
 exports.getArtistRoleRequestsHandler = getArtistRoleRequestsHandler;
+const exportTrackAndArtistData = async (req, res) => {
+    try {
+        const data = await adminService.extractTrackAndArtistData();
+        const workbook = new exceljs_1.default.Workbook();
+        const artistsSheet = workbook.addWorksheet('Artists');
+        artistsSheet.columns = [
+            { header: 'ID', key: 'id', width: 30 },
+            { header: 'Name', key: 'artistName', width: 30 },
+            { header: 'User ID', key: 'userId', width: 30 },
+            { header: 'Bio', key: 'bio', width: 60 },
+            { header: 'Monthly Listeners', key: 'monthlyListeners', width: 15 },
+            { header: 'Verified', key: 'verified', width: 10 },
+            { header: 'Label', key: 'label', width: 25 },
+            { header: 'Genres', key: 'genres', width: 30 },
+            { header: 'Track Count', key: 'trackCount', width: 15 },
+            { header: 'Created At', key: 'createdAt', width: 15 }
+        ];
+        artistsSheet.addRows(data.artists);
+        const tracksSheet = workbook.addWorksheet('Tracks');
+        tracksSheet.columns = [
+            { header: 'ID', key: 'id', width: 30 },
+            { header: 'Title', key: 'title', width: 40 },
+            { header: 'Artist', key: 'artist', width: 30 },
+            { header: 'Album', key: 'album', width: 30 },
+            { header: 'Audio URL', key: 'audioUrl', width: 40 },
+            { header: 'Label Name', key: 'labelName', width: 30 },
+            { header: 'Featured Artist Names', key: 'featuredArtistNames', width: 40 },
+            { header: 'Album', key: 'album', width: 40 },
+            { header: 'Album Type', key: 'albumType', width: 15 },
+            { header: 'Duration (sec)', key: 'duration', width: 15 },
+            { header: 'Release Date', key: 'releaseDate', width: 15 },
+            { header: 'Play Count', key: 'playCount', width: 15 },
+            { header: 'Tempo', key: 'tempo', width: 10 },
+            { header: 'Mood', key: 'mood', width: 20 },
+            { header: 'Key', key: 'key', width: 10 },
+            { header: 'Scale', key: 'scale', width: 10 },
+            { header: 'Danceability', key: 'danceability', width: 15 },
+            { header: 'Energy', key: 'energy', width: 15 },
+            { header: 'Genres', key: 'genres', width: 30 }
+        ];
+        tracksSheet.addRows(data.tracks);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=soundwave_data_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        await workbook.xlsx.write(res);
+        res.end();
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Export track and artist data');
+    }
+};
+exports.exportTrackAndArtistData = exportTrackAndArtistData;
+const fixAlbumTrackTypes = async (req, res) => {
+    try {
+        const result = await adminService.fixAlbumTrackTypeConsistency();
+        res.json({
+            message: 'Album track types fixed successfully.',
+            data: result,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Fix album track types');
+    }
+};
+exports.fixAlbumTrackTypes = fixAlbumTrackTypes;
 //# sourceMappingURL=admin.controller.js.map

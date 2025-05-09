@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveReport = exports.getReportById = exports.getUserReports = exports.getReports = exports.createReport = void 0;
+exports.deleteReport = exports.resolveReport = exports.getReportById = exports.getUserReports = exports.getReports = exports.createReport = void 0;
 const client_1 = require("@prisma/client");
 const report_service_1 = require("../services/report.service");
 const createReport = async (req, res) => {
@@ -160,4 +160,29 @@ const resolveReport = async (req, res) => {
     }
 };
 exports.resolveReport = resolveReport;
+const deleteReport = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Authentication required' });
+            return;
+        }
+        const result = await report_service_1.ReportService.deleteReport(id, user.id);
+        res.json({ message: result.message });
+    }
+    catch (error) {
+        console.error(`Error deleting report ${req.params.id}:`, error);
+        if (error.message === 'Report not found') {
+            res.status(404).json({ message: 'Report not found' });
+            return;
+        }
+        if (error.message.startsWith('Unauthorized')) {
+            res.status(403).json({ message: error.message });
+            return;
+        }
+        res.status(500).json({ message: error.message || 'Failed to delete report' });
+    }
+};
+exports.deleteReport = deleteReport;
 //# sourceMappingURL=report.controller.js.map

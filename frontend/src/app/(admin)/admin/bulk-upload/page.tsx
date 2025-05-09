@@ -32,6 +32,9 @@ interface UploadResult {
   loudness?: number | null;
   speechiness?: number | null;
   valence?: number | null;
+  albumName?: string | null;
+  albumId?: string;
+  albumType?: string;
 }
 
 export default function BulkUploadPage() {
@@ -131,28 +134,7 @@ export default function BulkUploadPage() {
     if (!results.length) return;
     
     // Create CSV headers
-    const headers = [
-      'Status', 
-      'File Name', 
-      'Track Title', 
-      'Artist', 
-      'Duration', 
-      'Tempo', 
-      'Mood', 
-      'Key', 
-      'Scale', 
-      'Genres', 
-      'Cover URL', 
-      'Track ID', 
-      'Audio URL',
-      'Danceability',
-      'Energy',
-      'Instrumentalness',
-      'Acousticness',
-      'Loudness',
-      'Speechiness',
-      'Valence'
-    ];
+    const headers = ['Status', 'File Name', 'Track Title', 'Artist', 'Album Name', 'Album Type', 'Duration', 'Tempo', 'Mood', 'Key', 'Scale', 'Genres', 'Cover URL', 'Track ID', 'Audio URL'];
     
     // Convert results to CSV rows
     const csvRows = results.map(result => {
@@ -161,6 +143,8 @@ export default function BulkUploadPage() {
         result.fileName,
         result.title || '',
         result.artistName || '',
+        result.albumName || 'N/A',
+        result.albumType || 'SINGLE',
         formatDuration(result.duration),
         result.tempo || '',
         result.mood || '',
@@ -410,6 +394,7 @@ export default function BulkUploadPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">File Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Track Title</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Artist</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Album</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Tempo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">Audio Analysis</th>
@@ -478,6 +463,25 @@ export default function BulkUploadPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.artistName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {result.albumName ? (
+                        <span className={cn(
+                          "px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded",
+                          result.albumType === 'EP' 
+                            ? theme === 'dark' ? "bg-purple-900/30 text-purple-200" : "bg-purple-100 text-purple-800"
+                            : theme === 'dark' ? "bg-blue-900/30 text-blue-200" : "bg-blue-100 text-blue-800"
+                        )}>
+                          {result.albumName} ({result.albumType || 'ALBUM'})
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          "px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded",
+                          theme === 'dark' ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+                        )}>
+                          Single
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDuration(result.duration)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{result.tempo}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
