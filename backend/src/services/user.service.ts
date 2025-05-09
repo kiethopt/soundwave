@@ -1510,7 +1510,6 @@ export const getGenreTopTracks = async (genreId: string) => {
           genreId,
         },
       },
-      type: 'SINGLE',
     },
     select: searchTrackSelect,
     orderBy: { playCount: 'desc' },
@@ -1542,7 +1541,6 @@ export const getGenreNewestTracks = async (genreId: string) => {
           genreId,
         },
       },
-      type: 'SINGLE',
     },
     select: searchTrackSelect,
     orderBy: { createdAt: 'desc' },
@@ -1678,9 +1676,6 @@ export const submitArtistClaim = async (userId: string, artistProfileId: string,
   }
   if (targetProfile.userId) {
     throw new Error('This artist profile is already associated with a user.');
-  }
-  if (targetProfile.isVerified) {
-    throw new Error('This artist profile is already verified.');
   }
 
   // 2. Check if the user already submitted a claim for this profile

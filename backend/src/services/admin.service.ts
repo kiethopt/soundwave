@@ -1670,8 +1670,7 @@ export const approveArtistClaim = async (
 
   // Double-check if the target profile is still available before approving
   if (
-    claimRequest.artistProfile.userId ||
-    claimRequest.artistProfile.isVerified
+    claimRequest.artistProfile.userId
   ) {
     // Optionally auto-reject here instead of throwing
     await prisma.artistClaimRequest.update({
