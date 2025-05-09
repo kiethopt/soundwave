@@ -764,7 +764,7 @@ export default function PlaylistPage() {
                 alt={playlist.user.name || playlist.user.username || 'Creator'}
                 width={24}
                 height={24}
-                className="rounded-full object-cover"
+                className="w-6 h-6 rounded-full object-cover aspect-square"
               />
               <Link href={`/profile/${playlist.user.id}`} className="text-white/90 hover:underline">
                 {playlist.user.name || playlist.user.username || 'Unknown User'}

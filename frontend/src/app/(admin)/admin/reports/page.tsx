@@ -16,9 +16,9 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye, Flag } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Flag, Trash2, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { ReportDetailModal, ResolveReportModal } from '@/components/ui/admin-modals';
+import { ReportDetailModal, ResolveReportModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 // Define constants for filter values
 const ALL_TYPES = 'ALL_TYPES';
@@ -52,6 +52,9 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isResolveOpen, setIsResolveOpen] = useState(false);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
 
   const limit = 10;
 
@@ -153,6 +156,35 @@ export default function ReportsPage() {
     setIsResolveOpen(true);
   };
 
+  const handleOpenDeleteModal = (report: Report) => {
+    setReportToDelete(report);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!reportToDelete) return;
+
+    setActionLoading(reportToDelete.id);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Authentication required');
+        setActionLoading(null);
+        return;
+      }
+      await api.reports.deleteReport(reportToDelete.id, token); // Assumes this API function exists/will be created
+      toast.success('Report deleted successfully');
+      setIsDeleteModalOpen(false);
+      setReportToDelete(null);
+      refreshTable(); // Refresh table after deletion
+    } catch (error: any) {
+      console.error('Error deleting report:', error);
+      toast.error(error.message || 'Failed to delete report');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleResolveReport = async (reportId: string, data: { status: ReportStatus; resolution: string }) => {
     try {
       setActionLoading(reportId);
@@ -171,10 +203,14 @@ export default function ReportsPage() {
         setReports((prevReports) =>
           prevReports.map((r) => (r.id === response.report.id ? response.report : r))
         );
+        // Close the modal after successful resolution
+        setIsResolveOpen(false);
       } else {
         // Fallback if report object isn't returned for some reason
         toast.success(response.message || 'Report resolved successfully');
         fetchReports(); // Refetch all reports as a fallback
+        // Close the modal even in fallback case
+        setIsResolveOpen(false);
       }
     } catch (error: any) {
       console.error('Error resolving report:', error);
@@ -420,7 +456,13 @@ export default function ReportsPage() {
                     <tr
                       key={report.id}
                       onClick={(e) => handleRowClick(report, e)}
-                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedReportIds.has(report.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === report.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${
+                        selectedReportIds.has(report.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''
+                      } ${actionLoading === report.id ? 'opacity-50 pointer-events-none' : ''} ${
+                        report.status === 'PENDING' ? 
+                          (theme === 'dark' ? 'bg-yellow-900/20 hover:bg-yellow-800/30' : 'bg-yellow-100/50 hover:bg-yellow-200/50') : 
+                          ''
+                      }`}
                     >
                       <td className="w-4 p-4">
                         <Checkbox
@@ -446,12 +488,12 @@ export default function ReportsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
-                            onClick={(e) => { e.stopPropagation(); handleViewDetails(report); }}
-                            aria-label={`View report details`}
+                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                            onClick={(e) => { e.stopPropagation(); handleOpenDeleteModal(report); }}
+                            aria-label={`Delete report`}
                             disabled={loading || actionLoading !== null}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                           {report.status === 'PENDING' && (
                             <Button
@@ -527,6 +569,18 @@ export default function ReportsPage() {
         isOpen={isResolveOpen}
         onClose={() => setIsResolveOpen(false)}
         onSubmit={handleResolveReport}
+        theme={theme}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setReportToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        item={reportToDelete ? { id: reportToDelete.id, name: `Report ID: ${reportToDelete.id}`, email: '' } : null} // Adapt item structure as needed by ConfirmDeleteModal
+        entityType="report"
         theme={theme}
       />
     </div>

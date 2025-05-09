@@ -45,6 +45,8 @@ const analyzeAudioWithReccoBeats = async (audioBuffer, title, artistName) => {
             instrumentalness: reccoFeatures.instrumentalness,
             acousticness: reccoFeatures.acousticness,
             valence: reccoFeatures.valence,
+            loudness: reccoFeatures.loudness,
+            speechiness: reccoFeatures.speechiness,
             genreIds
         };
     }
@@ -60,6 +62,8 @@ const analyzeAudioWithReccoBeats = async (audioBuffer, title, artistName) => {
             instrumentalness: null,
             acousticness: null,
             valence: null,
+            loudness: null,
+            speechiness: null,
             genreIds: []
         };
     }

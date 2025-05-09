@@ -365,11 +365,17 @@ export default function Header({
 
       // Handle navigation based on notification type
       if (notification.type === 'NEW_REPORT_SUBMITTED' || notification.type === 'REPORT_RESOLVED') {
-        // For report notifications, navigate to the reports page with the report ID
-        if (notification.reportId) {
-          router.push(`/reports?reportId=${notification.reportId}`);
+        // Check if current user is Admin, and route appropriately
+        if (user?.role === 'ADMIN') {
+          // Admin should go to admin reports page
+          router.push('/admin/reports');
         } else {
-          router.push('/reports');
+          // Regular users go to user reports page
+          if (notification.reportId) {
+            router.push(`/reports?reportId=${notification.reportId}`);
+          } else {
+            router.push('/reports');
+          }
         }
       } else if (notification.type === 'LABEL_REGISTRATION_APPROVED') {
         // Navigate to artist dashboard or a success page

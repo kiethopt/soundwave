@@ -5113,15 +5113,18 @@ export function ReportDetailModal({
             >
               Description
             </h3>
-            <p
-              className={`rounded-md p-3 text-sm ${
-                theme === "dark"
-                  ? "bg-gray-700 text-gray-200"
-                  : "bg-gray-100 text-gray-800"
-              }`}
-            >
+            <p className={`rounded-md p-3 ${ 
+              report.status === 'PENDING' 
+                ? (theme === 'light' ? 'bg-yellow-100/70 text-yellow-900' : 'bg-yellow-900/40 text-yellow-100') 
+                : (theme === 'light' ? 'bg-gray-100 text-gray-800' : 'bg-neutral-700 text-neutral-200')
+            }`}>
               {report.description}
             </p>
+            {report.status === 'PENDING' && (
+              <p className={`mt-2 text-xs italic ${theme === 'light' ? 'text-yellow-700' : 'text-yellow-300'}`}>
+                This report requires admin attention
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

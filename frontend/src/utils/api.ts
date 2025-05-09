@@ -1963,7 +1963,7 @@ export const api = {
       token: string,
       page: number = 1,
       limit: number = 10,
-      filters: { type?: string; status?: string } = {}
+      filters: { type?: string; status?: string; search?: string } = {}
     ) => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -1976,6 +1976,10 @@ export const api = {
 
       if (filters.status) {
         params.append("status", filters.status);
+      }
+      
+      if (filters.search) {
+        params.append("search", filters.search);
       }
 
       return fetchWithAuth(
@@ -1997,6 +2001,15 @@ export const api = {
           method: "PATCH",
           body: JSON.stringify(data),
         },
+        token
+      );
+    },
+    
+    // Admin only - delete a report
+    deleteReport: async (id: string, token: string) => {
+      return fetchWithAuth(
+        `/api/reports/${id}`,
+        { method: "DELETE" },
         token
       );
     },

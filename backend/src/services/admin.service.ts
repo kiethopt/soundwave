@@ -2106,6 +2106,8 @@ interface BulkUploadResult {
   mood: string | null;
   key: string | null;
   scale: string | null;
+  danceability: number | null;
+  energy: number | null;
   genreIds: string[];
   genres: string[];
   success: boolean;
@@ -2253,6 +2255,8 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           mood: null,
           key: null,
           scale: null,
+          danceability: null,
+          energy: null,
           genreIds: [],
           genres: [],
           albumName: albumName,
@@ -2389,6 +2393,8 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           mood,
           key,
           scale,
+          danceability,
+          energy,
           genreIds: finalGenreIds,
           genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : [],
           success: true,
@@ -2410,11 +2416,13 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           artistId,
           duration: newTrack.duration,
           audioUrl: newTrack.audioUrl,
-          coverUrl: newTrack.coverUrl || undefined, // Convert null to undefined
+          coverUrl: newTrack.coverUrl || undefined,
           tempo: newTrack.tempo,
           mood: newTrack.mood,
           key: newTrack.key,
           scale: newTrack.scale,
+          danceability: newTrack.danceability,
+          energy: newTrack.energy,
           genreIds: finalGenreIds,
           genres: newTrack.genres?.map((g) => g.genre.name),
           fileName: file.originalname,
@@ -2434,7 +2442,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         success: false,
         albumName: albumName,
         albumId: undefined,
-        albumType: albumName ? 'ALBUM' : 'SINGLE', // Set default based on albumName
+        albumType: albumName ? 'ALBUM' : 'SINGLE',
         artistId: '',
         trackId: '',
         duration: 0,
@@ -2444,6 +2452,8 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         mood: null,
         key: null,
         scale: null,
+        danceability: null,
+        energy: null,
         genreIds: [],
         genres: []
       });

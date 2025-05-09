@@ -25,6 +25,13 @@ interface UploadResult {
   genres?: string[];
   success: boolean;
   error?: string;
+  danceability?: number | null;
+  energy?: number | null;
+  instrumentalness?: number | null;
+  acousticness?: number | null;
+  loudness?: number | null;
+  speechiness?: number | null;
+  valence?: number | null;
   albumName?: string | null;
   albumId?: string;
   albumType?: string;
@@ -147,6 +154,13 @@ export default function BulkUploadPage() {
         result.coverUrl || '',
         result.trackId || '',
         result.audioUrl || '',
+        result.danceability !== undefined ? result.danceability : '',
+        result.energy !== undefined ? result.energy : '',
+        result.instrumentalness !== undefined ? result.instrumentalness : '',
+        result.acousticness !== undefined ? result.acousticness : '',
+        result.loudness !== undefined ? result.loudness : '',
+        result.speechiness !== undefined ? result.speechiness : '',
+        result.valence !== undefined ? result.valence : '',
         result.error || ''
       ].join(',');
     });
