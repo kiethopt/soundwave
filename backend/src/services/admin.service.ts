@@ -2278,17 +2278,6 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         }
       }
 
-      // 7. Generate cover artwork IF NOT extracted/uploaded
-      if (!coverUrl) { 
-        try {
-          // Truyền mood vào hàm generateCoverArtwork nếu có
-          coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
-          console.log(`Generated fallback cover artwork for "${title}"`);
-        } catch (coverError) {
-          console.error("Error generating cover artwork:", coverError);
-        }
-      }
-
       // Determine album vs single
       let albumTypeName: 'SINGLE' | 'EP' | 'ALBUM' = 'SINGLE';
       let shouldAddToAlbum = false;
@@ -2301,6 +2290,30 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         // If no album name or album name equals track title, it's a single
         albumTypeName = 'SINGLE';
         albumName = null;
+      }
+
+      // 7. Generate cover artwork ONLY for singles or for the first track in an album
+      if (!coverUrl) { 
+        if (!shouldAddToAlbum) {
+          // This is a single track, generate cover
+          try {
+            coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+            console.log(`Generated cover artwork for single "${title}"`);
+          } catch (coverError) {
+            console.error("Error generating cover artwork for single:", coverError);
+          }
+        } else if (albumName && (!albumTracks[albumName] || albumTracks[albumName].tracks.length === 0)) {
+          // This is the first track of an album, generate album cover
+          try {
+            coverUrl = await generateCoverArtwork(albumName, derivedArtistName, mood);
+            console.log(`Generated cover artwork for album "${albumName}"`);
+          } catch (coverError) {
+            console.error(`Error generating cover artwork for album "${albumName}":`, coverError);
+          }
+        } else {
+          // This is not the first track of an album, don't generate cover
+          console.log(`Skipping cover generation for "${title}" as it will use album cover`);
+        }
       }
 
       // 8. Create Track record in Prisma
@@ -2335,8 +2348,14 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           albumTracks[albumName] = {
             tracks: [],
             artistId,
-            coverUrl: coverUrl || undefined // Convert null to undefined
+            coverUrl: undefined
           };
+        }
+        
+        // If this track has an embedded cover, prioritize it for the album
+        if (coverUrl && !albumTracks[albumName].coverUrl) {
+          console.log(`Using embedded cover from "${title}" for album "${albumName}"`);
+          albumTracks[albumName].coverUrl = coverUrl;
         }
         
         // Add track data to album mapping
@@ -2348,7 +2367,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           artistName: derivedArtistName,
           artistId,
           audioUrl,
-          coverUrl,
+          coverUrl, // Keep track's own cover URL for reference, but it won't be used if the album has a cover
           tempo,
           mood,
           key,
@@ -2456,9 +2475,9 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       });
       
       let album;
-      // Initialize with defaults - albumType is an enum from Prisma, albumTypeName is a string
-      let albumType: AlbumType = AlbumType.EP;
+      // Initialize with defaults
       let albumTypeName: 'EP' | 'ALBUM' | 'SINGLE' = 'EP';
+      let albumType: AlbumType = AlbumType.EP;
       
       if (existingAlbum) {
         console.log(`Album "${albumName}" already exists for this artist. Adding tracks to existing album.`);
@@ -2479,13 +2498,15 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           albumType = AlbumType.ALBUM;
           albumTypeName = 'ALBUM';
           
-          // Update album type
+          // Update album type and data
           await prisma.album.update({
             where: { id: existingAlbum.id },
             data: {
               type: AlbumType.ALBUM,
               duration: newTotalDuration,
-              totalTracks: newTotalTracks
+              totalTracks: newTotalTracks,
+              // Only update album cover if album has a better cover image and existing album has no cover
+              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
             }
           });
           
@@ -2502,12 +2523,16 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
             where: { id: existingAlbum.id },
             data: {
               duration: newTotalDuration,
-              totalTracks: newTotalTracks
+              totalTracks: newTotalTracks,
+              // Only update album cover if album has a better cover image and existing album has no cover
+              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
             }
           });
         }
         
-        album = existingAlbum;
+        album = await prisma.album.findUnique({
+          where: { id: existingAlbum.id }
+        });
       } else {
         // For new albums, determine type based on duration
         // EP if total duration is less than 10 minutes (600 seconds)
@@ -2518,7 +2543,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         album = await prisma.album.create({
           data: {
             title: albumName,
-            coverUrl: coverUrl || undefined,
+            coverUrl: albumData.coverUrl, // Use the best cover URL determined earlier
             releaseDate: new Date(),
             duration: totalDuration,
             totalTracks: tracks.length,
@@ -2539,10 +2564,18 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           ? existingAlbum.totalTracks + 1 + i 
           : i + 1; // 1-based track numbering
         
+        // Check if album is defined before using it
+        if (!album) {
+          console.error(`Album object is null when trying to create track "${trackInfo.title}"`);
+          continue; // Skip this track
+        }
+        
         // Create track with album connection and track number
         await prisma.track.create({
           data: {
             ...trackInfo.trackData,
+            // Use album's cover URL instead of track's own cover URL
+            coverUrl: album.coverUrl || trackInfo.trackData.coverUrl,
             album: { connect: { id: album.id } },
             trackNumber: trackNumber,
             type: albumType // Use the possibly updated album type
@@ -2554,10 +2587,12 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           r => r.fileName === trackInfo.fileName && r.title === trackInfo.title
         );
         
-        if (resultIndex !== -1) {
+        if (resultIndex !== -1 && album) {
           results[resultIndex].albumId = album.id;
           // Ensure albumTypeName is correctly typed for the results array
           results[resultIndex].albumType = albumTypeName as 'SINGLE' | 'EP' | 'ALBUM';
+          // Update the cover URL in results to match what was actually saved
+          results[resultIndex].coverUrl = album.coverUrl || results[resultIndex].coverUrl;
         }
       }
     } catch (albumError) {
