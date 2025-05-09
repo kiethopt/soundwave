@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import * as userService from '../services/user.service';
 import { handleError } from '../utils/handle-utils';
-import { getIO, getUserSockets } from '../config/socket'; // Import socket functions
+import { getIO, getUserSockets } from '../config/socket';
 import { uploadToCloudinary } from '../utils/cloudinary';
 
 // Yêu cầu trở thành Artist (Request Artist Role)

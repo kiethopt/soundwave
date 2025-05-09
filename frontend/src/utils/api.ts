@@ -1417,6 +1417,14 @@ export const api = {
 
     delete: async (id: string, token: string) =>
       fetchWithAuth(`/api/labels/${id}`, { method: "DELETE" }, token),
+
+    requestRegistration: async (formData: FormData, token: string) => {
+      return fetchWithAuth(
+        `/api/labels/registrations`,
+        { method: 'POST', body: formData },
+        token
+      );
+    },
   },
 
   dashboard: {

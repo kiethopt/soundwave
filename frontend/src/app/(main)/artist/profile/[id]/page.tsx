@@ -17,6 +17,13 @@ import Image from "next/image";
 import io, { Socket } from "socket.io-client";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { cn } from "@/lib/utils";
+import { RegisterLabelModal } from "@/components/ui/artist-modals";
 
 function getBrightness(hexColor: string) {
   const r = parseInt(hexColor.substr(1, 2), 16);
@@ -65,6 +72,7 @@ export default function ArtistProfilePage({
     "popular"
   );
   const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [isRegisterLabelModalOpen, setIsRegisterLabelModalOpen] = useState(false);
 
   const {
     currentTrack,
@@ -1036,6 +1044,31 @@ export default function ArtistProfilePage({
     }
   };
 
+  const handleRegisterLabelSubmit = async (formData: FormData) => {
+    if (!token) {
+      toast.error("Authentication required.");
+      return;
+    }
+
+    const labelName = formData.get("name") as string;
+    toast.loading(`Submitting request for label "${labelName || 'New Label'}"...`, { id: 'register-label' });
+
+    try {
+      await api.labels.requestRegistration(formData, token);
+      
+      toast.success(`Request for label "${labelName || 'New Label'}" submitted successfully!`, {
+        id: 'register-label',
+      });
+      setIsRegisterLabelModalOpen(false);
+
+    } catch (error: any) {
+      console.error("Failed to submit label registration:", error);
+      toast.error(error.message || "Failed to submit label registration.", {
+        id: 'register-label',
+      });
+    }
+  };
+
   const handleFeaturedTrackPlay = (track: Track) => {
     if (currentTrack?.id === track.id && isPlaying && queueType === "featuredOn") {
       pauseTrack();
@@ -1097,7 +1130,8 @@ export default function ArtistProfilePage({
                   <span>Back</span>
                 </button>
 
-                {isOwner && userData.currentProfile === 'ARTIST' && userData.artistProfile?.isVerified && (
+                {isOwner && (
+                  <div className="flex gap-2">
                     <Button
                       variant={theme === "dark" ? "outline" : "outline"}
                       size="sm"
@@ -1107,6 +1141,16 @@ export default function ArtistProfilePage({
                       <Edit className="w-4 h-4" />
                       Edit Profile
                     </Button>
+                    <Button
+                      variant={theme === "dark" ? "outline" : "outline"}
+                      size="sm"
+                      onClick={() => setIsRegisterLabelModalOpen(true)}
+                      className="flex-shrink-0 gap-2"
+                    >
+                      <Tag className="w-4 h-4" />
+                      Register Label
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -1381,6 +1425,13 @@ export default function ArtistProfilePage({
             onSubmit={handleProfileUpdate}
             theme={theme}
             availableGenres={availableGenres}
+          />
+
+          <RegisterLabelModal
+            isOpen={isRegisterLabelModalOpen}
+            onClose={() => setIsRegisterLabelModalOpen(false)}
+            onSubmit={handleRegisterLabelSubmit}
+            theme={theme}
           />
 
         </div>
