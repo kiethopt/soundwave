@@ -46,7 +46,8 @@ export default function NewAlbum() {
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   // State to store the artist's default label name
-  const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
 
   useEffect(() => {
     // Fetch genres and artist profile data
@@ -60,9 +61,10 @@ export default function NewAlbum() {
         };
 
         // Fetch genres and artist profile in parallel
-        const [genresResponse, profileResponse] = await Promise.all([
+        const [genresResponse, profileResponse, selectableLabelsResponse] = await Promise.all([
           api.artists.getAllGenres(token, 1, 100),
-          api.auth.getMe(token) // Use getMe to fetch profile
+          api.auth.getMe(token), // Use getMe to fetch profile
+          api.labels.getSelectableByArtist(token)
         ]);
 
         // Set Genres
@@ -73,11 +75,16 @@ export default function NewAlbum() {
           }))
         );
 
-        // Set Artist Label Name from profile
-        if (profileResponse?.artistProfile?.label?.name) {
-          setArtistLabelName(profileResponse.artistProfile.label.name);
+        // Set available labels for selection
+        if (selectableLabelsResponse && selectableLabelsResponse.data) { // Assuming response is { data: Label[] }
+          setAvailableLabels(selectableLabelsResponse.data.map((label: Label) => ({ id: label.id, name: label.name })));
+        }
+
+        // Pre-select artist's own label if it exists
+        if (profileResponse?.artistProfile?.label?.id) {
+          setSelectedLabel(profileResponse.artistProfile.label.id);
         } else {
-          setArtistLabelName(null);
+          setSelectedLabel(null);
         }
 
       } catch (error) {
@@ -141,6 +148,10 @@ export default function NewAlbum() {
       selectedGenres.forEach((genreId) => {
         formData.append('genres', genreId);
       });
+
+      if (selectedLabel) {
+        formData.append('labelId', selectedLabel);
+      }
 
       await api.albums.create(formData, token);
       toast.success('Album created successfully');
@@ -295,24 +306,19 @@ export default function NewAlbum() {
                  />
                </div>
 
-               {/* Display Artist's Default Label (Read-only) */}
-               {artistLabelName && (
-                 <div className="space-y-1.5">
-                   <UILabel htmlFor="labelDisplay" className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label</UILabel>
-                   <Input
-                     type="text"
-                     id="labelDisplay"
-                     value={artistLabelName}
-                     disabled
-                     className={cn(
-                       'w-full',
-                       theme === 'light'
-                         ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                         : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
-                     )}
-                   />
-                 </div>
-               )}
+               {/* New Label Selector */}
+               <div className="space-y-1.5">
+                 <UILabel className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label (Optional)</UILabel>
+                 <SearchableSelect
+                   options={availableLabels.map(l => ({ id: l.id, name: l.name }))}
+                   value={selectedLabel ? [selectedLabel] : []}
+                   onChange={(selectedIds: string[]) => {
+                     setSelectedLabel(selectedIds.length > 0 ? selectedIds[0] : null);
+                   }}
+                   placeholder="Select a label..."
+                   multiple={false}
+                 />
+               </div>
 
                 {/* Submit Button */}
                <div className="flex justify-end pt-4">

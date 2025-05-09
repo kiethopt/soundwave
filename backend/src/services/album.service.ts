@@ -340,7 +340,6 @@ export const addTracksToAlbum = async (req: Request) => {
       try {
         const metadata = await mm.parseBuffer(file.buffer); // Removed { duration: true } option
         duration = Math.floor(metadata.format.duration || 0);
-        console.log(`[addTracksToAlbum] Track ${index} (${file.originalname}): Parsed duration = ${metadata.format.duration}, Saved duration = ${duration}`);
         if (!metadata.format.duration) {
            console.warn(`[addTracksToAlbum] Track ${index} (${file.originalname}): music-metadata could not find duration.`);
         }
@@ -416,9 +415,10 @@ export const addTracksToAlbum = async (req: Request) => {
     })
   );
 
-  const tracks = await prisma.track.findMany({ where: { albumId }, select: { duration: true } });
+  const tracks = await prisma.track.findMany({ where: { albumId }, select: { duration: true, id: true, title: true } }); // Added id and title for logging
   const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
 
+  // Enhanced Logging
   const updatedAlbum = await prisma.album.update({
     where: { id: albumId },
     data: { duration: totalDuration, totalTracks: tracks.length },

@@ -900,7 +900,7 @@ export default function PlaylistPage() {
                 <div className="flex justify-center">#</div>
                 <div>Title</div>
                 <div>Album</div>
-                <div className="text-left">Genre</div>
+                <div className="text-left">Genre(s)</div>
                 <div className="flex items-center justify-start">
                   Date Added
                 </div>

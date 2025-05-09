@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -36,6 +37,7 @@ import {
   AlbumIcon,
   ShieldCheck,
   Tags,
+  Music,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -51,7 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Music } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { Album, Track } from "@/types";
@@ -61,6 +62,15 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X, Check } from "lucide-react";
 import { Report, ReportStatus, ReportType } from "@/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "./card";
+import { Label as CardLabel } from "./label";
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -1760,8 +1770,8 @@ interface ApproveModalProps {
   onClose: () => void;
   onConfirm: () => void;
   theme?: "light" | "dark";
-  itemName?: string;    // Changed from artistName
-  itemType?: string;    // Added for context (e.g., "artist", "label request")
+  itemName?: string;
+  itemType?: string;
 }
 
 export function ApproveModal({
@@ -4459,8 +4469,8 @@ export function EditAlbumModal({
               >
                 <AlbumIcon
                   className={cn(
-                    "w-7 h-7",
-                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                    "w-8 h-8",
+                    theme === "dark" ? "text-gray-500" : "text-gray-400"
                   )}
                   strokeWidth={1.5}
                 />
@@ -4999,70 +5009,137 @@ export function ReportDetailModal({
     }
   };
 
-  const getEntityName = () => {
+  const renderEntityDetails = () => {
     if (report.track) {
       return (
-        <div className="flex flex-col">
-          <span
-            className={`font-medium ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {report.track.title}
-          </span>
-          <span
-            className={`text-sm ${
-              theme === "dark" ? "text-gray-400" : "text-gray-500"
-            }`}
-          >
-            Track by {report.track.artist.artistName}
-          </span>
-        </div>
+        <Card className={theme === "dark" ? "bg-gray-750 border-gray-650" : "bg-gray-50 border-gray-200"}>
+          <CardHeader>
+            <CardTitle className={theme === "dark" ? "text-white" : "text-gray-900"}>
+              Reported Track
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className={`w-16 h-16 flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                {report.track.coverUrl ? (
+                  <img 
+                    src={report.track.coverUrl} 
+                    alt={report.track.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Music className={`w-8 h-8 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`} />
+                )}
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Title:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.track.title}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Track ID:</CardLabel>
+                  <span className={`col-span-2 text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>{report.track.id}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Artist:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.track.artist.artistName}</span>
+                </div>
+                {report.track.album && (
+                  <div className="grid grid-cols-3 items-center">
+                    <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Album:</CardLabel>
+                    <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.track.album.title}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       );
     } else if (report.album) {
       return (
-        <div className="flex flex-col">
-          <span
-            className={`font-medium ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {report.album.title}
-          </span>
-          <span
-            className={`text-sm ${
-              theme === "dark" ? "text-gray-400" : "text-gray-500"
-            }`}
-          >
-            Album by {report.album.artist.artistName}
-          </span>
-        </div>
+        <Card className={theme === "dark" ? "bg-gray-750 border-gray-650" : "bg-gray-50 border-gray-200"}>
+          <CardHeader>
+            <CardTitle className={theme === "dark" ? "text-white" : "text-gray-900"}>
+              Reported Album
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className={`w-16 h-16 flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                {report.album.coverUrl ? (
+                  <img 
+                    src={report.album.coverUrl} 
+                    alt={report.album.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <AlbumIcon className={`w-8 h-8 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`} />
+                )}
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Title:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.album.title}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Album ID:</CardLabel>
+                  <span className={`col-span-2 text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>{report.album.id}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Artist:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.album.artist.artistName}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       );
     } else if (report.playlist) {
       return (
-        <div className="flex flex-col">
-          <span
-            className={`font-medium ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {report.playlist.name}
-          </span>
-          <span
-            className={`text-sm ${
-              theme === "dark" ? "text-gray-400" : "text-gray-500"
-            }`}
-          >
-            Playlist by{" "}
-            {report.playlist.user.name || report.playlist.user.username}
-          </span>
-        </div>
+        <Card className={theme === "dark" ? "bg-gray-750 border-gray-650" : "bg-gray-50 border-gray-200"}>
+          <CardHeader>
+            <CardTitle className={theme === "dark" ? "text-white" : "text-gray-900"}>
+              Reported Playlist
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className={`w-16 h-16 flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                {report.playlist.coverUrl ? (
+                  <img 
+                    src={report.playlist.coverUrl} 
+                    alt={report.playlist.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Music className={`w-8 h-8 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`} />
+                )}
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Name:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>{report.playlist.name}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Playlist ID:</CardLabel>
+                  <span className={`col-span-2 text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>{report.playlist.id}</span>
+                </div>
+                <div className="grid grid-cols-3 items-center">
+                  <CardLabel className={`col-span-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Owner:</CardLabel>
+                  <span className={`col-span-2 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
+                    {report.playlist.user?.name || report.playlist.user?.username || 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       );
     }
     return (
-      <span className={theme === "dark" ? "text-white" : "text-gray-900"}>
-        Unknown Entity
-      </span>
+      <p className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+        No specific entity details available for this report.
+      </p>
     );
   };
 
@@ -5223,6 +5300,52 @@ export function ReportDetailModal({
               )}
             </>
           )}
+
+          <div>
+            <h3
+              className={`text-sm font-medium mb-1 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Reported Entity
+            </h3>
+            {renderEntityDetails()}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Date Submitted
+              </h3>
+              <p
+                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
+              >
+                {new Date(report.createdAt).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <h3
+                className={`text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Date Resolved
+              </h3>
+              <p
+                className={
+                  theme === "dark" ? "text-gray-200" : "text-gray-800"
+                }
+              >
+                {report.resolvedAt
+                  ? new Date(report.resolvedAt).toLocaleString()
+                  : "N/A"}
+              </p>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="flex justify-end gap-2">

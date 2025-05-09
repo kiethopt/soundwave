@@ -1761,15 +1761,6 @@ const processBulkUpload = async (files) => {
                     console.error("Error finding fallback genre:", fallbackGenreError);
                 }
             }
-            if (!coverUrl) {
-                try {
-                    coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
-                    console.log(`Generated fallback cover artwork for "${title}"`);
-                }
-                catch (coverError) {
-                    console.error("Error generating cover artwork:", coverError);
-                }
-            }
             let albumTypeName = 'SINGLE';
             let shouldAddToAlbum = false;
             if (albumName && albumName !== title) {
@@ -1779,6 +1770,29 @@ const processBulkUpload = async (files) => {
             else {
                 albumTypeName = 'SINGLE';
                 albumName = null;
+            }
+            if (!coverUrl) {
+                if (!shouldAddToAlbum) {
+                    try {
+                        coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+                        console.log(`Generated cover artwork for single "${title}"`);
+                    }
+                    catch (coverError) {
+                        console.error("Error generating cover artwork for single:", coverError);
+                    }
+                }
+                else if (albumName && (!albumTracks[albumName] || albumTracks[albumName].tracks.length === 0)) {
+                    try {
+                        coverUrl = await generateCoverArtwork(albumName, derivedArtistName, mood);
+                        console.log(`Generated cover artwork for album "${albumName}"`);
+                    }
+                    catch (coverError) {
+                        console.error(`Error generating cover artwork for album "${albumName}":`, coverError);
+                    }
+                }
+                else {
+                    console.log(`Skipping cover generation for "${title}" as it will use album cover`);
+                }
             }
             const releaseDate = new Date();
             const trackData = {
@@ -1807,8 +1821,12 @@ const processBulkUpload = async (files) => {
                     albumTracks[albumName] = {
                         tracks: [],
                         artistId,
-                        coverUrl: coverUrl || undefined
+                        coverUrl: undefined
                     };
+                }
+                if (coverUrl && !albumTracks[albumName].coverUrl) {
+                    console.log(`Using embedded cover from "${title}" for album "${albumName}"`);
+                    albumTracks[albumName].coverUrl = coverUrl;
                 }
                 albumTracks[albumName].tracks.push({
                     trackData,
@@ -1924,8 +1942,8 @@ const processBulkUpload = async (files) => {
                 }
             });
             let album;
-            let albumType = client_1.AlbumType.EP;
             let albumTypeName = 'EP';
+            let albumType = client_1.AlbumType.EP;
             if (existingAlbum) {
                 console.log(`Album "${albumName}" already exists for this artist. Adding tracks to existing album.`);
                 albumType = existingAlbum.type;
@@ -1942,7 +1960,8 @@ const processBulkUpload = async (files) => {
                         data: {
                             type: client_1.AlbumType.ALBUM,
                             duration: newTotalDuration,
-                            totalTracks: newTotalTracks
+                            totalTracks: newTotalTracks,
+                            ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
                         }
                     });
                     await db_1.default.track.updateMany({
@@ -1956,11 +1975,14 @@ const processBulkUpload = async (files) => {
                         where: { id: existingAlbum.id },
                         data: {
                             duration: newTotalDuration,
-                            totalTracks: newTotalTracks
+                            totalTracks: newTotalTracks,
+                            ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
                         }
                     });
                 }
-                album = existingAlbum;
+                album = await db_1.default.album.findUnique({
+                    where: { id: existingAlbum.id }
+                });
             }
             else {
                 albumTypeName = totalDuration < 600 ? 'EP' : 'ALBUM';
@@ -1968,7 +1990,7 @@ const processBulkUpload = async (files) => {
                 album = await db_1.default.album.create({
                     data: {
                         title: albumName,
-                        coverUrl: coverUrl || undefined,
+                        coverUrl: albumData.coverUrl,
                         releaseDate: new Date(),
                         duration: totalDuration,
                         totalTracks: tracks.length,
@@ -1984,18 +2006,24 @@ const processBulkUpload = async (files) => {
                 const trackNumber = existingAlbum
                     ? existingAlbum.totalTracks + 1 + i
                     : i + 1;
+                if (!album) {
+                    console.error(`Album object is null when trying to create track "${trackInfo.title}"`);
+                    continue;
+                }
                 await db_1.default.track.create({
                     data: {
                         ...trackInfo.trackData,
+                        coverUrl: album.coverUrl || trackInfo.trackData.coverUrl,
                         album: { connect: { id: album.id } },
                         trackNumber: trackNumber,
                         type: albumType
                     }
                 });
                 const resultIndex = results.findIndex(r => r.fileName === trackInfo.fileName && r.title === trackInfo.title);
-                if (resultIndex !== -1) {
+                if (resultIndex !== -1 && album) {
                     results[resultIndex].albumId = album.id;
                     results[resultIndex].albumType = albumTypeName;
+                    results[resultIndex].coverUrl = album.coverUrl || results[resultIndex].coverUrl;
                 }
             }
         }

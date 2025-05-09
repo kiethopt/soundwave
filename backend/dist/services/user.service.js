@@ -631,9 +631,65 @@ const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDoc
             artistName: true,
             status: true,
             avatarUrl: true,
-            requestedGenres: true
+            requestedGenres: true,
+            user: { select: { id: true, name: true, username: true, avatar: true } },
         }
     });
+    try {
+        const admins = await db_1.default.user.findMany({ where: { role: client_1.Role.ADMIN } });
+        const requestingUserName = newArtistRequest.user.name || newArtistRequest.user.username || 'A user';
+        const notificationMessage = `User '${requestingUserName}' has submitted a request to become artist '${newArtistRequest.artistName}'.`;
+        const notificationPromises = admins.map(admin => db_1.default.notification.create({
+            data: {
+                type: client_1.NotificationType.ARTIST_REQUEST_SUBMITTED,
+                message: notificationMessage,
+                recipientType: client_1.RecipientType.USER,
+                userId: admin.id,
+                senderId: user.id,
+                artistRequestId: newArtistRequest.id,
+            },
+            select: {
+                id: true, type: true, message: true, recipientType: true, userId: true,
+                senderId: true, artistRequestId: true, createdAt: true, isRead: true
+            }
+        }));
+        const createdNotifications = await Promise.all(notificationPromises);
+        const io = (0, socket_1.getIO)();
+        const userSocketsMap = (0, socket_1.getUserSockets)();
+        createdNotifications.forEach(notification => {
+            const adminSocketId = userSocketsMap.get(notification.userId);
+            if (adminSocketId) {
+                console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${notification.userId} via socket ${adminSocketId}`);
+                io.to(adminSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistRequestId: notification.artistRequestId,
+                    senderId: notification.senderId,
+                    requestingUser: {
+                        id: newArtistRequest.user.id,
+                        name: newArtistRequest.user.name,
+                        username: newArtistRequest.user.username,
+                        avatar: newArtistRequest.user.avatar,
+                    },
+                    artistRequestDetails: {
+                        id: newArtistRequest.id,
+                        artistName: newArtistRequest.artistName,
+                        avatarUrl: newArtistRequest.avatarUrl,
+                    }
+                });
+            }
+            else {
+                console.log(`[Socket Emit] Admin ${notification.userId} not connected, skipping ARTIST_REQUEST_SUBMITTED socket event.`);
+            }
+        });
+    }
+    catch (notificationError) {
+        console.error("[Notify Error] Failed to create admin notifications for new artist request:", notificationError);
+    }
     return {
         message: 'Artist request submitted successfully. It will be reviewed by an administrator.',
         request: newArtistRequest,
