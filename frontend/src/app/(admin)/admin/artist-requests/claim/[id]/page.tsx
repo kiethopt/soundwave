@@ -373,7 +373,7 @@ export default function ClaimRequestDetail({
                           : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
-                      {request.status.toLowerCase()}
+                      {request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1).toLowerCase() : 'N/A'}
                     </dd>
                   </div>
 

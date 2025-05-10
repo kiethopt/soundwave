@@ -291,13 +291,17 @@ export const requestNewLabelRegistration = async (
     throw { status: 400, message: `You already have a pending registration request for the label "${data.name}".` };
   }
   
-  // 3. Check if a label with this name ALREADY EXISTS and is active (optional, but good to prevent obvious duplicates)
+  // 3. Check if a label with this name ALREADY EXISTS (Allow request to proceed for admin review)
+  /*
   const existingLabel = await prisma.label.findFirst({
       where: { name: data.name }
   });
   if (existingLabel) {
-      throw { status: 400, message: `A label named "${data.name}" already exists.` };
+      // Instead of throwing an error, we allow the request to be created.
+      // The admin will decide during the approval process.
+      // console.log(`Label registration request submitted for an existing label name: ${data.name}. Admin will review.`);
   }
+  */
 
   let logoUrl: string | undefined;
   if (logoFile) {
@@ -465,47 +469,88 @@ export const approveLabelRegistration = async (adminUserId: string, registration
 
   // Transaction to ensure all operations succeed or fail together
   return prisma.$transaction(async (tx) => {
-    // 1. Create the new Label
-    const newLabel = await tx.label.create({
-      data: {
-        name: registrationRequest.requestedLabelName,
-        description: registrationRequest.requestedLabelDescription,
-        logoUrl: registrationRequest.requestedLabelLogoUrl,
-        // artists: { connect: { id: registrationRequest.requestingArtistId } } // Connect the requesting artist initially
-      },
-      select: labelSelect, // Use your existing labelSelect
+    let targetLabelId: string;
+    let newLabelWasActuallyCreated = false;
+    let finalLabelName = registrationRequest.requestedLabelName;
+
+    // 1. Check if the label with the requested name already exists
+    const existingLabel = await tx.label.findUnique({
+      where: { name: registrationRequest.requestedLabelName },
+      select: { id: true, name: true },
     });
 
-    // 2. Update the ArtistProfile with the new labelId
+    if (existingLabel) {
+      // Label already exists, use its ID
+      targetLabelId = existingLabel.id;
+      finalLabelName = existingLabel.name; // Use the existing, potentially cased, name
+    } else {
+      // Label does not exist, create a new one
+      const newLabel = await tx.label.create({
+        data: {
+          name: registrationRequest.requestedLabelName,
+          description: registrationRequest.requestedLabelDescription,
+          logoUrl: registrationRequest.requestedLabelLogoUrl,
+        },
+        select: { id: true, name: true }, // Select only id and name
+      });
+      targetLabelId = newLabel.id;
+      finalLabelName = newLabel.name;
+      newLabelWasActuallyCreated = true;
+    }
+
+    // 2. Update the ArtistProfile with the new or existing labelId
     await tx.artistProfile.update({
       where: { id: registrationRequest.requestingArtistId },
-      data: { labelId: newLabel.id },
+      data: { labelId: targetLabelId },
     });
 
     // 3. Update the LabelRegistrationRequest
+    const labelRegistrationUpdateData: Prisma.LabelRegistrationRequestUpdateInput = {
+      status: RequestStatus.APPROVED,
+      reviewedAt: new Date(),
+      reviewedByAdmin: { connect: { id: adminUserId } },
+    };
+    
+    if (newLabelWasActuallyCreated) {
+      // Only set createdLabelId if a new label was actually created by THIS request's approval
+      // This maintains the unique constraint on createdLabelId
+      labelRegistrationUpdateData.createdLabel = { connect: { id: targetLabelId } };
+    }
+    // If an existing label was used, createdLabelId for THIS request remains null (or its previous value),
+    // as this request did not "create" that label.
+
     const updatedRequest = await tx.labelRegistrationRequest.update({
       where: { id: registrationId },
-      data: {
-        status: RequestStatus.APPROVED,
-        reviewedAt: new Date(),
-        reviewedByAdminId: adminUserId,
-        createdLabelId: newLabel.id,
-      },
+      data: labelRegistrationUpdateData,
     });
 
     // 4. Notify the artist
+    let approvalMessage: string;
+    if (newLabelWasActuallyCreated) {
+      approvalMessage = `Congratulations! Your request to register the label "${finalLabelName}" has been approved, and the label has been created.`;
+    } else {
+      approvalMessage = `Congratulations! Your request concerning the label "${finalLabelName}" has been approved. You are now associated with this existing label.`;
+    }
+
     if (registrationRequest.requestingArtist.userId) {
       await tx.notification.create({
         data: {
           userId: registrationRequest.requestingArtist.userId,
           recipientType: RecipientType.USER, // Artist is a user
           type: NotificationType.LABEL_REGISTRATION_APPROVED,
-          message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+          message: approvalMessage,
           // claimId: registrationRequest.id, // Optional: link to the request
         },
       });
     }
-    return { updatedRequest, newLabel };
+    
+    // Fetch full label details to return
+    const finalLabelDetails = await tx.label.findUnique({
+        where: { id: targetLabelId },
+        select: labelSelect
+    });
+    
+    return { updatedRequest, label: finalLabelDetails };
   });
 };
 
@@ -569,37 +614,52 @@ export const getSelectableLabelsForArtist = async (artistProfileId: string): Pro
     throw new Error('Artist profile ID is required to fetch selectable labels.');
   }
 
-  // 1. Find approved label registration requests for this artist
-  const approvedRequests = await prisma.labelRegistrationRequest.findMany({
+  let selectableLabels: Label[] = [];
+
+  // 1. Get the artist's current label (if any)
+  const artistProfile = await prisma.artistProfile.findUnique({
+    where: { id: artistProfileId },
+    select: {
+      labelId: true,
+      label: { select: labelSelect }, // Fetch full label details if labelId exists
+    },
+  });
+
+  if (artistProfile?.label) {
+    selectableLabels.push(artistProfile.label);
+  }
+
+  // 2. Find approved label registration requests where THIS artist CREATED the label
+  const approvedRequestsCreatingLabels = await prisma.labelRegistrationRequest.findMany({
     where: {
       requestingArtistId: artistProfileId,
       status: RequestStatus.APPROVED,
-      createdLabelId: { // Ensure there is a created label linked
+      createdLabelId: {
         not: null,
       },
     },
     select: {
-      createdLabelId: true,
+      createdLabel: { // Select the entire related label object
+        select: labelSelect, // This should give us the full Label type including _count
+      },
     },
   });
 
-  const ownedLabelIds = approvedRequests
-    .map(req => req.createdLabelId)
-    .filter((id): id is string => id !== null); // Ensure no null IDs
+  // Filter out any null/undefined createdLabel objects and ensure they are of type Label
+  const createdLabels: Label[] = approvedRequestsCreatingLabels
+    .map(req => req.createdLabel) // req.createdLabel is Label | null based on Prisma schema and select
+    .filter(label => label !== null && label !== undefined) as Label[]; // Cast to Label[] after filtering out nulls
 
-  // 2. Fetch the details of these owned labels
-  let selectableLabels: Label[] = []; // Explicitly type here
-  if (ownedLabelIds.length > 0) {
-    selectableLabels = await prisma.label.findMany({
-      where: {
-        id: { in: ownedLabelIds },
-      },
-      select: labelSelect, // Use your standard label selection
-      orderBy: {
-        name: 'asc',
-      },
-    });
-  }
+  // 3. Combine and deduplicate
+  // Add created labels to the selectableLabels list, avoiding duplicates
+  createdLabels.forEach(createdLabel => { // createdLabel is now guaranteed to be Label
+    if (createdLabel && !selectableLabels.some(sl => sl.id === createdLabel.id)) {
+      selectableLabels.push(createdLabel);
+    }
+  });
+
+  // Sort the final list by name
+  selectableLabels.sort((a, b) => a.name.localeCompare(b.name));
 
   // In the future, you could add logic here to fetch "public" labels
   // and merge them with selectableLabels, ensuring no duplicates.

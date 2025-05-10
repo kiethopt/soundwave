@@ -505,7 +505,7 @@ export default function ArtistRequestManagement() {
                           request.status === 'REJECTED' ? (theme === 'dark' ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800') :
                           (theme === 'dark' ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800')
                         }`}>
-                          {request.status ? request.status.toLowerCase() : 'N/A'}
+                          {request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1).toLowerCase() : 'N/A'}
                         </span>
                       </td>
                     </tr>
@@ -664,7 +664,16 @@ export default function ArtistRequestManagement() {
                       <td className="py-4 px-6">{claim.claimingUser.name || claim.claimingUser.username || claim.claimingUser.email}</td>
                       <td className="py-4 px-6">{claim.claimingUser.email}</td>
                       <td className="py-4 px-6">{formatDate(claim.submittedAt)}</td>
-                      <td className="py-4 px-6 capitalize">{claim.status.toLowerCase()}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          claim.status === 'PENDING' ? (theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800') :
+                          claim.status === 'APPROVED' ? (theme === 'dark' ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800') :
+                          claim.status === 'REJECTED' ? (theme === 'dark' ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800') :
+                          (theme === 'dark' ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800')
+                        }`}>
+                          {claim.status ? claim.status.charAt(0).toUpperCase() + claim.status.slice(1).toLowerCase() : 'N/A'}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 )}
