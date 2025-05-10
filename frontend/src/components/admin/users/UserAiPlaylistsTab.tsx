@@ -254,19 +254,19 @@ export const UserAiPlaylistsTab = ({
   }
 
   return (
-    <Card>
-      <CardHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 sm:pb-3">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <CardTitle className="text-xl sm:text-2xl">
-            AI Generated Playlists ({pagination.totalItems} playlists)
+    <Card className="rounded-xl shadow-lg">
+      <CardHeader className="px-6 pt-6 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle className="text-xl font-bold text-foreground">
+            AI Generated Playlists ({pagination.totalItems})
           </CardTitle>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* <Input placeholder="Search AI playlists..." className="sm:w-[250px]" /> */}
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setLocalRefreshTrigger((prev) => prev + 1)}
               disabled={loading}
+              className="h-9"
             >
               <RefreshCw
                 className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -278,7 +278,7 @@ export const UserAiPlaylistsTab = ({
       </CardHeader>
       <CardContent className="p-0">
         {error && playlists.length > 0 && (
-          <div className="mx-4 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm sm:mx-6">
+          <div className="mx-6 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm">
             <p>
               Could not fully refresh data. Displaying last known playlists.
               Error: {error}
@@ -286,57 +286,42 @@ export const UserAiPlaylistsTab = ({
           </div>
         )}
         <div className="overflow-x-auto">
-          <Table className="min-w-full table-fixed">
-            <colgroup>
-              <col className="w-[60px] sm:w-[70px]" />
-              <col className="w-[40%] sm:w-[35%]" />
-              <col className="w-[15%] hidden md:table-column" />
-              <col className="w-[20%] hidden sm:table-column" />
-              <col className="w-[15%] sm:w-[20%]" />
-            </colgroup>
+          <Table className="w-full">
             <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4 sm:pl-6">Preview</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell text-center">
-                  Tracks
-                </TableHead>
-                <TableHead className="hidden sm:table-cell text-center">
-                  Visibility
-                </TableHead>
-                <TableHead className="text-right pr-4 sm:pr-6">
-                  Actions
-                </TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[180px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Preview</TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Name</TableHead>
+                <TableHead className="w-[100px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Tracks</TableHead>
+                <TableHead className="w-[120px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Visibility</TableHead>
+                <TableHead className="w-[120px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && playlists.length > 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                   </TableCell>
                 </TableRow>
               )}
               {playlists.map((playlist) => (
-                <TableRow key={playlist.id} className="hover:bg-muted/50">
-                  <TableCell className="pl-4 sm:pl-6 py-2 align-middle">
+                <TableRow key={playlist.id} className="hover:bg-muted/50 transition-colors">
+                  <TableCell className="px-6 py-4 text-center">
                     {playlist.tracks && playlist.tracks.length > 0 ? (
-                      <div className="flex -space-x-2 overflow-hidden">
+                      <div className="flex justify-center -space-x-2">
                         {playlist.tracks.slice(0, 3).map(({ track }) =>
                           track.coverUrl ? (
                             <img
                               key={track.id}
                               src={track.coverUrl}
                               alt={track.title}
-                              title={`${track.title} by ${
-                                track.artist?.artistName || "Unknown"
-                              }`}
-                              className="inline-block h-8 w-8 rounded-full ring-2 ring-background"
+                              title={`${track.title} by ${track.artist?.artistName || "Unknown"}`}
+                              className="h-12 w-12 rounded-full object-cover border-2 border-primary/30 shadow"
                             />
                           ) : (
                             <div
                               key={track.id}
-                              className="h-8 w-8 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs"
+                              className="h-12 w-12 rounded-full border-2 border-primary/30 bg-muted flex items-center justify-center text-xs shadow"
                             >
                               ?
                             </div>
@@ -344,39 +329,35 @@ export const UserAiPlaylistsTab = ({
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         No tracks
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="py-2 align-middle">
-                    <div className="font-medium truncate" title={playlist.name}>
+                  <TableCell className="px-6 py-4">
+                    <div className="font-medium text-sm" title={playlist.name}>
                       {playlist.name}
                     </div>
                     {playlist.description && (
                       <p
-                        className="text-xs text-muted-foreground mt-1 truncate"
+                        className="text-sm text-muted-foreground mt-1 truncate"
                         title={playlist.description}
                       >
                         {playlist.description}
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell py-2 align-middle text-center">
+                  <TableCell className="px-6 py-4 text-center text-sm">
                     {playlist.totalTracks}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell py-2 align-middle text-center">
+                  <TableCell className="px-6 py-4 text-center">
                     <Badge
-                      variant={
-                        playlist.privacy === "PUBLIC" ? "default" : "secondary"
-                      }
+                      variant={playlist.privacy === "PUBLIC" ? "default" : "secondary"}
                       className={`
-                        ${
-                          playlist.privacy === "PUBLIC"
-                            ? "bg-green-500 hover:bg-green-600"
-                            : "bg-gray-500 hover:bg-gray-600"
-                        }
-                         text-white px-2 py-0.5 text-xs rounded-full transition-colors duration-150
+                        ${playlist.privacy === "PUBLIC"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : "bg-gray-500 hover:bg-gray-600"}
+                         text-white px-2.5 py-1 text-xs rounded-full transition-colors duration-150
                       `}
                     >
                       {actionLoading === playlist.id ? (
@@ -386,8 +367,8 @@ export const UserAiPlaylistsTab = ({
                       )}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right pr-4 sm:pr-6 py-2 align-middle">
-                    <div className="flex items-center justify-center gap-2">
+                  <TableCell className="px-6 py-4">
+                    <div className="flex items-center justify-center space-x-2">
                       <Switch
                         id={`visibility-switch-${playlist.id}`}
                         checked={playlist.privacy === "PUBLIC"}
@@ -400,11 +381,12 @@ export const UserAiPlaylistsTab = ({
                             ? "Unpublish Playlist"
                             : "Publish Playlist"
                         }
+                        className="h-5 w-10"
                       />
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9"
                         title="Preview Playlist"
                         onClick={() =>
                           toast("Preview functionality not yet implemented.")
@@ -412,7 +394,6 @@ export const UserAiPlaylistsTab = ({
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {/* Add Delete button if needed */}
                     </div>
                   </TableCell>
                 </TableRow>

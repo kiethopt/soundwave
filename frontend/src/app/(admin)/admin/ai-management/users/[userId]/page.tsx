@@ -9,6 +9,7 @@ import { api } from "@/utils/api";
 import type { User } from "@/types";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { UserAiPlaylistsTab } from "@/components/admin/users/UserAiPlaylistsTab";
 import { UserListeningHistoryTab } from "@/components/admin/users/UserListeningHistoryTab";
@@ -95,48 +96,51 @@ export default function UserDetailPageAiManagement() {
   }
 
   return (
-    <div
-      className={`container mx-auto space-y-6 p-4 mb-16 md:mb-0 theme-${theme}`}
-    >
-      {/* User Header Info - Keep it consistent */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-            {user.name || user.username || "User Details"}
-          </h1>
-          <p className="text-sm text-secondary">{user.email}</p>
-        </div>
-        <div>
-          <Button
-            onClick={handleGeneratePlaylist}
-            disabled={generatingPlaylist}
-          >
-            {generatingPlaylist ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Generate AI Playlist
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabs for different sections */}
-      <Tabs defaultValue="ai-playlists" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="ai-playlists">AI Playlists</TabsTrigger>
-          <TabsTrigger value="history">Listening History</TabsTrigger>
-        </TabsList>
-        <TabsContent value="ai-playlists" className="mt-4">
-          {/* Use the imported component and pass the refresh trigger */}
-          <UserAiPlaylistsTab
-            userId={userId}
-            refreshTrigger={playlistRefreshTrigger}
-          />
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
-          {/* Use the imported history tab component */}
-          <UserListeningHistoryTab userId={userId} />
-        </TabsContent>
-      </Tabs>
+    <div className={`container mx-auto space-y-6 p-6 mb-16 md:mb-0 theme-${theme}`}>
+      <Card className="rounded-xl shadow-lg">
+        <CardHeader className="px-6 pt-6 pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold text-foreground">
+                {user.name || user.username || "User Details"}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+            </div>
+            <Button
+              onClick={handleGeneratePlaylist}
+              disabled={generatingPlaylist}
+              size="sm"
+              className="h-9"
+            >
+              {generatingPlaylist ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Generate AI Playlist
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Tabs defaultValue="ai-playlists" className="w-full">
+            <div className="px-6 border-b">
+              <TabsList className="h-11 w-full grid grid-cols-2">
+                <TabsTrigger value="ai-playlists" className="text-sm">AI Playlists</TabsTrigger>
+                <TabsTrigger value="history" className="text-sm">Listening History</TabsTrigger>
+              </TabsList>
+            </div>
+            <div className="p-6">
+              <TabsContent value="ai-playlists" className="mt-0">
+                <UserAiPlaylistsTab
+                  userId={userId}
+                  refreshTrigger={playlistRefreshTrigger}
+                />
+              </TabsContent>
+              <TabsContent value="history" className="mt-0">
+                <UserListeningHistoryTab userId={userId} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

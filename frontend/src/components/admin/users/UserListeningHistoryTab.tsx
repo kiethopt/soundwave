@@ -20,6 +20,8 @@ import {
   RefreshCw,
   Info,
   Sparkles,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { formatDistanceToNow, format } from "date-fns";
@@ -381,9 +383,9 @@ export const UserListeningHistoryTab = ({
       return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
     }
     return sortConfig.direction === "asc" ? (
-      <ArrowUpDown className="ml-2 h-4 w-4" />
+      <ArrowUp className="ml-2 h-4 w-4 text-primary" />
     ) : (
-      <ArrowUpDown className="ml-2 h-4 w-4" />
+      <ArrowDown className="ml-2 h-4 w-4 text-primary" />
     );
   };
 
@@ -424,14 +426,13 @@ export const UserListeningHistoryTab = ({
   }
 
   return (
-    <Card>
-      <CardHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 sm:pb-3">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <CardTitle className="text-xl sm:text-2xl">
-            Listening History ({pagination.totalItems} plays)
+    <Card className="rounded-xl shadow-lg">
+      <CardHeader className="px-6 pt-6 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle className="text-xl font-bold text-foreground">
+            Listening History ({pagination.totalItems})
           </CardTitle>
-          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-            {/* Button to trigger confirmation dialog */}
+          <div className="flex items-center gap-2">
             {hasAnyMissingFeatures && (
               <Dialog
                 open={isConfirmDialogOpen}
@@ -442,19 +443,17 @@ export const UserListeningHistoryTab = ({
                     variant="outline"
                     size="sm"
                     disabled={isBulkReanalyzing || loading}
-                    className="bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
+                    className="h-9 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
                   >
                     {isBulkReanalyzing ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Sparkles className="mr-2 h-4 w-4" />
                     )}
-                    Re-analyze Missing Features ({tracksToReanalyzeIds.length})
+                    Re-analyze ({tracksToReanalyzeIds.length})
                   </Button>
                 </DialogTrigger>
-                <DialogContent
-                  className={cn("sm:max-w-md", theme === "dark" ? "dark" : "")}
-                >
+                <DialogContent className={cn("sm:max-w-md", theme === "dark" ? "dark" : "")}>
                   <DialogHeader>
                     <DialogTitle>Confirm Bulk Re-analysis</DialogTitle>
                     <DialogDescription>
@@ -492,6 +491,7 @@ export const UserListeningHistoryTab = ({
               size="sm"
               onClick={() => setLocalRefreshTrigger((prev) => prev + 1)}
               disabled={loading || isBulkReanalyzing}
+              className="h-9"
             >
               <RefreshCw
                 className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -500,7 +500,6 @@ export const UserListeningHistoryTab = ({
             </Button>
           </div>
         </div>
-        {/* Error message display */}
         {bulkReanalyzeError && (
           <p className="text-xs text-red-600 dark:text-red-500 mt-1">
             {bulkReanalyzeError}
@@ -509,7 +508,7 @@ export const UserListeningHistoryTab = ({
       </CardHeader>
       <CardContent className="p-0">
         {error && historyItems.length > 0 && (
-          <div className="mx-4 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm sm:mx-6">
+          <div className="mx-6 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm">
             <p>
               Could not fully refresh data. Displaying last known records.
               Error: {error}
@@ -517,83 +516,91 @@ export const UserListeningHistoryTab = ({
           </div>
         )}
         <div className="overflow-x-auto">
-          <Table className="min-w-full">
+          <Table className="w-full">
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px] pl-4 sm:pl-6">{null}</TableHead>
-                <TableHead>Track</TableHead>
-                <TableHead>Artist</TableHead>
-                <TableHead>Album</TableHead>
-                <TableHead className="text-right pr-4 sm:pr-6">
-                  Played At
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[60px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">{null}</TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Track</TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Artist</TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Album</TableHead>
+                <TableHead className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer" onClick={() => handleSort("createdAt")}>
+                  <div className="flex items-center justify-center">
+                    Played At {renderSortIcon("createdAt")}
+                  </div>
                 </TableHead>
-                <TableHead className="w-[80px] text-center pr-4 sm:pr-6">
-                  Details
-                </TableHead>
+                <TableHead className="w-[80px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && historyItems.length > 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                   </TableCell>
                 </TableRow>
               )}
               {historyItems.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50">
-                  <TableCell className="pl-4 sm:pl-6">
+                <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                  <TableCell className="px-6 py-4">
                     {item.track?.coverUrl ? (
-                      <Image
-                        src={item.track.coverUrl}
-                        alt={item.track.title ?? "Track cover"}
-                        width={56}
-                        height={56}
-                        className="rounded object-cover aspect-square"
-                      />
+                      <div className="flex justify-center">
+                        <div className="h-12 w-12 relative">
+                          <Image
+                            src={item.track.coverUrl}
+                            alt={item.track.title ?? "Track cover"}
+                            fill
+                            sizes="48px"
+                            className="rounded-full object-cover border-2 border-primary/30 shadow"
+                            priority={false}
+                          />
+                        </div>
+                      </div>
                     ) : (
-                      <div className="h-14 w-14 rounded bg-muted flex items-center justify-center text-xs">
-                        ?
+                      <div className="flex justify-center">
+                        <div className="h-12 w-12 rounded-full border-2 border-primary/30 bg-muted flex items-center justify-center text-xs shadow">
+                          ?
+                        </div>
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {item.track?.title || "Unknown Track"}
+                  <TableCell className="px-6 py-4">
+                    <div className="font-medium text-sm">
+                      {item.track?.title || "Unknown Track"}
+                    </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-6 py-4">
                     {item.track?.artist ? (
                       <Link
                         href={`/admin/artists/${item.track.artist.id}`}
-                        className="hover:underline"
+                        className="hover:underline text-primary text-sm"
                       >
                         {item.track.artist.artistName}
                       </Link>
                     ) : (
-                      <span className="text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         Unknown Artist
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-6 py-4">
                     {item.track?.album ? (
-                      <span title={item.track.album.title}>
+                      <span className="text-sm" title={item.track.album.title}>
                         {item.track.album.title.length > 30
                           ? `${item.track.album.title.substring(0, 30)}...`
                           : item.track.album.title}
                       </span>
                     ) : (
-                      // Potential Link: <Link href={`/admin/albums/${item.track.album.id}`} className="hover:underline">...</Link>
-                      <span className="text-muted-foreground">N/A</span>
+                      <span className="text-sm text-muted-foreground">N/A</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground pr-4 sm:pr-6">
-                    <span title={format(new Date(item.createdAt), "Pp")}>
+                  <TableCell className="px-6 py-4 text-center">
+                    <span title={format(new Date(item.createdAt), "Pp")} className="text-sm">
                       {formatDistanceToNow(new Date(item.createdAt), {
                         addSuffix: true,
                       })}
                     </span>
                     <br />
-                    <span className="text-xs opacity-70">
+                    <span className="text-xs text-muted-foreground">
                       {new Date(item.createdAt).toLocaleString("vi-VN", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -605,18 +612,20 @@ export const UserListeningHistoryTab = ({
                       })}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center py-2 align-middle pr-4 sm:pr-6">
-                    {item.track && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDetailsModal(item.track)}
-                        title="View Audio Features"
-                        className="h-8 w-8"
-                      >
-                        <Info className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <TableCell className="px-6 py-4">
+                    <div className="flex items-center justify-center">
+                      {item.track && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDetailsModal(item.track)}
+                          title="View Audio Features"
+                          className="h-8 w-8"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -624,8 +633,8 @@ export const UserListeningHistoryTab = ({
           </Table>
         </div>
       </CardContent>
-      {!loading && pagination.totalPages > 1 && (
-        <div className="px-4 py-3 sm:px-6 border-t">
+      {pagination.totalPages > 1 && (
+        <div className="px-6 py-3 border-t">
           <PaginationControls
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}

@@ -31,6 +31,14 @@ import {
 } from "@/components/ui/admin-modals";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation"; // Import useRouter
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface SortConfig {
   key: keyof User | null;
@@ -343,12 +351,12 @@ export default function AiUserManagementPage() {
 
   const renderSortIcon = (key: keyof User | null) => {
     if (sortConfig.key !== key) {
-      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
+      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
     }
     return sortConfig.direction === "asc" ? (
-      <ArrowUp className="ml-1 h-3 w-3 text-primary" />
+      <ArrowUp className="ml-2 h-4 w-4 text-primary" />
     ) : (
-      <ArrowDown className="ml-1 h-3 w-3 text-primary" />
+      <ArrowDown className="ml-2 h-4 w-4 text-primary" />
     );
   };
 
@@ -360,8 +368,7 @@ export default function AiUserManagementPage() {
     >
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold flex items-center">
-          <Bot className="mr-3 h-8 w-8 text-primary" /> User AI Playlist
-          Management
+          <Bot className="mr-3 h-8 w-8 text-primary" /> AI Playlist Management
         </h1>
         {/* Add any specific buttons for this page, e.g., "Create User with AI Playlist" if needed */}
       </div>
@@ -470,11 +477,11 @@ export default function AiUserManagementPage() {
       )}
 
       {/* Users Table */}
-      <div className="overflow-x-auto rounded-lg border shadow-md">
-        <table className="min-w-full divide-y divide-border">
-          <thead className="bg-muted/50">
-            <tr>
-              <th scope="col" className="px-4 py-3 text-left w-10">
+      <div className="overflow-x-auto rounded-xl border shadow-lg">
+        <Table className="min-w-full divide-y divide-border">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[50px] px-6 py-3 text-center">
                 <Checkbox
                   checked={
                     selectedUserIds.size === users.length && users.length > 0
@@ -486,101 +493,101 @@ export default function AiUserManagementPage() {
                   onCheckedChange={handleSelectAll}
                   aria-label="Select all users"
                 />
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted"
+              </TableHead>
+              <TableHead
+                className="w-[200px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("name")}
               >
-                Name {renderSortIcon("name")}
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted"
+                <div className="flex items-center pl-16">
+                  Name {renderSortIcon("name")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[250px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("email")}
               >
-                Email {renderSortIcon("email")}
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted"
+                <div className="flex items-center">
+                  Email {renderSortIcon("email")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("role")}
               >
-                Role {renderSortIcon("role")}
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted"
+                <div className="flex items-center">
+                  Role {renderSortIcon("role")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("isActive")}
               >
-                Status {renderSortIcon("isActive")}
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted"
+                <div className="flex items-center">
+                  Status {renderSortIcon("isActive")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("createdAt")}
               >
-                Joined {renderSortIcon("createdAt")}
-              </th>
-              <th
-                scope="col"
-                className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider"
-              >
+                <div className="flex items-center">
+                  Joined {renderSortIcon("createdAt")}
+                </div>
+              </TableHead>
+              <TableHead className="w-[120px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-border bg-card">
             {loading && users.length === 0 && (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={7}
-                  className="px-4 py-10 text-center text-muted-foreground"
+                  className="px-6 py-10 text-center text-muted-foreground"
                 >
                   <div className="flex flex-col items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
                     <span>Loading users...</span>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
             {!loading && users.length === 0 && (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={7}
-                  className="px-4 py-10 text-center text-muted-foreground"
+                  className="px-6 py-10 text-center text-muted-foreground"
                 >
                   No users found matching your criteria.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
             {users.map((user) => (
-              <tr
+              <TableRow
                 key={user.id}
                 onClick={(e) => handleRowClick(user, e)}
-                className="hover:bg-muted/50 cursor-pointer group"
+                className="hover:bg-muted/50 cursor-pointer group rounded-lg transition-colors"
                 aria-selected={selectedUserIds.has(user.id)}
               >
-                <td className="px-4 py-3">
+                <TableCell className="w-[50px] px-6 py-4 text-center">
                   <Checkbox
                     checked={selectedUserIds.has(user.id)}
                     onCheckedChange={(checked) =>
                       handleSelectRow(user.id, checked)
                     }
                     aria-labelledby={`user-name-${user.id}`}
-                    onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
+                    onClick={(e) => e.stopPropagation()}
                   />
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      <img
-                        className="h-10 w-10 rounded-full object-cover"
-                        src={user.avatar || "/images/default-avatar.png"}
-                        alt={user.name || user.username || "User"}
-                      />
-                    </div>
-                    <div className="ml-3">
+                </TableCell>
+                <TableCell className="px-6 py-4">
+                  <div className="flex items-center space-x-4">
+                    <img
+                      className="h-12 w-12 rounded-full object-cover border-2 border-primary/30 shadow"
+                      src={user.avatar || "/images/default-avatar.jpg"}
+                      alt={user.name || user.username || "User"}
+                    />
+                    <div>
                       <div
                         id={`user-name-${user.id}`}
                         className="text-sm font-semibold group-hover:text-primary transition-colors"
@@ -588,92 +595,95 @@ export default function AiUserManagementPage() {
                         {user.name || user.username || "N/A"}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {user.username || "-"}
+                        {user.username || user.name || "-"}
                       </div>
                     </div>
                   </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                </TableCell>
+                <TableCell className="px-6 py-4 text-sm text-muted-foreground">
                   {user.email}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <span
-                    className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
+                  <span 
+                    className={`inline-block text-xs font-semibold ${
                       user.role === "ADMIN"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-secondary text-secondary-foreground"
+                        ? "text-primary"
+                        : "text-secondary-foreground"
                     }`}
                   >
                     {user.role}
                   </span>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
+                  <span 
+                    className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       user.isActive
                         ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
+                    style={{marginLeft: "-6px"}}
                   >
                     {user.isActive ? "Active" : "Inactive"}
                   </span>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                  {formatDate(user.createdAt)}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-primary"
-                    title="View User Details & AI Playlists"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAction("view", user);
-                    }}
-                  >
-                    <Bot className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                    title="Edit User"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAction("edit", user);
-                    }}
-                  >
-                    {actionLoading === user.id &&
-                    editingUser?.id === user.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Edit className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    title="Delete User"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAction("delete", user);
-                    }}
-                    disabled={actionLoading === user.id}
-                  >
-                    {actionLoading === user.id &&
-                    deletingUser?.id === user.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </td>
-              </tr>
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
+                  <span className="inline-block text-sm text-muted-foreground">
+                    {formatDate(user.createdAt)}
+                  </span>
+                </TableCell>
+                <TableCell className="w-[120px] px-6 py-4">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      title="View User Details & AI Playlists"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("view", user);
+                      }}
+                    >
+                      <Bot className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                      title="Edit User"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("edit", user);
+                      }}
+                    >
+                      {actionLoading === user.id && editingUser?.id === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Edit className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      title="Delete User"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("delete", user);
+                      }}
+                      disabled={actionLoading === user.id}
+                    >
+                      {actionLoading === user.id && deletingUser?.id === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Pagination */}
