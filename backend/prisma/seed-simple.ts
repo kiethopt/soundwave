@@ -231,7 +231,7 @@ async function main() {
     }
 
     // === 4.2 Seed Regular User Accounts ===
-    const regularUserCount = 500;
+    const regularUserCount = 10;
     const userBar = multibar.create(regularUserCount, 0, { task: 'Seeding regular users' });
     const regularUserIds: string[] = [];
 
@@ -282,7 +282,10 @@ async function main() {
       const albumLabelId = await getLabelId(prisma, albumData.labelName);
       const albumGenreIds = await getGenreIds(prisma, albumData.genreNames);
       const totalTracks = albumData.tracks.length;
-      const albumReleaseDate = faker.date.between({ from: startDate, to: endDate }); // Release date within range
+      // Use album's releaseDate if present, otherwise generate one
+      let albumReleaseDate = albumData.releaseDate instanceof Date ? albumData.releaseDate : faker.date.between({ from: startDate, to: endDate });
+      if (albumReleaseDate > endDate) albumReleaseDate = endDate;
+      if (albumReleaseDate < startDate) albumReleaseDate = startDate;
 
       // Fetch durations for all tracks in the album first
       const trackDurations = await Promise.all(
@@ -336,7 +339,7 @@ async function main() {
       for (let trackIndex = 0; trackIndex < albumData.tracks.length; trackIndex++) {
         const trackData = albumData.tracks[trackIndex];
         const fetchedDuration = trackDurations[trackIndex]; // Get the pre-fetched duration
-        const trackCreatedDate = faker.date.between({ from: album.releaseDate, to: endDate }); // Track created after album release
+        const trackCreatedDate = faker.date.between({ from: albumReleaseDate, to: endDate }); // Track created after album release
 
         const track = await prisma.track.upsert({
           where: { title_artistId: { title: trackData.title, artistId } },
@@ -363,7 +366,7 @@ async function main() {
           create: {
             title: trackData.title,
             duration: fetchedDuration, // Use fetched duration
-            releaseDate: album.releaseDate, // Use album's release date
+            releaseDate: albumReleaseDate, // Use clamped album's release date
             trackNumber: trackData.trackNumber,
             coverUrl: trackData.coverUrl || album.coverUrl,
             audioUrl: trackData.audioUrl,

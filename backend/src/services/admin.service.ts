@@ -3492,7 +3492,16 @@ export const extractTrackAndArtistData = async () => {
           select: {
             id: true
           }
-        }
+        },
+        user: {
+          select: {
+            email: true,
+            username: true,
+            name: true
+          }
+        },
+        avatar: true,
+        socialMediaLinks: true,
       },
       orderBy: {
         artistName: 'asc'
@@ -3630,7 +3639,12 @@ export const extractTrackAndArtistData = async () => {
       label: artist.label?.name || '',
       genres: artist.genres.map(g => g.genre.name).join(', '),
       trackCount: artist.tracks.length,
-      createdAt: artist.createdAt.toISOString().split('T')[0]
+      createdAt: artist.createdAt.toISOString().split('T')[0],
+      userEmail: artist.user?.email || '',
+      userUsername: artist.user?.username || '',
+      userName: artist.user?.name || '',
+      avatar: artist.avatar || '',
+      socialMediaLinks: artist.socialMediaLinks ? JSON.stringify(artist.socialMediaLinks) : '',
     }));
 
     // Format albums for export
