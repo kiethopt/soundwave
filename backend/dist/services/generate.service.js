@@ -313,6 +313,23 @@ async function suggestTracksForExistingPlaylist(playlistId, userId, userPrompt, 
         console.error("[AI SuggestMore] Cannot suggest tracks: GEMINI_API_KEY is not set.");
         throw new Error("AI features are currently unavailable.");
     }
+    const musicKeywords = [
+        'song', 'track', 'music', 'artist', 'genre', 'album', 'playlist',
+        'add', 'suggest', 'find', 'play', 'listen', 'beat', 'rhythm', 'mood', 'vibe',
+        'pop', 'rock', 'jazz', 'electronic', 'hip hop', 'classical', 'instrumental',
+        'singer', 'band', 'cover', 'remix', 'acoustic', 'electric', 'dance', 'chill',
+        'upbeat', 'sad', 'happy', 'energy', 'tempo'
+    ];
+    const normalizedUserPrompt = userPrompt.toLowerCase();
+    const isMusicRelated = musicKeywords.some(keyword => normalizedUserPrompt.includes(keyword));
+    if (!isMusicRelated && userPrompt.length > 0) {
+        const commonNonMusicPhrases = ['tell me', 'what is', 'who is', 'how to', 'why is', 'can you', 'explain'];
+        const isLikelyNonMusicQuestion = commonNonMusicPhrases.some(phrase => normalizedUserPrompt.startsWith(phrase)) && normalizedUserPrompt.includes('?');
+        if (isLikelyNonMusicQuestion || (userPrompt.length < 15 && !isMusicRelated)) {
+            console.log(`[AI SuggestMore] Prompt "${userPrompt}" deemed non-music related or too vague. Bypassing Gemini.`);
+            return [];
+        }
+    }
     try {
         const playlist = await db_1.default.playlist.findUnique({
             where: { id: playlistId },
@@ -384,7 +401,7 @@ You are given:
 6.  Return your response ONLY as a valid JSON object adhering strictly to the defined schema, containing only the "suggestedTrackIds" array.
 7.  Do NOT include any tracks in "suggestedTrackIds" that are not explicitly listed in the \'Available Tracks\'.
 8.  Do NOT add any commentary, explanations, or text outside the JSON object. The entire response must be the JSON object itself.
-9.  **Strictly Adhere:** Your ONLY function is to suggest relevant track IDs. If the user\'s prompt asks for anything else (like creating images, writing text, answering questions, etc.), you MUST refuse by returning the JSON response: { "suggestedTrackIds": [] }.
+9.  **Strictly Adhere: Your ONLY function is to suggest relevant track IDs based on musical criteria. If the user's prompt asks for anything non-musical (e.g., telling a joke, providing information, writing a story, answering general questions, etc.), you MUST refuse by returning the JSON response: { "suggestedTrackIds": [] }. No other response is acceptable for non-musical requests.**
 `;
         const fullPrompt = `${systemPrompt}
 

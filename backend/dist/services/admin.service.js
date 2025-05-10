@@ -686,6 +686,15 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
         throw new Error("User ID missing from artist request, cannot create artist profile.");
     }
     const updatedData = await db_1.default.$transaction(async (tx) => {
+        const conflictingProfileByName = await tx.artistProfile.findUnique({
+            where: {
+                artistName: artistRequest.artistName,
+            },
+            select: { userId: true },
+        });
+        if (conflictingProfileByName && conflictingProfileByName.userId !== artistRequest.userId) {
+            throw new errors_1.HttpError(409, `The artist name "${artistRequest.artistName}" is already in use by another artist. This request cannot be approved with the current name.`);
+        }
         const userArtistProfile = await tx.artistProfile.upsert({
             where: { userId: artistRequest.userId },
             update: {
@@ -2440,39 +2449,65 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
         throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
     }
     return db_1.default.$transaction(async (tx) => {
-        const newLabel = await tx.label.create({
-            data: {
-                name: registrationRequest.requestedLabelName,
-                description: registrationRequest.requestedLabelDescription,
-                logoUrl: registrationRequest.requestedLabelLogoUrl,
-            },
-            select: prisma_selects_1.labelSelect,
+        let targetLabelId;
+        let newLabelWasActuallyCreated = false;
+        let finalLabelName = registrationRequest.requestedLabelName;
+        const existingLabel = await tx.label.findUnique({
+            where: { name: registrationRequest.requestedLabelName },
+            select: { id: true, name: true },
         });
+        if (existingLabel) {
+            targetLabelId = existingLabel.id;
+            finalLabelName = existingLabel.name;
+        }
+        else {
+            const newLabelEntry = await tx.label.create({
+                data: {
+                    name: registrationRequest.requestedLabelName,
+                    description: registrationRequest.requestedLabelDescription,
+                    logoUrl: registrationRequest.requestedLabelLogoUrl,
+                },
+                select: { id: true, name: true },
+            });
+            targetLabelId = newLabelEntry.id;
+            finalLabelName = newLabelEntry.name;
+            newLabelWasActuallyCreated = true;
+        }
         await tx.artistProfile.update({
             where: { id: registrationRequest.requestingArtistId },
-            data: { labelId: newLabel.id },
+            data: { labelId: targetLabelId },
         });
+        const labelRegistrationUpdateData = {
+            status: client_1.RequestStatus.APPROVED,
+            reviewedAt: new Date(),
+            reviewedByAdmin: { connect: { id: adminUserId } },
+        };
+        if (newLabelWasActuallyCreated) {
+            labelRegistrationUpdateData.createdLabel = { connect: { id: targetLabelId } };
+        }
         const updatedRequest = await tx.labelRegistrationRequest.update({
             where: { id: registrationId },
-            data: {
-                status: client_1.RequestStatus.APPROVED,
-                reviewedAt: new Date(),
-                reviewedByAdminId: adminUserId,
-                createdLabelId: newLabel.id,
-            },
+            data: labelRegistrationUpdateData,
         });
+        let approvalMessage;
+        if (newLabelWasActuallyCreated) {
+            approvalMessage = `Congratulations! Your request to register the label "${finalLabelName}" has been approved, and the label has been created.`;
+        }
+        else {
+            approvalMessage = `Congratulations! Your request concerning the label "${finalLabelName}" has been approved. You are now associated with this existing label.`;
+        }
         if (registrationRequest.requestingArtist.userId) {
             const notificationData = {
                 data: {
-                    recipientType: client_1.RecipientType.ARTIST,
-                    artistId: registrationRequest.requestingArtistId,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: registrationRequest.requestingArtist.userId,
                     type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
-                    message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+                    message: approvalMessage,
                     isRead: false,
                 },
                 select: {
                     id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
-                    artistId: true,
+                    userId: true,
                 }
             };
             const notification = await tx.notification.create(notificationData);
@@ -2480,18 +2515,26 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
             const targetUserSocketId = (0, socket_2.getUserSockets)().get(registrationRequest.requestingArtist.userId);
             if (targetUserSocketId) {
                 io.to(targetUserSocketId).emit('notification', {
-                    ...notification,
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
                     createdAt: notification.createdAt.toISOString(),
-                    labelName: newLabel.name,
-                    labelId: newLabel.id,
+                    labelName: finalLabelName,
+                    labelId: targetLabelId,
                 });
-                console.log(`[Socket Emit] Sent LABEL_REGISTRATION_APPROVED (to ArtistProfile ${notification.artistId}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`);
+                console.log(`[Socket Emit][AdminService] Sent LABEL_REGISTRATION_APPROVED (Label: ${finalLabelName}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`);
             }
             else {
-                console.log(`[Socket Emit] User ${registrationRequest.requestingArtist.userId} (for ArtistProfile ${notification.artistId}) not connected for LABEL_REGISTRATION_APPROVED.`);
+                console.log(`[Socket Emit][AdminService] User ${registrationRequest.requestingArtist.userId} (for Label: ${finalLabelName}) not connected for LABEL_REGISTRATION_APPROVED.`);
             }
         }
-        return { updatedRequest, newLabel };
+        const finalLabelDetails = await tx.label.findUnique({
+            where: { id: targetLabelId },
+            select: prisma_selects_1.labelSelect
+        });
+        return { updatedRequest, label: finalLabelDetails };
     });
 };
 exports.approveLabelRegistration = approveLabelRegistration;

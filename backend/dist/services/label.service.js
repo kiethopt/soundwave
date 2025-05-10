@@ -253,12 +253,6 @@ const requestNewLabelRegistration = async (userId, data, logoFile) => {
     if (existingPendingRequest) {
         throw { status: 400, message: `You already have a pending registration request for the label "${data.name}".` };
     }
-    const existingLabel = await db_1.default.label.findFirst({
-        where: { name: data.name }
-    });
-    if (existingLabel) {
-        throw { status: 400, message: `A label named "${data.name}" already exists.` };
-    }
     let logoUrl;
     if (logoFile) {
         try {
@@ -397,38 +391,68 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
         throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
     }
     return db_1.default.$transaction(async (tx) => {
-        const newLabel = await tx.label.create({
-            data: {
-                name: registrationRequest.requestedLabelName,
-                description: registrationRequest.requestedLabelDescription,
-                logoUrl: registrationRequest.requestedLabelLogoUrl,
-            },
-            select: prisma_selects_1.labelSelect,
+        let targetLabelId;
+        let newLabelWasActuallyCreated = false;
+        let finalLabelName = registrationRequest.requestedLabelName;
+        const existingLabel = await tx.label.findUnique({
+            where: { name: registrationRequest.requestedLabelName },
+            select: { id: true, name: true },
         });
+        if (existingLabel) {
+            targetLabelId = existingLabel.id;
+            finalLabelName = existingLabel.name;
+        }
+        else {
+            const newLabel = await tx.label.create({
+                data: {
+                    name: registrationRequest.requestedLabelName,
+                    description: registrationRequest.requestedLabelDescription,
+                    logoUrl: registrationRequest.requestedLabelLogoUrl,
+                },
+                select: { id: true, name: true },
+            });
+            targetLabelId = newLabel.id;
+            finalLabelName = newLabel.name;
+            newLabelWasActuallyCreated = true;
+        }
         await tx.artistProfile.update({
             where: { id: registrationRequest.requestingArtistId },
-            data: { labelId: newLabel.id },
+            data: { labelId: targetLabelId },
         });
+        const labelRegistrationUpdateData = {
+            status: client_1.RequestStatus.APPROVED,
+            reviewedAt: new Date(),
+            reviewedByAdmin: { connect: { id: adminUserId } },
+        };
+        if (newLabelWasActuallyCreated) {
+            labelRegistrationUpdateData.createdLabel = { connect: { id: targetLabelId } };
+        }
         const updatedRequest = await tx.labelRegistrationRequest.update({
             where: { id: registrationId },
-            data: {
-                status: client_1.RequestStatus.APPROVED,
-                reviewedAt: new Date(),
-                reviewedByAdminId: adminUserId,
-                createdLabelId: newLabel.id,
-            },
+            data: labelRegistrationUpdateData,
         });
+        let approvalMessage;
+        if (newLabelWasActuallyCreated) {
+            approvalMessage = `Congratulations! Your request to register the label "${finalLabelName}" has been approved, and the label has been created.`;
+        }
+        else {
+            approvalMessage = `Congratulations! Your request concerning the label "${finalLabelName}" has been approved. You are now associated with this existing label.`;
+        }
         if (registrationRequest.requestingArtist.userId) {
             await tx.notification.create({
                 data: {
                     userId: registrationRequest.requestingArtist.userId,
                     recipientType: client_1.RecipientType.USER,
                     type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
-                    message: `Congratulations! Your request to register the label "${newLabel.name}" has been approved.`,
+                    message: approvalMessage,
                 },
             });
         }
-        return { updatedRequest, newLabel };
+        const finalLabelDetails = await tx.label.findUnique({
+            where: { id: targetLabelId },
+            select: prisma_selects_1.labelSelect
+        });
+        return { updatedRequest, label: finalLabelDetails };
     });
 };
 exports.approveLabelRegistration = approveLabelRegistration;
@@ -475,7 +499,18 @@ const getSelectableLabelsForArtist = async (artistProfileId) => {
     if (!artistProfileId) {
         throw new Error('Artist profile ID is required to fetch selectable labels.');
     }
-    const approvedRequests = await db_1.default.labelRegistrationRequest.findMany({
+    let selectableLabels = [];
+    const artistProfile = await db_1.default.artistProfile.findUnique({
+        where: { id: artistProfileId },
+        select: {
+            labelId: true,
+            label: { select: prisma_selects_1.labelSelect },
+        },
+    });
+    if (artistProfile?.label) {
+        selectableLabels.push(artistProfile.label);
+    }
+    const approvedRequestsCreatingLabels = await db_1.default.labelRegistrationRequest.findMany({
         where: {
             requestingArtistId: artistProfileId,
             status: client_1.RequestStatus.APPROVED,
@@ -484,24 +519,20 @@ const getSelectableLabelsForArtist = async (artistProfileId) => {
             },
         },
         select: {
-            createdLabelId: true,
+            createdLabel: {
+                select: prisma_selects_1.labelSelect,
+            },
         },
     });
-    const ownedLabelIds = approvedRequests
-        .map(req => req.createdLabelId)
-        .filter((id) => id !== null);
-    let selectableLabels = [];
-    if (ownedLabelIds.length > 0) {
-        selectableLabels = await db_1.default.label.findMany({
-            where: {
-                id: { in: ownedLabelIds },
-            },
-            select: prisma_selects_1.labelSelect,
-            orderBy: {
-                name: 'asc',
-            },
-        });
-    }
+    const createdLabels = approvedRequestsCreatingLabels
+        .map(req => req.createdLabel)
+        .filter(label => label !== null && label !== undefined);
+    createdLabels.forEach(createdLabel => {
+        if (createdLabel && !selectableLabels.some(sl => sl.id === createdLabel.id)) {
+            selectableLabels.push(createdLabel);
+        }
+    });
+    selectableLabels.sort((a, b) => a.name.localeCompare(b.name));
     return selectableLabels;
 };
 exports.getSelectableLabelsForArtist = getSelectableLabelsForArtist;
