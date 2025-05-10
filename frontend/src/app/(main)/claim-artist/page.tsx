@@ -33,6 +33,8 @@ export default function ClaimArtistPage() {
   const [userClaims, setUserClaims] = useState<ArtistClaimRequest[]>([]);
   const [hasPendingClaim, setHasPendingClaim] = useState(false);
   const [claimTimestamp, setClaimTimestamp] = useState<number | null>(null);
+  const [hasAnyClaim, setHasAnyClaim] = useState(false);
+  const [anyClaimTimestamp, setAnyClaimTimestamp] = useState<number | null>(null);
 
   
   useEffect(() => {
@@ -91,6 +93,19 @@ export default function ClaimArtistPage() {
       setClaimTimestamp(null);
     }
   }, [selectedArtist, userClaims]);
+
+  useEffect(() => {
+    if (userClaims.length > 0) {
+      const anyClaim = userClaims.find(
+        claim => claim.status === "PENDING" || claim.status === "APPROVED"
+      );
+      setHasAnyClaim(!!anyClaim);
+      setAnyClaimTimestamp(anyClaim ? new Date(anyClaim.submittedAt).getTime() : null);
+    } else {
+      setHasAnyClaim(false);
+      setAnyClaimTimestamp(null);
+    }
+  }, [userClaims]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -165,18 +180,18 @@ export default function ClaimArtistPage() {
     }
   };
 
-  if (hasPendingClaim) {
+  if (hasAnyClaim) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-slate-900 to-neutral-900 text-white">
         <div className="bg-black/40 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-lg p-10 w-full max-w-xl flex flex-col items-center">
           <Clock className="w-16 h-16 text-white/50 mb-4" />
           <h1 className="text-4xl md:text-5xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 drop-shadow-lg mb-2">
-            You already have a pending claim for this artist.
+            You already have a claim for an artist profile.
           </h1>
-          <p className="text-md md:text-lg text-gray-300 text-center mb-2">Please wait for admin approval before submitting another claim.</p>
-          {claimTimestamp && (
+          <p className="text-md md:text-lg text-gray-300 text-center mb-2">You cannot claim another artist profile until your previous claim is resolved.</p>
+          {anyClaimTimestamp && (
             <span className="text-base text-white/60 mt-2">
-              Submitted on: {new Date(claimTimestamp).toLocaleString('en-US', {
+              Submitted on: {new Date(anyClaimTimestamp).toLocaleString('en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
