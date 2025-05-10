@@ -5,9 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
 import {
-    Music,
     Album,
-    Users,
     BarChartBig,
     ListMusic,
     TrendingUp,
