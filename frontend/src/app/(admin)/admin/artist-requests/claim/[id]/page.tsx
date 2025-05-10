@@ -2,14 +2,13 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // Import Link
 import { api } from '@/utils/api';
-import { ArrowLeft, Check, X, ExternalLink } from 'lucide-react'; // Thêm ExternalLink
-import { ArtistClaimRequest } from '@/types'; // Thay đổi kiểu dữ liệu
+import { ArrowLeft, Check, X, ExternalLink } from 'lucide-react';
+import { ArtistClaimRequest } from '@/types'; 
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { RejectModal, ApproveModal } from '@/components/ui/admin-modals';
-import Image from 'next/image'; // Import Image
+import Image from 'next/image';
 
 // Đổi tên component
 export default function ClaimRequestDetail({
@@ -18,10 +17,8 @@ export default function ClaimRequestDetail({
   params: Promise<{ id: string }>;
 }) {
   const { theme } = useTheme();
-  // Đổi tên biến id để rõ ràng hơn (không bắt buộc)
   const { id: claimId } = use(params);
   const router = useRouter();
-  // Sử dụng kiểu ArtistClaimRequest
   const [request, setRequest] = useState<ArtistClaimRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +34,6 @@ export default function ClaimRequestDetail({
         if (!token) {
           throw new Error('No authentication token found');
         }
-        // Gọi API mới để lấy chi tiết claim request
         const response = await api.admin.getArtistClaimRequestDetail(claimId, token);
         setRequest(response);
       } catch (err) {
@@ -72,10 +68,8 @@ export default function ClaimRequestDetail({
       // Gọi API mới để duyệt claim
       await api.admin.approveArtistClaim(request.id, token);
       toast.success('Artist claim request approved successfully!');
-      // Cập nhật trạng thái request cục bộ để UI phản ánh ngay lập tức
       setRequest(prev => prev ? { ...prev, status: 'APPROVED' } : null);
-      // Có thể không cần redirect ngay, để admin xem lại kết quả
-      // router.push('/admin/artist-requests?tab=claim');
+      router.push('/admin/artist-requests');
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to approve claim request'
@@ -108,7 +102,7 @@ export default function ClaimRequestDetail({
       toast.success('Artist claim request rejected successfully!');
       // Cập nhật trạng thái request cục bộ
       setRequest(prev => prev ? { ...prev, status: 'REJECTED', rejectionReason: reason } : null);
-      // router.push('/admin/artist-requests?tab=claim');
+      router.push('/admin/artist-requests');
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to reject claim request'
@@ -181,7 +175,7 @@ export default function ClaimRequestDetail({
             {/* Back Button */}
             <div className="w-fit">
               <button
-                onClick={() => router.push('/admin/artist-requests?tab=claim')} // Điều hướng về tab claim
+                onClick={() => router.push('/admin/artist-requests')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   theme === 'light'
                     ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
@@ -189,7 +183,7 @@ export default function ClaimRequestDetail({
                 }`}
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-                <span>Back to Claims</span>
+                <span>Back</span>
               </button>
             </div>
 

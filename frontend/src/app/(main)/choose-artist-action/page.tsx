@@ -1,6 +1,4 @@
 import Link from 'next/link';
-// It's recommended to use Next.js Image component for optimized images
-// import Image from 'next/image';
 
 export default function ChooseArtistActionPage() {
   return (
@@ -22,11 +20,6 @@ export default function ChooseArtistActionPage() {
           className="flex-1 bg-neutral-800/70 border border-neutral-700 rounded-xl p-6 md:p-8 hover:bg-neutral-700/80 hover:border-purple-500/70 transform hover:scale-105 transition-all duration-300 flex flex-col items-center text-center shadow-xl hover:shadow-purple-500/30"
         >
           <div className="w-32 h-32 md:w-40 md:h-40 bg-gradient-to-br from-purple-600 to-pink-500 rounded-full mb-6 md:mb-8 flex items-center justify-center text-white shadow-lg">
-            {/*
-              TODO: Replace this div with an <Image /> component or an <img> tag.
-              For example: <Image src="/path/to/your-artist-icon.svg" alt="Claim Artist Profile" width={100} height={100} />
-              Or use an icon library like Heroicons.
-            */}
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 md:w-20 md:h-20">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
             </svg>
@@ -41,11 +34,6 @@ export default function ChooseArtistActionPage() {
           className="flex-1 bg-neutral-800/70 border border-neutral-700 rounded-xl p-6 md:p-8 hover:bg-neutral-700/80 hover:border-green-500/70 transform hover:scale-105 transition-all duration-300 flex flex-col items-center text-center shadow-xl hover:shadow-green-500/30"
         >
           <div className="w-32 h-32 md:w-40 md:h-40 bg-gradient-to-br from-green-500 to-emerald-400 rounded-full mb-6 md:mb-8 flex items-center justify-center text-white shadow-lg">
-            {/*
-              TODO: Replace this div with an <Image /> component or an <img> tag.
-              For example: <Image src="/path/to/your-new-artist-icon.svg" alt="Request New Artist Profile" width={100} height={100} />
-              Or use an icon library like Heroicons.
-            */}
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 md:w-20 md:h-20">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 8h4M20 6v4" />

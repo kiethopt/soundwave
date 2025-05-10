@@ -2,7 +2,7 @@ import { Role } from '@prisma/client';
 
 export interface ArtistData {
   user: { email: string; username: string; name: string; };
-  profile: { artistName: string; bio: string; avatar: string; socialMediaLinks?: { facebook?: string; instagram?: string; }; };
+  profile: { artistName: string; bio: string; avatar: string; socialMediaLinks?: { facebook?: string; instagram?: string; }; labelName?: string; };
 }
 
 export const artists: ArtistData[] = [
@@ -19,7 +19,8 @@ export const artists: ArtistData[] = [
       "socialMediaLinks": {
         "facebook": "https://www.facebook.com/ameest319",
         "instagram": "https://www.instagram.com/ameemee_m"
-      }
+      },
+      "labelName": "Warner Music Vietnam"
     }
   },
   {
@@ -35,7 +36,8 @@ export const artists: ArtistData[] = [
       "socialMediaLinks": {
         "facebook": "https://www.facebook.com/andreerighthand",
         "instagram": "https://www.instagram.com/andreerighthand"
-      }
+      },
+      "labelName": "SPACESPEAKERS LABEL"
     }
   },
   {
@@ -51,7 +53,8 @@ export const artists: ArtistData[] = [
       "socialMediaLinks": {
         "facebook": "https://www.facebook.com/bigdaddy.official",
         "instagram": "https://www.instagram.com/bigdaddyofficial"
-      }
+      },
+      "labelName": "SPACESPEAKERS LABEL"
     }
   },
   {

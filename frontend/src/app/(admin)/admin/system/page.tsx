@@ -31,7 +31,6 @@ import {
 export default function SystemManagementPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState<string | null>(null);
   const [settings, setSettings] = useState<SystemSettings>({
     cacheEnabled: false,
     debugMode: false,

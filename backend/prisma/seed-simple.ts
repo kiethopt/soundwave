@@ -1,4 +1,4 @@
-import { PrismaClient, Role, AlbumType, FollowingType, HistoryType, RequestStatus } from '@prisma/client';
+import { PrismaClient, Role, AlbumType, FollowingType, HistoryType, RequestStatus, ClaimStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import * as cliProgress from 'cli-progress';
@@ -157,22 +157,33 @@ async function main() {
         },
       });
 
+      const { labelName, ...profileDataWithoutLabelName } = artistData.profile;
+      let artistLabelId: string | null = null;
+      if (labelName) {
+        artistLabelId = await getLabelId(prisma, labelName);
+        if (!artistLabelId) {
+            console.warn(colors.yellow(`⚠️ Could not find labelId for labelName "${labelName}" for artist "${artistData.profile.artistName}". Setting label to null.`));
+        }
+      }
+
       const createdDate = faker.date.between({ from: startDate, to: endDate }); // Use consistent date for profile
       const artistProfile = await prisma.artistProfile.upsert({
         where: { userId: user.id },
         update: {
-          ...artistData.profile,
+          ...profileDataWithoutLabelName,
           isVerified: true,
           isActive: true,
+          labelId: artistLabelId,
           verifiedAt: createdDate, // Verified on the same day it was created/updated within range
           updatedAt: createdDate,
         },
         create: {
-          ...artistData.profile,
+          ...profileDataWithoutLabelName,
           userId: user.id,
           role: Role.ARTIST,
           isVerified: true,
           isActive: true,
+          labelId: artistLabelId,
           verifiedAt: createdDate,
           createdAt: createdDate,
           updatedAt: createdDate,
@@ -231,7 +242,7 @@ async function main() {
     }
 
     // === 4.2 Seed Regular User Accounts ===
-    const regularUserCount = 10;
+    const regularUserCount = 25;
     const userBar = multibar.create(regularUserCount, 0, { task: 'Seeding regular users' });
     const regularUserIds: string[] = [];
 
@@ -259,6 +270,79 @@ async function main() {
       });
       regularUserIds.push(user.id);
       userBar.increment();
+    }
+
+    // === 4.3 Seed Unclaimed Artist Profiles for Claiming ===
+    const unclaimedProfileCount = 50;
+    const unclaimedProfilesBar = multibar.create(unclaimedProfileCount, 0, { task: 'Seeding unclaimed artist profiles' });
+    const unclaimedArtistProfileIds: string[] = [];
+    const allDbLabels = await prisma.label.findMany({ select: { id: true } });
+    const allDbLabelIds = allDbLabels.map(l => l.id);
+
+    for (let i = 0; i < unclaimedProfileCount; i++) {
+      const artistName = faker.person.fullName() + ` (Unclaimed #${i + 1})`;
+      const profileCreatedDate = faker.date.between({ from: startDate, to: endDate });
+      let randomLabelId: string | null = null;
+      if (allDbLabelIds.length > 0) {
+        randomLabelId = faker.helpers.arrayElement(allDbLabelIds);
+      }
+
+      const unclaimedProfile = await prisma.artistProfile.create({
+        data: {
+          artistName: artistName,
+          bio: faker.lorem.paragraph(),
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${artistName.replace(/\s+/g, '_')}`,
+          userId: null,
+          isVerified: false,
+          isActive: true,
+          role: Role.ARTIST,
+          labelId: randomLabelId,
+          socialMediaLinks: {
+            instagram: `https://instagram.com/${faker.internet.username()}`,
+          },
+          createdAt: profileCreatedDate,
+          updatedAt: profileCreatedDate,
+        }
+      });
+      unclaimedArtistProfileIds.push(unclaimedProfile.id);
+      unclaimedProfilesBar.increment();
+    }
+
+    // === 4.4 Seed Artist Claim Requests ===
+    const claimRequestTargetCount = 50;
+    const claimRequestCount = Math.min(claimRequestTargetCount, unclaimedArtistProfileIds.length, regularUserIds.length);
+    const claimRequestBar = multibar.create(claimRequestCount, 0, { task: 'Seeding artist claim requests' });
+    
+    if (claimRequestCount > 0) {
+        const availableUnclaimedProfileIds = [...unclaimedArtistProfileIds]; // Create a mutable copy
+
+        for (let i = 0; i < claimRequestCount; i++) {
+            if (availableUnclaimedProfileIds.length === 0 || regularUserIds.length === 0) break; // Stop if no profiles or users left
+
+            const claimingUserId = faker.helpers.arrayElement(regularUserIds); // Can pick the same user for multiple claims if desired
+            
+            // Pick a unique unclaimed profile for this claim
+            const profileIndexToClaim = faker.number.int({ min: 0, max: availableUnclaimedProfileIds.length - 1 });
+            const artistProfileIdToClaim = availableUnclaimedProfileIds.splice(profileIndexToClaim, 1)[0];
+
+            if (!artistProfileIdToClaim) continue; // Should not happen if logic is correct
+
+            await prisma.artistClaimRequest.create({
+                data: {
+                    claimingUserId: claimingUserId,
+                    artistProfileId: artistProfileIdToClaim,
+                    proof: [
+                        faker.lorem.sentence(10),
+                        faker.internet.url(),
+                        `Contact: ${faker.phone.number()}`
+                    ],
+                    status: ClaimStatus.PENDING,
+                    submittedAt: faker.date.between({ from: startDate, to: endDate }),
+                    // reviewedAt, reviewedByAdminId, rejectionReason are null by default
+                }
+            });
+            claimRequestBar.increment();
+        }
     }
 
     // === 5. Seed Albums and Tracks (from albums.ts) ===

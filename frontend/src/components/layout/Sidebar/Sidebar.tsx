@@ -1178,7 +1178,7 @@ export default function Sidebar({
                           <Bot className="w-5 h-5" />
                         </div>
                         <span className="ml-3 font-medium text-sm">
-                          AI User Playlists
+                          System Playlists
                         </span>
                       </>
                     )}

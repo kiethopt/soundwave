@@ -1561,7 +1561,7 @@ export const getArtistClaimRequests = async (req: Request) => {
   const { search, startDate, endDate } = req.query;
 
   const where: Prisma.ArtistClaimRequestWhereInput = {
-    status: ClaimStatus.PENDING, // Only fetch pending requests
+    status: ClaimStatus.PENDING,
     AND: [],
   };
 
