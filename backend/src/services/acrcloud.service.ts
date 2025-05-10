@@ -100,12 +100,13 @@ export const recognizeAudioWithACRCloud = async (
 
   try {
     const result: ACRCloudSDKResponse = await acrClient.identify(audioBuffer);
-    // console.log('[ACRCloud Service] SDK API Response:', JSON.stringify(result, null, 2));
+    console.log('[ACRCloud Service] Raw SDK API Response:', JSON.stringify(result, null, 2));
 
     if (result.status && result.status.code === 0) {
       if (result.metadata && result.metadata.music && result.metadata.music.length > 0) {
         const sdkMatch = result.metadata.music[0];
-        
+        const rawExternalMetadata = (sdkMatch as any).external_metadata; // SDK response might have this untyped
+
         // Map SDK response to our ACRCloudMusicEntry
         const mappedMatch: ACRCloudMusicEntry = {
           title: sdkMatch.title || 'Unknown Title',
@@ -118,16 +119,34 @@ export const recognizeAudioWithACRCloud = async (
           play_offset_ms: sdkMatch.play_offset_ms,
           external_ids: sdkMatch.external_ids,
           acrid: sdkMatch.acrid,
-          // external_metadata might not be directly available or structured the same way.
-                          // The SDK type (Music) doesn't list external_metadata.
-                          // If ACRCloud returns Spotify/YouTube IDs, they are often at the top level of `sdkMatch`
-                          // or within `sdkMatch.external_ids`. For now, we initialize it as potentially empty.
-                          // Actual testing will reveal where these IDs are located in the SDK response.
-          external_metadata: { 
-            // Example: if sdkMatch has spotify_track_id, map it here
-            // spotify: sdkMatch.spotify ? { track: { id: sdkMatch.spotify.track_id, name: sdkMatch.spotify.track_name } ... } : undefined
-          }
+          external_metadata: undefined, // Initialize
         };
+
+        if (rawExternalMetadata) {
+          mappedMatch.external_metadata = {
+            spotify: rawExternalMetadata.spotify ? {
+              track: rawExternalMetadata.spotify.track ? {
+                id: rawExternalMetadata.spotify.track.id,
+                name: rawExternalMetadata.spotify.track.name,
+                href: rawExternalMetadata.spotify.track.href || (rawExternalMetadata.spotify.track.id ? `https://open.spotify.com/track/${rawExternalMetadata.spotify.track.id}` : undefined),
+              } : undefined,
+              artists: rawExternalMetadata.spotify.artists?.map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                href: a.href,
+              })),
+              album: rawExternalMetadata.spotify.album ? {
+                id: rawExternalMetadata.spotify.album.id,
+                name: rawExternalMetadata.spotify.album.name,
+                href: rawExternalMetadata.spotify.album.href,
+              } : undefined,
+            } : undefined,
+            youtube: rawExternalMetadata.youtube ? {
+              vid: rawExternalMetadata.youtube.vid,
+            } : undefined,
+            deezer: rawExternalMetadata.deezer, // Assumes deezer data structure is as is
+          };
+        }
         
         // If Spotify/YouTube info is directly on sdkMatch or external_ids, adapt here:
         // For example, if the SDK returns a `spotify` object directly in `sdkMatch.external_metadata` (unlikely based on its type def)

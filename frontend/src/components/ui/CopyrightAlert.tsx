@@ -11,7 +11,9 @@ export interface CopyrightInfo {
   releaseDate?: string;
   label?: string;
   similarity?: number; // Optional: if you want to show similarity score
-  songLink?: string;
+  songLink?: string; // This can be a generic link or fallback
+  spotifyLink?: string; // Specific link for Spotify
+  youtubeLink?: string; // Specific link for YouTube
   isBlocking: boolean;
 }
 
@@ -128,19 +130,55 @@ export const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo,
             )}
           </div>
           
-          {copyright.songLink && (
-            <a 
-              href={copyright.songLink} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className={cn(
-                "mt-3 inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
-                linkStyles[alertType][theme]
-              )}
-            >
-              View Original <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
+          {/* Link Section */}
+          <div className="mt-3 flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-2">
+            {copyright.songLink && !copyright.spotifyLink && !copyright.youtubeLink && ( // Fallback if specific links aren't available
+              <a
+                href={copyright.songLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                  linkStyles[alertType][theme]
+                )}
+              >
+                View Source <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {copyright.spotifyLink && (
+              <a
+                href={copyright.spotifyLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                  // Consider specific styling for Spotify if desired, e.g., green-ish
+                  linkStyles[alertType][theme], // Using general link style for now
+                  theme === 'light' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-green-800/30 text-green-300 hover:bg-green-800/50'
+
+                )}
+              >
+                {/* Optional: Spotify Icon */}
+                Check on Spotify <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {copyright.youtubeLink && (
+              <a
+                href={copyright.youtubeLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                  // Consider specific styling for YouTube if desired, e.g., red-ish
+                  linkStyles[alertType][theme], // Using general link style for now
+                  theme === 'light' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-red-800/30 text-red-300 hover:bg-red-800/50'
+                )}
+              >
+                {/* Optional: YouTube Icon */}
+                Check on YouTube <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
       

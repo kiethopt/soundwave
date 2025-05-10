@@ -280,6 +280,9 @@ export default function NewTrack() {
 
       if (result.copyrightDetails) {
           const details = result.copyrightDetails;
+          console.log('[Frontend CheckCopyright] Received copyrightDetails from backend:', JSON.stringify(details, null, 2));
+          console.log('[Frontend CheckCopyright] External Metadata:', JSON.stringify(details.external_metadata, null, 2));
+
           // Extract artist name(s) correctly
           let artistString = 'Unknown Artist';
           if (details.artists && details.artists.length > 0) {
@@ -292,8 +295,14 @@ export default function NewTrack() {
             album: details.album?.name,
             releaseDate: details.release_date,
             label: details.label,
-            songLink: details.song_link,
-            isBlocking: false,
+            // songLink: details.song_link, // Commented out as specific links are preferred
+            isBlocking: false, // Non-blocking scenario
+            // NEW: Extract Spotify and YouTube links for CopyrightInfo
+            // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
+            spotifyLink: details.external_metadata?.spotify?.track?.href,
+            youtubeLink: details.external_metadata?.youtube?.vid
+                           ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
+                           : undefined,
           };
           setCopyrightInfo(newCopyrightInfo);
           toast.success(result.message || 'Potential match found (non-blocking)');
@@ -319,6 +328,9 @@ export default function NewTrack() {
       if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
           // Blocking copyright conflict
           const details = backendError.copyrightDetails;
+          console.log('[Frontend CheckCopyright] Received blocking copyrightDetails from backend (error path):', JSON.stringify(details, null, 2));
+          console.log('[Frontend CheckCopyright] External Metadata (error path):', JSON.stringify(details.external_metadata, null, 2));
+
           // Extract artist name(s) correctly
           let artistString = 'Unknown Artist';
           if (details.artists && details.artists.length > 0) {
@@ -331,8 +343,14 @@ export default function NewTrack() {
             album: details.album?.name,
             releaseDate: details.release_date,
             label: details.label,
-            songLink: details.song_link,
+            // songLink: details.song_link, // Commented out as specific links are preferred
             isBlocking: true,
+            // NEW: Extract Spotify and YouTube links for CopyrightInfo
+            // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
+            spotifyLink: details.external_metadata?.spotify?.track?.href,
+            youtubeLink: details.external_metadata?.youtube?.vid
+                           ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
+                           : undefined,
           };
           setCopyrightInfo(newCopyrightInfo);
           if (backendError.message && backendError.message.includes('similarity score')) {
@@ -414,8 +432,14 @@ export default function NewTrack() {
           album: details.album,
           releaseDate: details.release_date,
           label: details.label,
-          songLink: details.song_link,
+          // songLink: details.song_link, // Commented out as specific links are preferred
           isBlocking: true,
+          // NEW: Extract Spotify and YouTube links for CopyrightInfo
+          // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
+          spotifyLink: details.external_metadata?.spotify?.track?.href,
+          youtubeLink: details.external_metadata?.youtube?.vid
+                         ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
+                         : undefined,
         };
         setCopyrightInfo(newCopyrightInfo);
         displayMessage = backendError.message || 'Copyright match detected, upload failed.';
