@@ -288,15 +288,18 @@ export const UserListeningHistoryTab = ({
           params.toString()
         );
 
+        // Add this log to debug pagination
+        console.log("[UserListeningHistoryTab] Pagination data:", response.pagination);
+
         setHistoryItems(response.data || []);
         const newTotalItems = response.pagination?.totalItems ?? 0;
-        setPagination((prev) => ({
+        setPagination({
           currentPage: response.pagination?.currentPage ?? 1,
           totalPages: response.pagination?.totalPages ?? 1,
           totalItems: newTotalItems,
           hasNextPage: response.pagination?.hasNextPage ?? false,
           hasPrevPage: response.pagination?.hasPrevPage ?? false,
-        }));
+        });
 
         if (onTotalItemsChange) {
           onTotalItemsChange(newTotalItems);
@@ -430,7 +433,7 @@ export const UserListeningHistoryTab = ({
       <CardHeader className="px-6 pt-6 pb-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <CardTitle className="text-xl font-bold text-foreground">
-            Listening History ({pagination.totalItems})
+            Listening History ({historyItems.length || 0})
           </CardTitle>
           <div className="flex items-center gap-2">
             {hasAnyMissingFeatures && (

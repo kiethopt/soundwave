@@ -99,14 +99,18 @@ export const UserAiPlaylistsTab = ({
           "[UserAiPlaylistsTab] Fetched playlists RESPONSE:",
           response
         ); // LOG RESPONSE
+        
+        // Add this log to debug pagination
+        console.log("[UserAiPlaylistsTab] Pagination data:", response.pagination);
+        
         setPlaylists(response.data || []);
-        setPagination((prev) => ({
+        setPagination({
           currentPage: response.pagination?.currentPage ?? 1,
           totalPages: response.pagination?.totalPages ?? 1,
           totalItems: response.pagination?.totalItems ?? 0,
           hasNextPage: response.pagination?.hasNextPage ?? false,
           hasPrevPage: response.pagination?.hasPrevPage ?? false,
-        }));
+        });
       } catch (err: any) {
         console.error("Error fetching AI playlists:", err);
         setError(err.message || "Could not load AI playlists");
@@ -258,7 +262,7 @@ export const UserAiPlaylistsTab = ({
       <CardHeader className="px-6 pt-6 pb-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <CardTitle className="text-xl font-bold text-foreground">
-            AI Generated Playlists ({pagination.totalItems})
+            AI Generated Playlists ({playlists.length || 0})
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button
