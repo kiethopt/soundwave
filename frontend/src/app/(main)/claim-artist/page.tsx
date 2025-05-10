@@ -55,12 +55,14 @@ export default function ClaimArtistPage() {
         const result = await api.user.getClaimableArtists(token);
         if (result && Array.isArray(result)) {
           setArtists(
-            result.map((artist: any) => ({
-              id: artist.id,
-              artistName: artist.artistName,
-              avatar: artist.avatar,
-              userId: artist.userId,
-            }))
+            result
+              .filter((artist: any) => !artist.userId)
+              .map((artist: any) => ({
+                id: artist.id,
+                artistName: artist.artistName,
+                avatar: artist.avatar,
+                userId: artist.userId,
+              }))
           );
         } else {
           toast.error("Failed to load artists");
@@ -165,11 +167,13 @@ export default function ClaimArtistPage() {
 
   if (hasPendingClaim) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
-        <div className="bg-black/20 border border-white/10 rounded-lg backdrop-blur-sm p-8 w-full max-w-lg flex flex-col items-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-slate-900 to-neutral-900 text-white">
+        <div className="bg-black/40 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-lg p-10 w-full max-w-xl flex flex-col items-center">
           <Clock className="w-16 h-16 text-white/50 mb-4" />
-          <h1 className="text-2xl font-bold mb-2 text-white text-center">You already have a pending claim for this artist.</h1>
-          <p className="text-lg text-white/80 text-center mb-2">Please wait for admin approval before submitting another claim.</p>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 drop-shadow-lg mb-2">
+            You already have a pending claim for this artist.
+          </h1>
+          <p className="text-md md:text-lg text-gray-300 text-center mb-2">Please wait for admin approval before submitting another claim.</p>
           {claimTimestamp && (
             <span className="text-base text-white/60 mt-2">
               Submitted on: {new Date(claimTimestamp).toLocaleString('en-US', {
@@ -187,24 +191,34 @@ export default function ClaimArtistPage() {
   }
 
   return (
-    <div className="min-h-screen space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
-      <div className="bg-black/20 border border-white/10 rounded-lg backdrop-blur-sm p-8 w-full">
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="secondary"
-            onClick={() => router.back()}
-            className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100 flex items-center gap-2"
-            type="button"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back</span>
-          </Button>
-          <h1 className="text-3xl font-bold tracking-tight mb-0 text-white">Claim Artist Profile</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-slate-900 to-neutral-900 text-white">
+      <div className="bg-black/40 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-lg p-10 w-full max-w-2xl flex flex-col items-center">
+        <div className="flex flex-col w-full mb-10">
+          <div className="flex items-center justify-start mb-4">
+            <Button
+              variant="secondary"
+              onClick={() => router.back()}
+              className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100 flex items-center gap-2 px-4 py-2 rounded-2xl shadow-md border border-white/10"
+              type="button"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back</span>
+            </Button>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 drop-shadow-lg mb-2">
+            Claim Artist Profile
+          </h1>
+          <p className="text-md md:text-lg text-gray-300 text-center mb-6">
+            Submit your claim to manage your artist profile on Soundwave.
+          </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-10 w-full">
           <div>
-            <label className={cn("block text-sm font-medium mb-1.5", "text-white/80")}>Artist</label>
-            <div className={cn(artistTouched && !selectedArtist && 'border border-red-500 rounded')}> 
+            <label className={cn("block text-base font-semibold mb-2 text-white/80")}>Artist</label>
+            <div className={cn(
+              "rounded-2xl border-2 border-white/20 bg-white/10 focus-within:border-purple-400 transition-all p-3 shadow-md",
+              artistTouched && !selectedArtist && 'border-red-500'
+            )}>
               <ArtistSelect
                 artists={artists}
                 value={selectedArtist}
@@ -222,50 +236,50 @@ export default function ClaimArtistPage() {
           {(selectedArtist && !selectedArtist.userId) && (
             <>
               <div>
-                <label className={cn("block text-sm font-medium mb-1.5", "text-white/80")}>Upload Proof/Evidence</label>
+                <label className={cn("block text-base font-semibold mb-2 text-white/80")}>Upload Proof/Evidence</label>
                 <div className={cn(
-                  "mb-4 rounded text-sm text-white p-3 border border-white/10 bg-white/10"
-                )}>Please upload at least one of the following as evidence:<ul className="list-disc ml-5 mt-2"><li>Screenshot of your social media page (Facebook, Instagram, Twitter, etc.) showing you as the owner/admin</li><li>Email or message from a label or manager confirming your ownership</li><li>Official document or contract linking you to the artist profile (PDF, Word)</li><li>Other clear proof of your connection to this artist</li></ul></div>
+                  "mb-4 rounded-2xl text-sm text-white p-5 border border-white/10 bg-white/10 shadow-lg"
+                )}>Please upload at least one of the following as evidence:<ul className="list-disc ml-5 mt-2 text-white/80"><li>Screenshot of your social media page (Facebook, Instagram, Twitter, etc.) showing you as the owner/admin</li><li>Email or message from a label or manager confirming your ownership</li><li>Official document or contract linking you to the artist profile (PDF, Word)</li><li>Other clear proof of your connection to this artist</li></ul></div>
                 <div
                   className={cn(
-                    "w-full min-h-[120px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group p-2",
-                    "border-white/20 bg-white/5",
+                    "w-full min-h-[140px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group p-6 transition-all",
+                    "border-white/20 bg-white/10 hover:border-pink-400 hover:bg-white/20 shadow-lg",
                     filesTouched && files.length === 0 && 'border-red-500'
                   )}
                   onClick={handleUploadClick}
                 >
                   {previews.length === 0 ? (
                     <div className="text-center p-4">
-                      <Upload className="h-12 w-12 mx-auto mb-3 text-white/40" />
+                      <Upload className="h-14 w-14 mx-auto mb-3 text-gradient-to-r from-purple-400 via-pink-500 to-red-500 text-white/40" />
                       <p className="font-medium text-white/70">Click to upload images or documents</p>
                       <p className="text-xs mt-1 text-white/40">PNG, JPG, GIF, PDF, DOC, DOCX up to 10MB each</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2 w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
                       {previews.map((src, idx) => (
-                        <div key={idx} className="relative group">
+                        <div key={idx} className="relative group rounded-2xl shadow-xl overflow-hidden hover:scale-105 transition-all">
                           {src === 'document' ? (
-                            <div className="flex flex-col items-center justify-center w-full h-24 bg-white/10 rounded">
+                            <div className="flex flex-col items-center justify-center w-full h-24 bg-white/10 rounded-2xl">
                               <FileText className="h-8 w-8 text-white/60 mb-1" />
                               <span className="text-xs text-white/80 text-center break-all px-1">{files[idx]?.name}</span>
                             </div>
                           ) : (
-                            <img src={src} alt={`Proof ${idx + 1}`} className="w-full h-24 object-cover rounded" />
+                            <img src={src} alt={`Proof ${idx + 1}`} className="w-full h-24 object-cover rounded-2xl" />
                           )}
                           <button
                             type="button"
                             onClick={e => { e.stopPropagation(); handleRemoveFile(idx); }}
-                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-80 hover:opacity-100"
+                            className="absolute top-2 right-2 bg-black/70 text-white rounded-full p-1 opacity-80 hover:opacity-100 shadow-lg"
                             aria-label="Remove file"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-5 w-5" />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none rounded-2xl">
                     <p className="text-white text-sm font-medium">{previews.length > 0 ? 'Click to add more files' : 'Upload Files'}</p>
                   </div>
                 </div>
@@ -289,7 +303,7 @@ export default function ClaimArtistPage() {
                   type="button"
                   variant="ghost"
                   onClick={() => router.back()}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 px-4 py-2 rounded-2xl shadow-md bg-neutral-700/60 hover:bg-neutral-700/80 border border-white/10"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -297,7 +311,7 @@ export default function ClaimArtistPage() {
                 <Button
                   type="submit"
                   disabled={Boolean(loading || (selectedArtist && selectedArtist.userId) || hasPendingClaim)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-8 py-3 rounded-2xl shadow-xl transition-all transform hover:scale-105"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center gap-2">
