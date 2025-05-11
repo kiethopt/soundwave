@@ -32,13 +32,22 @@ export const generatePlaylist = async (req: Request, res: Response): Promise<voi
     });
   } catch (error) {
     if (error instanceof Error) {
+      // Handle specific AI feature availability errors
       if (error.message.includes('AI features are currently unavailable')) {
         res.status(503).json({ message: 'AI features are currently unavailable. Please try again later.' });
         return;
       }
       
+      // Handle safety/moderation failures
       if (error.message.includes('safety reasons')) {
         res.status(400).json({ message: error.message });
+        return;
+      }
+
+      // Handle invalid prompt errors with custom message
+      if (error.message.startsWith('INVALID_PROMPT:')) {
+        const cleanErrorMessage = error.message.replace('INVALID_PROMPT:', '').trim();
+        res.status(400).json({ message: cleanErrorMessage });
         return;
       }
     }
@@ -49,7 +58,7 @@ export const generatePlaylist = async (req: Request, res: Response): Promise<voi
 export const suggestMoreTracks = async (req: Request, res: Response): Promise<void> => {
   try {
     const { playlistId } = req.params;
-    const { prompt, numberOfTracks = 5 } = req.body;
+    const { prompt } = req.body;
 
     if (!req.user) {
       res.status(401).json({ message: 'Unauthorized' });
@@ -66,19 +75,12 @@ export const suggestMoreTracks = async (req: Request, res: Response): Promise<vo
         return;
     }
 
-    const numTracks = parseInt(String(numberOfTracks), 10);
-    if (isNaN(numTracks) || numTracks <= 0 || numTracks > 20) { // Limit suggestions per request
-        res.status(400).json({ message: 'numberOfTracks must be a positive integer between 1 and 20.' });
-        return;
-    }
-
-    console.log(`[Generate Controller] Received track suggestion request for playlist ${playlistId} from user ${req.user.id} with prompt: "${prompt}", count: ${numTracks}`);
+    console.log(`[Generate Controller] Received track suggestion request for playlist ${playlistId} from user ${req.user.id} with prompt: "${prompt}"`);
 
     const suggestedTrackIds = await generateService.suggestTracksForExistingPlaylist(
       playlistId,
       req.user.id,
-      prompt,
-      numTracks
+      prompt
     );
 
     if (!suggestedTrackIds || suggestedTrackIds.length === 0) {
@@ -142,6 +144,12 @@ export const suggestMoreTracks = async (req: Request, res: Response): Promise<vo
     if (error instanceof Error) {
       if (error.message.includes('AI features are currently unavailable')) {
         res.status(503).json({ message: 'AI features are currently unavailable for suggestions. Please try again later.' });
+        return;
+      }
+      // Check for the specific INVALID_PROMPT error from the service
+      if (error.message.startsWith('INVALID_PROMPT:')) {
+        const cleanErrorMessage = error.message.replace('INVALID_PROMPT:', '').trim();
+        res.status(400).json({ message: cleanErrorMessage });
         return;
       }
       if (error.message.includes('safety reasons') || error.message.includes('Playlist not found')) {

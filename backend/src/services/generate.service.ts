@@ -210,6 +210,34 @@ export async function generatePlaylistFromPrompt(userId: string, userPrompt: str
       throw new Error("AI features are currently unavailable.");
     }
 
+    // --- BEGIN PROMPT PRE-FILTERING ---
+    const musicKeywords = [
+        'song', 'track', 'music', 'artist', 'genre', 'album', 'playlist',
+        'add', 'suggest', 'find', 'play', 'listen', 'beat', 'rhythm', 'mood', 'vibe', 'create', 'generate', 'make',
+        'pop', 'rock', 'jazz', 'electronic', 'hip hop', 'classical', 'instrumental', 'ost', 'soundtrack',
+        'singer', 'band', 'cover', 'remix', 'acoustic', 'electric', 'dance', 'chill', 'workout', 'focus', 'sleep',
+        'upbeat', 'sad', 'happy', 'energy', 'tempo', 'ballad', 'lofi', 'anthem', 'oldies', 'hits', 'trending',
+        // Vietnamese specific keywords
+        'nhạc', 'bài hát', 'ca sĩ', 'thể loại', 'danh sách phát', 'nghe', 'giai điệu', 'tâm trạng',
+        'nhạc trẻ', 'nhạc vàng', 'nhạc trịnh', 'nhạc cách mạng', 'nhạc thiếu nhi', 'nhạc phim', 'v-pop',
+        'ca khúc', 'sáng tác', 'hòa tấu', 'nhạc không lời'
+    ];
+
+    const normalizedUserPrompt = userPrompt.toLowerCase().trim();
+    const isMusicRelated = musicKeywords.some(keyword => normalizedUserPrompt.includes(keyword));
+
+    if (!isMusicRelated && normalizedUserPrompt.length > 0) {
+        const commonNonMusicPhrases = ['tell me', 'what is', 'who is', 'how to', 'why is', 'can you explain', 'can you write', 'give me', 'help me with'];
+        const isLikelyNonMusicQuestion = commonNonMusicPhrases.some(phrase => normalizedUserPrompt.startsWith(phrase));
+        const seemsLikeGibberish = normalizedUserPrompt.length < 10 && !normalizedUserPrompt.includes(" "); // Very short, no spaces
+
+        if (isLikelyNonMusicQuestion || seemsLikeGibberish || (normalizedUserPrompt.length < 15 && !isMusicRelated) ) {
+            console.log(`[AI Playlist Gen] Prompt "${userPrompt}" deemed non-music related or too vague. Bypassing Gemini.`);
+            throw new Error("INVALID_PROMPT:Your request didn't seem to be about creating a music playlist. Please try a prompt like 'Create a playlist of upbeat V-pop songs' or 'Make a lofi playlist for studying'.");
+        }
+    }
+    // --- END PROMPT PRE-FILTERING ---
+
     try {
         // 1. Get Track Context
         const trackContext = await getTrackContextForAI(150);
@@ -405,13 +433,15 @@ interface AISuggestMoreResponse {
     suggestedTrackIds: string[];
 }
 
+const MAX_SUGGESTIONS_PER_REQUEST = 20; // Giới hạn số lượng track được đề xuất
+const DEFAULT_SUGGESTIONS_IF_UNSPECIFIED = 5; // Mặc định nếu AI không suy ra từ prompt
+
 export async function suggestTracksForExistingPlaylist(
     playlistId: string,
-    userId: string, // Keep userId for potential future use or logging
-    userPrompt: string,
-    numberOfTracksToSuggest: number = 5
+    userId: string,
+    userPrompt: string
 ): Promise<string[]> {
-    console.log(`[AI SuggestMore] Starting suggestion for playlist ${playlistId}, user ${userId}, prompt: "${userPrompt}", count: ${numberOfTracksToSuggest}`);
+    console.log(`[AI SuggestMore] Starting suggestion for playlist ${playlistId}, user ${userId}, prompt: "${userPrompt}"`);
 
     if (!GEMINI_API_KEY) {
         console.error("[AI SuggestMore] Cannot suggest tracks: GEMINI_API_KEY is not set.");
@@ -421,26 +451,27 @@ export async function suggestTracksForExistingPlaylist(
     // --- BEGIN PROMPT PRE-FILTERING ---
     const musicKeywords = [
         'song', 'track', 'music', 'artist', 'genre', 'album', 'playlist',
-        'add', 'suggest', 'find', 'play', 'listen', 'beat', 'rhythm', 'mood', 'vibe',
-        'pop', 'rock', 'jazz', 'electronic', 'hip hop', 'classical', 'instrumental',
-        'singer', 'band', 'cover', 'remix', 'acoustic', 'electric', 'dance', 'chill',
-        'upbeat', 'sad', 'happy', 'energy', 'tempo'
-        // Add more keywords as needed
+        'add', 'suggest', 'find', 'play', 'listen', 'beat', 'rhythm', 'mood', 'vibe', 'create', 'generate', 'make',
+        'pop', 'rock', 'jazz', 'electronic', 'hip hop', 'classical', 'instrumental', 'ost', 'soundtrack',
+        'singer', 'band', 'cover', 'remix', 'acoustic', 'electric', 'dance', 'chill', 'workout', 'focus', 'sleep',
+        'upbeat', 'sad', 'happy', 'energy', 'tempo', 'ballad', 'lofi', 'anthem', 'oldies', 'hits', 'trending',
+        // Vietnamese specific keywords
+        'nhạc', 'bài hát', 'ca sĩ', 'thể loại', 'danh sách phát', 'nghe', 'giai điệu', 'tâm trạng',
+        'nhạc trẻ', 'nhạc vàng', 'nhạc trịnh', 'nhạc cách mạng', 'nhạc thiếu nhi', 'nhạc phim', 'v-pop',
+        'ca khúc', 'sáng tác', 'hòa tấu', 'nhạc không lời'
     ];
 
-    const normalizedUserPrompt = userPrompt.toLowerCase();
+    const normalizedUserPrompt = userPrompt.toLowerCase().trim();
     const isMusicRelated = musicKeywords.some(keyword => normalizedUserPrompt.includes(keyword));
 
-    if (!isMusicRelated && userPrompt.length > 0) { // Check length to avoid empty prompts being caught here if other validation is removed
-        // A more sophisticated check might involve looking at sentence structure or intent,
-        // but for now, keyword check is a good first step.
-        // Also check for very short prompts that are unlikely to be music requests.
-        const commonNonMusicPhrases = ['tell me', 'what is', 'who is', 'how to', 'why is', 'can you', 'explain'];
-        const isLikelyNonMusicQuestion = commonNonMusicPhrases.some(phrase => normalizedUserPrompt.startsWith(phrase)) && normalizedUserPrompt.includes('?');
+    if (!isMusicRelated && normalizedUserPrompt.length > 0) { 
+        const commonNonMusicPhrases = ['tell me', 'what is', 'who is', 'how to', 'why is', 'can you explain', 'can you write', 'give me', 'help me with'];
+        const isLikelyNonMusicQuestion = commonNonMusicPhrases.some(phrase => normalizedUserPrompt.startsWith(phrase));
+        const seemsLikeGibberish = normalizedUserPrompt.length < 10 && !normalizedUserPrompt.includes(" "); // Very short, no spaces
 
-        if (isLikelyNonMusicQuestion || (userPrompt.length < 15 && !isMusicRelated)) {
+        if (isLikelyNonMusicQuestion || seemsLikeGibberish || (normalizedUserPrompt.length < 15 && !isMusicRelated)) {
              console.log(`[AI SuggestMore] Prompt "${userPrompt}" deemed non-music related or too vague. Bypassing Gemini.`);
-             return [];
+             throw new Error("INVALID_PROMPT:Your request didn't seem to be about suggesting music tracks. Please try a prompt like 'Add more songs by this artist' or 'Suggest similar tracks with higher energy'.");
         }
     }
     // --- END PROMPT PRE-FILTERING ---
@@ -496,9 +527,9 @@ export async function suggestTracksForExistingPlaylist(
                     suggestedTrackIds: {
                         type: SchemaType.ARRAY,
                         items: { type: SchemaType.STRING },
-                        description: `List of unique track IDs (typically ${numberOfTracksToSuggest}) suggested to be added. These IDs must NOT be in the 'Current Playlist Tracks' list and must be chosen from 'Available Tracks'.`,
-                        maxItems: numberOfTracksToSuggest + 2, // Allow AI some flexibility, we will trim later
-                        minItems: 1 // Expect at least one suggestion if possible
+                        description: `List of unique track IDs suggested to be added. The AI should infer the number of tracks from the user's prompt (e.g., 'add 10 songs', 'suggest 7 V-pop tracks'). If no number is specified, the AI should suggest around ${DEFAULT_SUGGESTIONS_IF_UNSPECIFIED} tracks. These IDs must NOT be in the 'Current Playlist Tracks' list and must be chosen from 'Available Tracks'.`,
+                        maxItems: MAX_SUGGESTIONS_PER_REQUEST, 
+                        minItems: 0 
                     },
                 },
                 required: ['suggestedTrackIds'],
@@ -512,7 +543,7 @@ export async function suggestTracksForExistingPlaylist(
 
         // 4. Construct the prompt for Gemini
         const systemPrompt = `
-You are Soundwave AI, an expert music curator. Your task is to suggest ${numberOfTracksToSuggest} additional tracks for an EXISTING playlist based on the user\'s request.
+You are Soundwave AI, an expert music curator. Your task is to suggest additional tracks for an EXISTING playlist based on the user\'s request.
 You are given:
 1. The user\'s textual request.
 2. A list of \'Current Playlist Tracks\' that are already in the playlist.
@@ -521,9 +552,9 @@ You are given:
 **Critical Instructions:**
 1.  Analyze the user\'s prompt (e.g., "${userPrompt}") AND the \'Current Playlist Tracks\' to understand the desired mood, genre, artists, or theme for the new additions. Consider all provided track attributes (Genres, Mood, Tempo, Key, Scale, Danceability, Energy) for deeper understanding.
 2.  Scan the \'Available Tracks\' list. Each track has an ID, Title, Artist, Genres, Mood, Tempo, Key, Scale, Danceability, and Energy.
-3.  Select EXACTLY ${numberOfTracksToSuggest} UNIQUE track IDs (or as close as possible if ${numberOfTracksToSuggest} distinct, suitable tracks cannot be found) from the \'Available Tracks\' list that BEST match the user\'s prompt AND stylistically complement the \'Current Playlist Tracks\'. Leverage all track attributes (Mood, Tempo, Key, Scale, Danceability, Energy, Genres) for this selection. If the user\'s prompt specifies a number of tracks or a breakdown by artist, prioritize fulfilling that specific count.
+3.  Infer the desired number of tracks from the user's prompt. If the user asks for a specific number of tracks (e.g., "add 10 tracks", "give me 7 songs"), aim to provide that many unique track IDs. If no number is specified in the prompt, aim to provide around ${DEFAULT_SUGGESTIONS_IF_UNSPECIFIED} unique track IDs. Select these unique track IDs from the \'Available Tracks\' list that BEST match the user\'s prompt AND stylistically complement the \'Current Playlist Tracks\'. Leverage all track attributes (Mood, Tempo, Key, Scale, Danceability, Energy, Genres) for this selection.
 4.  **ABSOLUTELY DO NOT suggest any track IDs that are already present in the \'Current Playlist Tracks\' list.** Your suggestions must be new additions.
-5.  If you cannot find ${numberOfTracksToSuggest} suitable and new tracks from \'Available Tracks\' that meet the user\'s criteria, suggest as many as you can find (even if it\'s less than ${numberOfTracksToSuggest}), or an empty list if none are suitable AT ALL.
+5.  If you cannot find a sufficient number of suitable and new tracks from \'Available Tracks\' that meet the user\'s criteria (based on their prompt or the default of ${DEFAULT_SUGGESTIONS_IF_UNSPECIFIED}), suggest as many as you can find, or an empty list if none are suitable AT ALL.
 6.  Return your response ONLY as a valid JSON object adhering strictly to the defined schema, containing only the "suggestedTrackIds" array.
 7.  Do NOT include any tracks in "suggestedTrackIds" that are not explicitly listed in the \'Available Tracks\'.
 8.  Do NOT add any commentary, explanations, or text outside the JSON object. The entire response must be the JSON object itself.
@@ -633,8 +664,10 @@ ${availableTracksContext}`;
             console.warn(`[AI SuggestMore] AI suggested invalid/inactive track IDs that were filtered out: ${invalidTrackIds.join(', ')}`);
         }
         
-        console.log(`[AI SuggestMore] Returning ${validSuggestedTrackIds.length} valid track IDs to add.`);
-        return validSuggestedTrackIds.slice(0, numberOfTracksToSuggest); // Ensure we don't return more than requested
+        // Return the validated & filtered suggestions, capped at MAX_SUGGESTIONS_PER_REQUEST
+        const finalSuggestions = validSuggestedTrackIds.slice(0, MAX_SUGGESTIONS_PER_REQUEST);
+        console.log(`[AI SuggestMore] Returning ${finalSuggestions.length} valid track IDs to add (capped at ${MAX_SUGGESTIONS_PER_REQUEST}).`);
+        return finalSuggestions;
 
     } catch (error) {
         console.error('[AI SuggestMore] Error during track suggestion:', error);
