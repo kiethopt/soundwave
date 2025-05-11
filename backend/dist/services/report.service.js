@@ -4,33 +4,42 @@ exports.ReportService = void 0;
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const prisma = new client_1.PrismaClient();
+const platformReportTypes = [
+    'ACCOUNT_ISSUE',
+    'BUG_REPORT',
+    'GENERAL_FEEDBACK',
+    'UI_UX_ISSUE',
+    client_1.ReportType.OTHER,
+];
 class ReportService {
     static async createReport(userId, data) {
-        if (!data.trackId && !data.playlistId && !data.albumId && data.type !== client_1.ReportType.OTHER) {
-            throw new Error('A report must be associated with a track, playlist, or album, unless it is of type OTHER.');
+        if (!platformReportTypes.includes(data.type) && !data.trackId && !data.playlistId && !data.albumId) {
+            throw new Error('This type of report must be associated with a track, playlist, or album.');
         }
-        if (data.trackId) {
-            const track = await prisma.track.findUnique({
-                where: { id: data.trackId }
-            });
-            if (!track) {
-                throw new Error('Track not found');
+        if (!platformReportTypes.includes(data.type)) {
+            if (data.trackId) {
+                const track = await prisma.track.findUnique({
+                    where: { id: data.trackId }
+                });
+                if (!track) {
+                    throw new Error('Track not found');
+                }
             }
-        }
-        if (data.playlistId) {
-            const playlist = await prisma.playlist.findUnique({
-                where: { id: data.playlistId }
-            });
-            if (!playlist) {
-                throw new Error('Playlist not found');
+            if (data.playlistId) {
+                const playlist = await prisma.playlist.findUnique({
+                    where: { id: data.playlistId }
+                });
+                if (!playlist) {
+                    throw new Error('Playlist not found');
+                }
             }
-        }
-        if (data.albumId) {
-            const album = await prisma.album.findUnique({
-                where: { id: data.albumId }
-            });
-            if (!album) {
-                throw new Error('Album not found');
+            if (data.albumId) {
+                const album = await prisma.album.findUnique({
+                    where: { id: data.albumId }
+                });
+                if (!album) {
+                    throw new Error('Album not found');
+                }
             }
         }
         const report = await prisma.report.create({
@@ -70,7 +79,7 @@ class ReportService {
             entityName = playlist?.name || 'playlist';
             entityType = 'playlist';
         }
-        else if (data.type === client_1.ReportType.OTHER) {
+        else if (platformReportTypes.includes(data.type)) {
             entityName = 'Platform Issue/General Feedback';
             entityType = 'platform';
         }
@@ -215,7 +224,7 @@ class ReportService {
             entityName = report.playlist.name || 'playlist';
             entityType = 'playlist';
         }
-        else if (report.type === client_1.ReportType.OTHER) {
+        else if (platformReportTypes.includes(report.type)) {
             entityName = 'Platform Issue/General Feedback';
             entityType = 'platform';
         }
