@@ -72,6 +72,11 @@ const generatePlaylist = async (req, res) => {
                 res.status(400).json({ message: error.message });
                 return;
             }
+            if (error.message.startsWith('INVALID_PROMPT:')) {
+                const cleanErrorMessage = error.message.replace('INVALID_PROMPT:', '').trim();
+                res.status(400).json({ message: cleanErrorMessage });
+                return;
+            }
         }
         (0, handle_utils_1.handleError)(res, error, 'Generate playlist');
     }
@@ -80,7 +85,7 @@ exports.generatePlaylist = generatePlaylist;
 const suggestMoreTracks = async (req, res) => {
     try {
         const { playlistId } = req.params;
-        const { prompt, numberOfTracks = 5 } = req.body;
+        const { prompt } = req.body;
         if (!req.user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
@@ -93,13 +98,8 @@ const suggestMoreTracks = async (req, res) => {
             res.status(400).json({ message: 'Valid playlistId is required' });
             return;
         }
-        const numTracks = parseInt(String(numberOfTracks), 10);
-        if (isNaN(numTracks) || numTracks <= 0 || numTracks > 20) {
-            res.status(400).json({ message: 'numberOfTracks must be a positive integer between 1 and 20.' });
-            return;
-        }
-        console.log(`[Generate Controller] Received track suggestion request for playlist ${playlistId} from user ${req.user.id} with prompt: "${prompt}", count: ${numTracks}`);
-        const suggestedTrackIds = await generateService.suggestTracksForExistingPlaylist(playlistId, req.user.id, prompt, numTracks);
+        console.log(`[Generate Controller] Received track suggestion request for playlist ${playlistId} from user ${req.user.id} with prompt: "${prompt}"`);
+        const suggestedTrackIds = await generateService.suggestTracksForExistingPlaylist(playlistId, req.user.id, prompt);
         if (!suggestedTrackIds || suggestedTrackIds.length === 0) {
             res.status(200).json({
                 message: 'AI could not find any new suitable tracks based on your prompt or the playlist is already optimal with current tracks.',
@@ -151,6 +151,11 @@ const suggestMoreTracks = async (req, res) => {
         if (error instanceof Error) {
             if (error.message.includes('AI features are currently unavailable')) {
                 res.status(503).json({ message: 'AI features are currently unavailable for suggestions. Please try again later.' });
+                return;
+            }
+            if (error.message.startsWith('INVALID_PROMPT:')) {
+                const cleanErrorMessage = error.message.replace('INVALID_PROMPT:', '').trim();
+                res.status(400).json({ message: cleanErrorMessage });
                 return;
             }
             if (error.message.includes('safety reasons') || error.message.includes('Playlist not found')) {

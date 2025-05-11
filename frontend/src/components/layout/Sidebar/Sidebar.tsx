@@ -12,6 +12,7 @@ import {
   ChartIcon,
   Tags,
   LayoutGrid,
+  MagicWand,
 } from "@/components/ui/Icons";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -477,8 +478,8 @@ export default function Sidebar({
                                   <AddSimple
                                     className={`w-6 h-6 ${
                                       theme === "light"
-                                        ? "text-gray-600 group-hover:text-gray-900"
-                                        : "text-white/70 group-hover:text-white"
+                                        ? "text-gray-700 group-hover:text-gray-900"
+                                        : "text-white/90 group-hover:text-white"
                                     }`}
                                   />
                                 </button>
@@ -495,22 +496,24 @@ export default function Sidebar({
                                 <DropdownMenuItem
                                   onClick={handleCreateInstantPlaylist}
                                   disabled={isCreatingPlaylist}
-                                  className={`cursor-pointer ${
+                                  className={`flex items-center gap-2 cursor-pointer ${
                                     theme === "light"
                                       ? "hover:bg-gray-100"
                                       : "hover:bg-white/10"
                                   }`}
                                 >
+                                  <Music className="w-4 h-4" />
                                   Create Playlist
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={toggleAiPromptInput}
-                                  className={`cursor-pointer ${
+                                  className={`flex items-center gap-2 cursor-pointer ${
                                     theme === "light"
                                       ? "hover:bg-gray-100"
                                       : "hover:bg-white/10"
                                   }`}
                                 >
+                                  <Bot className="w-4 h-4" />
                                   Create Playlist with AI
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -532,7 +535,7 @@ export default function Sidebar({
                           <DropdownMenuTrigger asChild>
                             <button disabled={isCreatingPlaylist}>
                               <div
-                                className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/70 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                                className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/90 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
                               >
                                 <AddSimple className="w-6 h-6" />
                               </div>
@@ -561,22 +564,24 @@ export default function Sidebar({
                             <DropdownMenuItem
                               onClick={handleCreateInstantPlaylist}
                               disabled={isCreatingPlaylist}
-                              className={`cursor-pointer ${
+                              className={`flex items-center gap-2 cursor-pointer ${
                                 theme === "light"
                                   ? "hover:bg-gray-100"
                                   : "hover:bg-white/10"
                               }`}
                             >
+                              <Music className="w-4 h-4" />
                               Create Playlist
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={toggleAiPromptInput}
-                              className={`cursor-pointer ${
+                              className={`flex items-center gap-2 cursor-pointer ${
                                 theme === "light"
                                   ? "hover:bg-gray-100"
                                   : "hover:bg-white/10"
                               }`}
                             >
+                              <MagicWand className="w-4 h-4" />
                               Create Playlist with AI
                             </DropdownMenuItem>
                           </DropdownMenuContent>

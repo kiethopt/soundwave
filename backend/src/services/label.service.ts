@@ -536,9 +536,10 @@ export const approveLabelRegistration = async (adminUserId: string, registration
       await tx.notification.create({
         data: {
           userId: registrationRequest.requestingArtist.userId,
-          recipientType: RecipientType.USER, // Artist is a user
+          recipientType: RecipientType.ARTIST, // Artist is a user
           type: NotificationType.LABEL_REGISTRATION_APPROVED,
           message: approvalMessage,
+          artistId: registrationRequest.requestingArtistId, // Target artist profile
           // claimId: registrationRequest.id, // Optional: link to the request
         },
       });
@@ -597,9 +598,10 @@ export const rejectLabelRegistration = async (
     await prisma.notification.create({
       data: {
         userId: registrationRequest.requestingArtist.userId,
-        recipientType: RecipientType.USER, // Artist is a user
+        recipientType: RecipientType.ARTIST, // Artist is a user
         type: NotificationType.LABEL_REGISTRATION_REJECTED,
         message: `We regret to inform you that your request to register the label "${registrationRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+        artistId: registrationRequest.requestingArtistId, // Target artist profile
         // claimId: registrationRequest.id, // Optional: link to the request
       },
     });

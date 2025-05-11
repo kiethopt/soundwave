@@ -3,6 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteReport = exports.resolveReport = exports.getReportById = exports.getUserReports = exports.getReports = exports.createReport = void 0;
 const client_1 = require("@prisma/client");
 const report_service_1 = require("../services/report.service");
+const platformReportTypes = [
+    'ACCOUNT_ISSUE',
+    'BUG_REPORT',
+    'GENERAL_FEEDBACK',
+    'UI_UX_ISSUE',
+    client_1.ReportType.OTHER,
+];
 const createReport = async (req, res) => {
     try {
         const { type, description, trackId, playlistId, albumId } = req.body;
@@ -19,9 +26,9 @@ const createReport = async (req, res) => {
             res.status(400).json({ message: 'Description is required' });
             return;
         }
-        if (!trackId && !playlistId && !albumId) {
+        if (!platformReportTypes.includes(type) && !trackId && !playlistId && !albumId) {
             res.status(400).json({
-                message: 'A report must be associated with a track, playlist, or album'
+                message: 'This type of report must be associated with a track, playlist, or album.'
             });
             return;
         }

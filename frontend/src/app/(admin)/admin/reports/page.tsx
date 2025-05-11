@@ -24,6 +24,15 @@ import { ReportDetailModal, ResolveReportModal, ConfirmDeleteModal } from '@/com
 const ALL_TYPES = 'ALL_TYPES';
 const ALL_STATUSES = 'ALL_STATUSES';
 
+// Define the platform report types for consistent labeling (mirroring user-facing page)
+const platformReportTypeOptions = [
+  { value: 'ACCOUNT_ISSUE', label: 'Account Issue' },
+  { value: 'BUG_REPORT', label: 'Bug Report' },
+  { value: 'GENERAL_FEEDBACK', label: 'General Feedback' },
+  { value: 'UI_UX_ISSUE', label: 'UI/UX Issue' },
+  { value: 'OTHER', label: 'Other' },
+] as const;
+
 interface SortConfig {
   key: keyof Report | null;
   direction: 'asc' | 'desc';
@@ -266,6 +275,30 @@ export default function ReportsPage() {
             AI Issue
           </Badge>
         );
+      case 'ACCOUNT_ISSUE':
+        return (
+          <Badge variant="outline" className="bg-sky-500/10 text-sky-500 border-sky-500/20">
+            Account
+          </Badge>
+        );
+      case 'BUG_REPORT':
+        return (
+          <Badge variant="outline" className="bg-pink-500/10 text-pink-500 border-pink-500/20">
+            Bug
+          </Badge>
+        );
+      case 'GENERAL_FEEDBACK':
+        return (
+          <Badge variant="outline" className="bg-teal-500/10 text-teal-500 border-teal-500/20">
+            Feedback
+          </Badge>
+        );
+      case 'UI_UX_ISSUE':
+        return (
+          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
+            UI/UX
+          </Badge>
+        );
       case 'OTHER':
         return (
           <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
@@ -302,8 +335,41 @@ export default function ReportsPage() {
           <span className={`text-sm ${textMutedClass}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
         </div>
       );
+    } else {
+      // Handle reports not tied to a specific entity (Track, Album, Playlist)
+      const platformReportOption = platformReportTypeOptions.find(option => option.value === report.type);
+
+      if (platformReportOption) {
+        let subText = 'Platform issue'; // Default subtext
+        if (platformReportOption.value === 'GENERAL_FEEDBACK') {
+          subText = 'General feedback';
+        }
+        return (
+          <div className="flex flex-col">
+            <span className={`font-medium ${textPrimaryClass}`}>{platformReportOption.label}</span>
+            <span className={`text-sm ${textMutedClass}`}>{subText}</span>
+          </div>
+        );
+      } else {
+        // Fallback for any other types that might not have an entity or are not in platformReportTypeOptions
+        const formattedType = String(report.type)
+          .toLowerCase()
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, char => char.toUpperCase());
+        
+        let subText = 'Platform issue'; // Default subtext for fallback
+        if (String(report.type) === 'GENERAL_FEEDBACK') { // Check original enum value string
+          subText = 'General feedback';
+        }
+
+        return (
+          <div className="flex flex-col">
+            <span className={`font-medium ${textPrimaryClass}`}>{formattedType}</span>
+            <span className={`text-sm ${textMutedClass}`}>{subText}</span>
+          </div>
+        );
+      }
     }
-    return <span className={textPrimaryClass}>Unknown Entity</span>;
   };
 
   const handleRowClick = (report: Report, e: React.MouseEvent<HTMLTableRowElement>) => {
@@ -350,6 +416,10 @@ export default function ReportsPage() {
               <SelectItem value="COPYRIGHT_VIOLATION">Copyright Violation</SelectItem>
               <SelectItem value="INAPPROPRIATE_CONTENT">Inappropriate Content</SelectItem>
               <SelectItem value="AI_GENERATION_ISSUE">AI Generation Issue</SelectItem>
+              <SelectItem value="ACCOUNT_ISSUE">Account Issue</SelectItem>
+              <SelectItem value="BUG_REPORT">Bug Report</SelectItem>
+              <SelectItem value="GENERAL_FEEDBACK">General Feedback</SelectItem>
+              <SelectItem value="UI_UX_ISSUE">UI/UX Issue</SelectItem>
               <SelectItem value="OTHER">Other</SelectItem>
             </SelectContent>
           </Select>

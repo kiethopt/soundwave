@@ -558,12 +558,22 @@ export interface SearchSuggestion {
   };
 }
 
-export type ReportType =
-  | "COPYRIGHT_VIOLATION"
-  | "INAPPROPRIATE_CONTENT"
-  | "AI_GENERATION_ISSUE"
-  | "OTHER";
-export type ReportStatus = "PENDING" | "RESOLVED" | "REJECTED";
+export enum ReportType {
+  COPYRIGHT_VIOLATION = 'COPYRIGHT_VIOLATION',
+  INAPPROPRIATE_CONTENT = 'INAPPROPRIATE_CONTENT',
+  AI_GENERATION_ISSUE = 'AI_GENERATION_ISSUE',
+  ACCOUNT_ISSUE = 'ACCOUNT_ISSUE',
+  BUG_REPORT = 'BUG_REPORT',
+  GENERAL_FEEDBACK = 'GENERAL_FEEDBACK',
+  UI_UX_ISSUE = 'UI_UX_ISSUE',
+  OTHER = 'OTHER',
+}
+
+export enum ReportStatus {
+  PENDING = "PENDING",
+  RESOLVED = "RESOLVED",
+  REJECTED = "REJECTED",
+}
 
 export interface Report {
   id: string;

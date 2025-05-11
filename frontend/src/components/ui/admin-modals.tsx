@@ -5394,14 +5394,14 @@ export function ResolveReportModal({
 }: ResolveReportModalProps) {
   const [resolution, setResolution] = useState("");
   const [resolutionStatus, setResolutionStatus] =
-    useState<ReportStatus>("RESOLVED");
+    useState<ReportStatus>(ReportStatus.RESOLVED); // Ensure this uses the enum member
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       // Reset form when modal opens
       setResolution("");
-      setResolutionStatus("RESOLVED");
+      setResolutionStatus(ReportStatus.RESOLVED);
       setIsSubmitting(false);
     }
   }, [isOpen]);
@@ -5568,3 +5568,4 @@ export function ResolveReportModal({
     </Dialog>
   );
 }
+

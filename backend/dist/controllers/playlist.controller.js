@@ -166,6 +166,10 @@ const getPlaylists = async (req, res, next) => {
             const playlists = await db_1.default.playlist.findMany({
                 where: {
                     userId,
+                    OR: [
+                        { isAIGenerated: false },
+                        { isAIGenerated: true, privacy: 'PUBLIC' },
+                    ],
                 },
                 include: {
                     _count: {

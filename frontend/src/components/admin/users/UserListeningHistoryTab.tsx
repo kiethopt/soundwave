@@ -14,7 +14,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Info, Sparkles } from "lucide-react";
+import {
+  Loader2,
+  ArrowUpDown,
+  RefreshCw,
+  Info,
+  Sparkles,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { formatDistanceToNow, format } from "date-fns";
 import Image from "next/image";
@@ -46,7 +54,6 @@ interface HistoryWithDetails extends Omit<History, "track" | "user"> {
     scale?: string | null;
     danceability?: number | null;
     energy?: number | null;
-    genres?: { genre: { name: string } }[];
   } | null;
   // User details might not be needed here if we only show history for one user
 }
@@ -60,6 +67,16 @@ interface ApiResponse {
     hasNextPage: boolean;
     hasPrevPage: boolean;
   };
+}
+
+interface SortConfig {
+  key:
+    | keyof History
+    | "track.title"
+    | "track.artist.artistName"
+    | "track.album.title"
+    | null; // Allow sorting by nested fields
+  direction: "asc" | "desc";
 }
 
 interface UserListeningHistoryTabProps {
@@ -94,6 +111,12 @@ export const UserListeningHistoryTab = ({
     hasNextPage: false,
     hasPrevPage: false,
   });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "createdAt",
+    direction: "desc",
+  });
+  const [searchInput, setSearchInput] = useState("");
+  const [activeSearchTerm, setActiveSearchTerm] = useState("");
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
   const [selectedTrackForDetails, setSelectedTrackForDetails] = useState<
     HistoryWithDetails["track"] | null
@@ -103,7 +126,8 @@ export const UserListeningHistoryTab = ({
   const [bulkReanalyzeError, setBulkReanalyzeError] = useState<string | null>(
     null
   );
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false); // State for confirm dialog
+  const [bulkReanalyzeProgress, setBulkReanalyzeProgress] = useState(0); // State for progress
 
   const limit = 15;
 
@@ -125,10 +149,7 @@ export const UserListeningHistoryTab = ({
           item.track.danceability === null ||
           item.track.danceability === undefined ||
           item.track.energy === null ||
-          item.track.energy === undefined ||
-          item.track.genres === null ||
-          item.track.genres === undefined ||
-          item.track.genres.length === 0)
+          item.track.energy === undefined)
     );
   }, [historyItems]);
 
@@ -152,10 +173,7 @@ export const UserListeningHistoryTab = ({
             item.track.danceability === null ||
             item.track.danceability === undefined ||
             item.track.energy === null ||
-            item.track.energy === undefined ||
-            item.track.genres === null ||
-            item.track.genres === undefined ||
-            item.track.genres.length === 0)
+            item.track.energy === undefined)
       )
       .map((item) => item.track!.id);
   }, [historyItems]);
@@ -164,17 +182,18 @@ export const UserListeningHistoryTab = ({
     console.log(
       `[UserListeningHistoryTab] Re-analysis successful for track ${trackId}. Refreshing history...`
     );
-    setLocalRefreshTrigger((c) => c + 1);
+    setLocalRefreshTrigger((prev) => prev + 1);
   }, []);
 
   // --- Bulk Re-analyze Logic ---
   const startBulkReanalyze = useCallback(async () => {
-    setIsConfirmDialogOpen(false);
+    setIsConfirmDialogOpen(false); // Close confirm dialog if open
     setIsBulkReanalyzing(true);
     setBulkReanalyzeError(null);
-    let toastId: string | undefined = undefined;
+    setBulkReanalyzeProgress(0);
+    let toastId: string | undefined = undefined; // Initialize toastId
 
-    const trackIds = tracksToReanalyzeIds;
+    const trackIds = tracksToReanalyzeIds; // Use memoized list
 
     if (trackIds.length === 0) {
       toast("No tracks found requiring re-analysis on this page.");
@@ -214,12 +233,10 @@ export const UserListeningHistoryTab = ({
       try {
         await api.admin.reanalyzeTrack(trackId, token);
         successCount++;
-      } catch (err: unknown) {
+      } catch (err: any) {
         console.error(`Error re-analyzing track ${trackId}:`, err);
         errorCount++;
-        const errorMessage =
-          err instanceof Error ? err.message : "Unknown error";
-        errors.push({ trackId, message: errorMessage });
+        errors.push({ trackId, message: err.message || "Unknown error" });
       }
     }
 
@@ -243,13 +260,13 @@ export const UserListeningHistoryTab = ({
     }
 
     setIsBulkReanalyzing(false);
-    setLocalRefreshTrigger((c) => c + 1);
-  }, [tracksToReanalyzeIds]);
+    setLocalRefreshTrigger((prev) => prev + 1); // Refresh the table data
+  }, [tracksToReanalyzeIds]); // Dependency on the calculated list
 
   const fetchHistory = useCallback(
-    async (page: number) => {
+    async (page: number, sort: SortConfig) => {
       console.log(
-        `[UserListeningHistoryTab DEBUG] fetchHistory CALLED with Page: ${page}`
+        `[UserListeningHistoryTab DEBUG] fetchHistory CALLED with Page: ${page}, Sort Key: ${sort.key}`
       );
       setLoading(true);
       setError(null);
@@ -257,20 +274,29 @@ export const UserListeningHistoryTab = ({
         const token = localStorage.getItem("userToken");
         if (!token) throw new Error("No authentication token found");
 
-        const params = new URLSearchParams();
-        params.append("page", page.toString());
-        params.append("limit", limit.toString());
+        const queryParams: { [key: string]: string | number } = {
+          page: page.toString(),
+          limit: limit.toString(),
+        };
 
-        // Chuyển URLSearchParams thành object
-        const paramsObject: { [key: string]: string } = {};
-        for (const [key, value] of params.entries()) {
-          paramsObject[key] = value;
+        if (sort.key) {
+          queryParams["sortBy"] = sort.key;
+          queryParams["sortOrder"] = sort.direction;
+        }
+        if (activeSearchTerm) {
+          queryParams["search"] = activeSearchTerm;
         }
 
         const response: ApiResponse = await api.admin.getUserListeningHistory(
           userId,
           token,
-          paramsObject // Truyền object thay vì params.toString()
+          queryParams
+        );
+
+        // Add this log to debug pagination
+        console.log(
+          "[UserListeningHistoryTab] Pagination data:",
+          response.pagination
         );
 
         setHistoryItems(response.data || []);
@@ -286,12 +312,9 @@ export const UserListeningHistoryTab = ({
         if (onTotalItemsChange) {
           onTotalItemsChange(newTotalItems);
         }
-      } catch (err: unknown) {
+      } catch (err: any) {
         console.error("Error fetching listening history:", err);
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Could not load listening history";
+        const errorMessage = err.message || "Could not load listening history";
         setError(errorMessage);
         if (error !== errorMessage) {
           toast.error(errorMessage);
@@ -311,26 +334,70 @@ export const UserListeningHistoryTab = ({
         setLoading(false);
       }
     },
-    [userId, limit, onTotalItemsChange, error]
+    [userId, limit, onTotalItemsChange, activeSearchTerm]
   );
+
+  const refreshData = useCallback(() => {
+    fetchHistory(pagination.currentPage, sortConfig);
+  }, [fetchHistory, pagination.currentPage, sortConfig]);
 
   useEffect(() => {
     const currentPageForFetch = pagination.currentPage;
+    const sortKeyForFetch = sortConfig.key;
+    const sortDirectionForFetch = sortConfig.direction;
     console.log(
-      `[UserListeningHistoryTab DEBUG] useEffect RUNNING. Fetching with Page: ${currentPageForFetch}, LocalRefresh: ${localRefreshTrigger}, ParentRefresh: ${refreshTrigger}`
+      `[UserListeningHistoryTab DEBUG] useEffect RUNNING. Fetching with Page: ${currentPageForFetch}, Sort Key: ${sortKeyForFetch}, Sort Dir: ${sortDirectionForFetch}, LocalRefresh: ${localRefreshTrigger}, ParentRefresh: ${refreshTrigger}`
     );
-    fetchHistory(currentPageForFetch);
+    fetchHistory(currentPageForFetch, {
+      key: sortKeyForFetch,
+      direction: sortDirectionForFetch,
+    });
   }, [
     fetchHistory,
     pagination.currentPage,
+    sortConfig.key,
+    sortConfig.direction,
     localRefreshTrigger,
     refreshTrigger,
   ]);
 
+  const handleSort = (key: SortConfig["key"]) => {
+    if (!key) return;
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setSortConfig({ key, direction });
+  };
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination((p) => ({ ...p, currentPage: newPage }));
+      setPagination((prev) => ({ ...prev, currentPage: newPage }));
     }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setActiveSearchTerm(searchInput);
+  };
+
+  const formatTrackDuration = (seconds?: number | null) => {
+    if (seconds === null || seconds === undefined) return "--:--";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  const renderSortIcon = (key: SortConfig["key"]) => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+    }
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="ml-2 h-4 w-4 text-primary" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4 text-primary" />
+    );
   };
 
   const handleOpenDetailsModal = (track: HistoryWithDetails["track"]) => {
@@ -370,14 +437,13 @@ export const UserListeningHistoryTab = ({
   }
 
   return (
-    <Card>
-      <CardHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 sm:pb-3">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <CardTitle className="text-xl sm:text-2xl">
-            Listening History ({pagination.totalItems} plays)
+    <Card className="rounded-xl shadow-lg">
+      <CardHeader className="px-6 pt-6 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle className="text-xl font-bold text-foreground">
+            Listening History ({historyItems.length || 0})
           </CardTitle>
-          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-            {/* Button to trigger confirmation dialog */}
+          <div className="flex items-center gap-2">
             {hasAnyMissingFeatures && (
               <Dialog
                 open={isConfirmDialogOpen}
@@ -388,14 +454,14 @@ export const UserListeningHistoryTab = ({
                     variant="outline"
                     size="sm"
                     disabled={isBulkReanalyzing || loading}
-                    className="bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
+                    className="h-9 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
                   >
                     {isBulkReanalyzing ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Sparkles className="mr-2 h-4 w-4" />
                     )}
-                    Re-analyze Missing Features ({tracksToReanalyzeIds.length})
+                    Re-analyze ({tracksToReanalyzeIds.length})
                   </Button>
                 </DialogTrigger>
                 <DialogContent
@@ -436,8 +502,9 @@ export const UserListeningHistoryTab = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLocalRefreshTrigger((c) => c + 1)}
+              onClick={() => setLocalRefreshTrigger((prev) => prev + 1)}
               disabled={loading || isBulkReanalyzing}
+              className="h-9"
             >
               <RefreshCw
                 className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -446,7 +513,6 @@ export const UserListeningHistoryTab = ({
             </Button>
           </div>
         </div>
-        {/* Error message display */}
         {bulkReanalyzeError && (
           <p className="text-xs text-red-600 dark:text-red-500 mt-1">
             {bulkReanalyzeError}
@@ -455,7 +521,7 @@ export const UserListeningHistoryTab = ({
       </CardHeader>
       <CardContent className="p-0">
         {error && historyItems.length > 0 && (
-          <div className="mx-4 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm sm:mx-6">
+          <div className="mx-6 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm">
             <p>
               Could not fully refresh data. Displaying last known records.
               Error: {error}
@@ -463,20 +529,30 @@ export const UserListeningHistoryTab = ({
           </div>
         )}
         <div className="overflow-x-auto">
-          <Table className="min-w-full">
+          <Table className="w-full">
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 pl-3 pr-1 py-1">Image</TableHead>
-                <TableHead>Track</TableHead>
-                <TableHead>Artist</TableHead>
-                <TableHead>Album</TableHead>
-                <TableHead className="min-w-[120px] hidden xl:table-cell">
-                  Genre
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[60px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                  {null}
                 </TableHead>
-                <TableHead className="text-right pr-4 sm:pr-6">
-                  Played At
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Track
                 </TableHead>
-                <TableHead className="w-[80px] text-center pr-4 sm:pr-6">
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Artist
+                </TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Album
+                </TableHead>
+                <TableHead
+                  className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort("createdAt")}
+                >
+                  <div className="flex items-center justify-center">
+                    Played At {renderSortIcon("createdAt")}
+                  </div>
+                </TableHead>
+                <TableHead className="w-[80px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
                   Details
                 </TableHead>
               </TableRow>
@@ -484,70 +560,79 @@ export const UserListeningHistoryTab = ({
             <TableBody>
               {loading && historyItems.length > 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                   </TableCell>
                 </TableRow>
               )}
               {historyItems.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50">
-                  <TableCell className="w-16 h-16 pl-3 pr-1 py-1">
+                <TableRow
+                  key={item.id}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <TableCell className="px-6 py-4">
                     {item.track?.coverUrl ? (
-                      <Image
-                        src={item.track.coverUrl}
-                        alt={item.track.title || "Track cover"}
-                        width={48}
-                        height={48}
-                        className="rounded-sm object-cover aspect-square"
-                      />
+                      <div className="flex justify-center">
+                        <div className="h-12 w-12 relative">
+                          <Image
+                            src={item.track.coverUrl}
+                            alt={item.track.title ?? "Track cover"}
+                            fill
+                            sizes="48px"
+                            className="rounded-full object-cover border-2 border-primary/30 shadow"
+                            priority={false}
+                          />
+                        </div>
+                      </div>
                     ) : (
-                      <div className="w-12 h-12 bg-muted rounded-sm flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-muted-foreground" />
+                      <div className="flex justify-center">
+                        <div className="h-12 w-12 rounded-full border-2 border-primary/30 bg-muted flex items-center justify-center text-xs shadow">
+                          ?
+                        </div>
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {item.track?.title || "Unknown Track"}
+                  <TableCell className="px-6 py-4">
+                    <div className="font-medium text-sm">
+                      {item.track?.title || "Unknown Track"}
+                    </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-6 py-4">
                     {item.track?.artist ? (
                       <Link
                         href={`/admin/artists/${item.track.artist.id}`}
-                        className="hover:underline"
+                        className="hover:underline text-primary text-sm"
                       >
                         {item.track.artist.artistName}
                       </Link>
                     ) : (
-                      <span className="text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         Unknown Artist
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-6 py-4">
                     {item.track?.album ? (
-                      <span title={item.track.album.title}>
+                      <span className="text-sm" title={item.track.album.title}>
                         {item.track.album.title.length > 30
                           ? `${item.track.album.title.substring(0, 30)}...`
                           : item.track.album.title}
                       </span>
                     ) : (
-                      // Potential Link: <Link href={`/admin/albums/${item.track.album.id}`} className="hover:underline">...</Link>
-                      <span className="text-muted-foreground">N/A</span>
+                      <span className="text-sm text-muted-foreground">N/A</span>
                     )}
                   </TableCell>
-                  <TableCell className="hidden xl:table-cell">
-                    {item.track?.genres && item.track.genres.length > 0
-                      ? item.track.genres.map((g) => g.genre.name).join(", ")
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground pr-4 sm:pr-6">
-                    <span title={format(new Date(item.createdAt), "Pp")}>
+                  <TableCell className="px-6 py-4 text-center">
+                    <span
+                      title={format(new Date(item.createdAt), "Pp")}
+                      className="text-sm"
+                    >
                       {formatDistanceToNow(new Date(item.createdAt), {
                         addSuffix: true,
                       })}
                     </span>
                     <br />
-                    <span className="text-xs opacity-70">
+                    <span className="text-xs text-muted-foreground">
                       {new Date(item.createdAt).toLocaleString("vi-VN", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -559,18 +644,20 @@ export const UserListeningHistoryTab = ({
                       })}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center py-2 align-middle pr-4 sm:pr-6">
-                    {item.track && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDetailsModal(item.track)}
-                        title="View Audio Features"
-                        className="h-8 w-8"
-                      >
-                        <Info className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <TableCell className="px-6 py-4">
+                    <div className="flex items-center justify-center">
+                      {item.track && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDetailsModal(item.track)}
+                          title="View Audio Features"
+                          className="h-8 w-8"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -578,8 +665,8 @@ export const UserListeningHistoryTab = ({
           </Table>
         </div>
       </CardContent>
-      {!loading && pagination.totalPages > 1 && (
-        <div className="px-4 py-3 sm:px-6 border-t">
+      {pagination.totalPages > 1 && (
+        <div className="px-6 py-3 border-t">
           <PaginationControls
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
@@ -589,11 +676,10 @@ export const UserListeningHistoryTab = ({
           />
         </div>
       )}
-      {isDetailsModalOpen && selectedTrackForDetails && (
+      {selectedTrackForDetails && (
         <TrackDetailsModal
           isOpen={isDetailsModalOpen}
           onClose={handleCloseDetailsModal}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           track={selectedTrackForDetails as any}
           onSuccessfulReanalyze={handleSuccessfulReanalyze}
         />

@@ -113,13 +113,46 @@ export const handleError = (
   error: unknown,
   operation: string
 ): void => {
-  console.error(`${operation} error:`, error);
+  // Format error message
+  let statusCode = 500;
+  let message = 'Internal server error';
+  console.error(`Error in ${operation}:`, error);
 
-  const errorMessage =
-    error instanceof Error ? error.message : 'Internal server error';
+  if (error instanceof Error) {
+    // Check for specific error types and patterns
+    if (error.message.startsWith('INVALID_PROMPT:')) {
+      // This should be handled by specific controllers before reaching here
+      statusCode = 400;
+      message = error.message.replace('INVALID_PROMPT:', '').trim();
+      console.log(`[AI Error] Invalid prompt detected: ${message}`);
+    } else if (error.message.includes('Not Found') || error.name === 'NotFoundError') {
+      statusCode = 404;
+      message = error.message || 'Resource not found';
+    } else if (error.message.includes('Forbidden') || error.message.includes('Not authorized')) {
+      statusCode = 403;
+      message = error.message;
+    } else if (error.message.includes('Unauthorized') || error.message.includes('authentication failed')) {
+      statusCode = 401;
+      message = error.message;
+    } else if (
+      error.message.includes('Invalid') ||
+      error.message.includes('already exists') ||
+      error.message.includes('validation failed') ||
+      error.name === 'ValidationError'
+    ) {
+      statusCode = 400;
+      message = error.message;
+    }
+    
+    // Default fallback if not a specific pattern
+    if (statusCode === 500) {
+      message = error.message || 'Internal server error';
+    }
+  }
 
-  res.status(500).json({
-    message: 'Internal server error',
-    error: errorMessage,
+  // Send response
+  res.status(statusCode).json({
+    success: false,
+    message,
   });
 };

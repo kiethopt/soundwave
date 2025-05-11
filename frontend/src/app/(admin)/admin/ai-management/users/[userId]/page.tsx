@@ -8,10 +8,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { api } from "@/utils/api";
 import type { User } from "@/types";
 import toast from "react-hot-toast";
-import { Loader2, Settings } from "lucide-react";
-
-// import { UserSystemPlaylistsTab } from "@/components/admin/users/UserSystemPlaylistsTab";
-import { UserSystemPlaylistsTab } from "@/components/admin/users/UserSystemPlaylistsTab";
+import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UserSystemPlaylistsTab } from "@/components/admin/users/UserAiPlaylistsTab";
 import { UserListeningHistoryTab } from "@/components/admin/users/UserListeningHistoryTab";
 import GeneratePlaylistParamsModal from "@/components/admin/users/GeneratePlaylistParamsModal";
 
@@ -91,6 +90,10 @@ export default function UserSystemPlaylistDetailPage() {
     setIsParamsModalOpen(true);
   };
 
+  const handleCloseParamsModal = () => {
+    setIsParamsModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -113,54 +116,63 @@ export default function UserSystemPlaylistDetailPage() {
 
   return (
     <div
-      className={`container mx-auto space-y-6 p-4 mb-16 md:mb-0 theme-${theme}`}
+      className={`container mx-auto space-y-6 p-6 mb-16 md:mb-0 theme-${theme}`}
     >
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-            {user.name || user.username || "User Details"} - System Playlists
-            Management
-          </h1>
-          <p className="text-sm text-secondary">
-            Manage System Playlists for {user.email}
-          </p>
-        </div>
-        <div>
-          <Button
-            onClick={handleOpenParamsModal}
-            disabled={isGeneratingPlaylist}
-          >
-            {isGeneratingPlaylist ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Generate System Playlist
-          </Button>
-        </div>
-      </div>
+      <Card className="rounded-xl shadow-lg">
+        <CardHeader className="px-6 pt-6 pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold text-foreground">
+                {user.name || user.username || "User Details"}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+            </div>
+            <Button
+              onClick={handleOpenParamsModal}
+              disabled={isGeneratingPlaylist}
+              size="sm"
+              className="h-9"
+            >
+              {isGeneratingPlaylist ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Generate AI Playlist
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Tabs defaultValue="ai-playlists" className="w-full">
+            <div className="px-6 border-b">
+              <TabsList className="h-11 w-full grid grid-cols-2">
+                <TabsTrigger value="ai-playlists" className="text-sm">
+                  AI Playlists
+                </TabsTrigger>
+                <TabsTrigger value="history" className="text-sm">
+                  Listening History
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <div className="p-6">
+              <TabsContent value="ai-playlists" className="mt-0">
+                <UserSystemPlaylistsTab
+                  userId={userId}
+                  refreshTrigger={systemPlaylistRefreshTrigger}
+                />
+              </TabsContent>
+              <TabsContent value="history" className="mt-0">
+                <UserListeningHistoryTab userId={userId} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </CardContent>
+      </Card>
 
-      <Tabs defaultValue="system-playlists" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="system-playlists">System Playlists</TabsTrigger>
-          <TabsTrigger value="history">Listening History</TabsTrigger>
-        </TabsList>
-        <TabsContent value="system-playlists" className="mt-4">
-          <UserSystemPlaylistsTab
-            userId={userId}
-            refreshTrigger={systemPlaylistRefreshTrigger}
-          />
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
-          <UserListeningHistoryTab userId={userId} />
-        </TabsContent>
-      </Tabs>
-      {user && (
-        <GeneratePlaylistParamsModal
-          isOpen={isParamsModalOpen}
-          onClose={() => setIsParamsModalOpen(false)}
-          onGenerate={handleGenerateWithParams}
-          isLoading={isGeneratingPlaylist}
-        />
-      )}
+      <GeneratePlaylistParamsModal
+        isOpen={isParamsModalOpen}
+        onClose={handleCloseParamsModal}
+        onGenerate={handleGenerateWithParams}
+        isLoading={isGeneratingPlaylist}
+      />
     </div>
   );
 }

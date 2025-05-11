@@ -2642,10 +2642,11 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
         if (registrationRequest.requestingArtist.userId) {
             const notificationData = {
                 data: {
-                    recipientType: client_1.RecipientType.USER,
+                    recipientType: client_1.RecipientType.ARTIST,
                     userId: registrationRequest.requestingArtist.userId,
                     type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
                     message: approvalMessage,
+                    artistId: registrationRequest.requestingArtistId,
                     isRead: false,
                 },
                 select: {
@@ -2730,6 +2731,7 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
                 artistId: updatedRequest.requestingArtistId,
                 type: client_1.NotificationType.LABEL_REGISTRATION_REJECTED,
                 message: `We regret to inform you that your request to register the label "${updatedRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+                userId: artistUserIdForSocketTargeting,
                 isRead: false,
             },
             select: {
