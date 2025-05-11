@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import type { Playlist, Track, ArtistProfile } from "@/types";
+import type {
+  Playlist,
+  Track,
+  ArtistProfile,
+  Genre as PrismaGenre,
+} from "@/types"; // Assuming Genre might be a Prisma type
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -20,19 +25,45 @@ import { Loader2, ArrowUpDown, Eye, RefreshCw, Trash2 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlaylistPreviewModal } from "./PlaylistPreviewModal";
-import { DeletePlaylistModal } from "./DeletePlaylistModal";
+// import { ConfirmDeletePlaylistModal } from "./ConfirmDeletePlaylistModal"; // Sẽ thêm sau
 
-// Define the structure of the playlist data we expect from the API
-interface PlaylistWithPreview extends Omit<Playlist, "tracks"> {
+// Interface cho track trong PlaylistPreviewModal mong đợi
+interface PreviewModalTrackData
+  extends Pick<Track, "id" | "title" | "coverUrl" | "duration"> {
+  artist: Pick<ArtistProfile, "artistName"> | null;
+  album?: { title?: string } | null;
+  genres?: { genre: { name: string } }[]; // Đã sửa: Cập nhật cấu trúc genres
+  addedAt?: string;
+}
+
+// Interface cho playlist mà PlaylistPreviewModal mong đợi
+interface PreviewModalPlaylistData extends Omit<Playlist, "tracks"> {
+  id: string;
+  name: string;
+  description?: string; // Đã sửa: description là string | undefined để khớp với Omit<Playlist, "tracks">
+  tracks: { track: PreviewModalTrackData; addedAt?: string }[];
+}
+
+// Interface cho dữ liệu track nhận từ API (có thể phức tạp hơn)
+interface ApiTrackData
+  extends Pick<Track, "id" | "title" | "coverUrl" | "duration"> {
+  artist: Pick<ArtistProfile, "artistName"> | null;
+  album?: { title?: string } | null;
+  // Giả sử API trả về cấu trúc genres lồng nhau từ Prisma
+  genres?: { genre: Pick<PrismaGenre, "name"> }[];
+  // Thêm các trường khác mà API có thể trả về cho track
+}
+
+// Interface cho playlist nhận từ API, chứa ApiTrackData
+interface PlaylistFromApi extends Omit<Playlist, "tracks"> {
   tracks: {
-    track: Pick<Track, "id" | "title" | "coverUrl"> & {
-      artist: Pick<ArtistProfile, "artistName"> | null;
-    };
+    track: ApiTrackData;
+    addedAt?: string; // Ngày track được thêm vào playlist này
   }[];
 }
 
 interface ApiResponse {
-  data: PlaylistWithPreview[];
+  data: PlaylistFromApi[];
   pagination: {
     currentPage: number;
     totalPages: number;
@@ -52,12 +83,15 @@ interface UserSystemPlaylistsTabProps {
   refreshTrigger?: number;
 }
 
-export const UserSystemPlaylistsTab = ({
+export const UserSystemPlaylistsTab: React.FC<UserSystemPlaylistsTabProps> = ({
   userId,
   refreshTrigger,
-}: UserSystemPlaylistsTabProps) => {
+}) => {
   const { theme } = useTheme();
-  const [playlists, setPlaylists] = useState<PlaylistWithPreview[]>([]);
+  // State sẽ lưu trữ dữ liệu đã được chuyển đổi, sẵn sàng cho PlaylistPreviewModal
+  const [playlistsForModal, setPlaylistsForModal] = useState<
+    PreviewModalPlaylistData[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,16 +108,11 @@ export const UserSystemPlaylistsTab = ({
   });
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
   const [previewingPlaylist, setPreviewingPlaylist] =
-    useState<PlaylistWithPreview | null>(null);
+    useState<PreviewModalPlaylistData | null>(null);
   const [isPlaylistPreviewModalOpen, setIsPlaylistPreviewModalOpen] =
     useState(false);
-  const [deletingPlaylist, setDeletingPlaylist] =
-    useState<PlaylistWithPreview | null>(null);
-  const [isDeletePlaylistModalOpen, setIsDeletePlaylistModalOpen] =
-    useState(false);
-  const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
 
-  const limit = 10; // Or fetch from config/props
+  const limit = 10;
 
   const fetchPlaylists = useCallback(
     async (page: number, sort: SortConfig) => {
@@ -100,18 +129,45 @@ export const UserSystemPlaylistsTab = ({
           params.append("sortBy", sort.key);
           params.append("sortOrder", sort.direction);
         }
-        // Add search param if needed later
 
+        // Sử dụng API call thật sự
         const response: ApiResponse = await api.admin.getUserSystemPlaylists(
           userId,
           token,
           params.toString()
         );
+
+        const transformedPlaylists = response.data.map((p) => ({
+          ...p,
+          tracks: p.tracks.map((pt) => ({
+            track: {
+              id: pt.track.id,
+              title: pt.track.title,
+              coverUrl: pt.track.coverUrl,
+              duration: pt.track.duration,
+              artist: pt.track.artist,
+              album: pt.track.album,
+              genres:
+                (pt.track.genres
+                  ?.map((g_item) =>
+                    g_item && g_item.genre
+                      ? { genre: { name: g_item.genre.name } }
+                      : null
+                  )
+                  .filter((g_obj) => g_obj !== null) as {
+                  genre: { name: string };
+                }[]) || [],
+            },
+            addedAt: pt.addedAt,
+          })),
+        }));
+
         console.log(
-          "[UserSystemPlaylistsTab] Fetched playlists RESPONSE:",
-          response
-        ); // LOG RESPONSE
-        setPlaylists(response.data || []);
+          "[UserSystemPlaylistsTab] Transformed Playlists for Modal:",
+          transformedPlaylists
+        );
+        setPlaylistsForModal(transformedPlaylists);
+
         setPagination((prev) => ({
           currentPage: response.pagination?.currentPage ?? 1,
           totalPages: response.pagination?.totalPages ?? 1,
@@ -123,7 +179,7 @@ export const UserSystemPlaylistsTab = ({
         console.error("Error fetching System Playlists:", err);
         setError(err.message || "Could not load System Playlists");
         toast.error(err.message || "Could not load System Playlists");
-        setPlaylists([]);
+        setPlaylistsForModal([]);
         setPagination({
           currentPage: 1,
           totalPages: 1,
@@ -142,36 +198,18 @@ export const UserSystemPlaylistsTab = ({
     fetchPlaylists(pagination.currentPage, sortConfig);
   }, [fetchPlaylists, pagination.currentPage, sortConfig]);
 
-  // Fetch data on initial load, page change, sort change, or trigger changes
   useEffect(() => {
-    console.log(
-      "[UserSystemPlaylistsTab] useEffect triggered. Page:",
-      pagination.currentPage,
-      "Sort Key:",
-      sortConfig.key,
-      "Sort Dir:",
-      sortConfig.direction,
-      "LocalRefresh:",
-      localRefreshTrigger,
-      "ParentRefresh:",
-      refreshTrigger
-    );
     fetchPlaylists(pagination.currentPage, sortConfig);
   }, [
     fetchPlaylists,
     pagination.currentPage,
-    sortConfig.key, // Changed
-    sortConfig.direction, // Changed
+    sortConfig.key,
+    sortConfig.direction,
     localRefreshTrigger,
     refreshTrigger,
   ]);
 
-  // Reset page if sort changes
   useEffect(() => {
-    console.log(
-      "[UserSystemPlaylistsTab] SortConfig changed, resetting page to 1. New sort:",
-      sortConfig
-    );
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, [sortConfig.key, sortConfig.direction]);
 
@@ -206,8 +244,8 @@ export const UserSystemPlaylistsTab = ({
         newVisibility,
         token
       );
+
       toast.success("Visibility updated successfully!", { id: toastId });
-      // Refresh data by incrementing local trigger
       setLocalRefreshTrigger((prev) => prev + 1);
     } catch (err: any) {
       console.error("Error updating playlist visibility:", err);
@@ -219,33 +257,8 @@ export const UserSystemPlaylistsTab = ({
     }
   };
 
-  const handleOpenPreviewModal = (playlist: PlaylistWithPreview) => {
-    // Make sure playlist has required data before opening modal
-    if (!playlist || !playlist.name) {
-      console.error(
-        "[UserSystemPlaylistsTab] Cannot preview playlist: Missing required data",
-        playlist
-      );
-      toast.error("Cannot preview this playlist. Missing required data.");
-      return;
-    }
-
-    // Ensure playlist tracks are properly formatted before opening modal
-    if (!playlist.tracks || !Array.isArray(playlist.tracks)) {
-      console.warn(
-        "[UserSystemPlaylistsTab] Playlist has no tracks or invalid tracks format",
-        playlist
-      );
-      // Still allow opening by providing empty tracks array
-      setPreviewingPlaylist({
-        ...playlist,
-        tracks: [],
-      });
-    } else {
-      // Just use the playlist as is, the modal component handles null checks
-      setPreviewingPlaylist(playlist);
-    }
-
+  const handleOpenPreviewModal = (playlist: PreviewModalPlaylistData) => {
+    setPreviewingPlaylist(playlist);
     setIsPlaylistPreviewModalOpen(true);
   };
 
@@ -254,45 +267,9 @@ export const UserSystemPlaylistsTab = ({
     setPreviewingPlaylist(null);
   };
 
-  // New function to handle both refresh and close for the preview modal
-  const handleRefreshAndClosePreviewModal = () => {
-    handleClosePreviewModal(); // Close the modal first
-    setLocalRefreshTrigger((prev) => prev + 1); // Trigger data refresh
-    // Alternatively, if refreshData was kept: refreshData();
-  };
-
-  const handleOpenDeleteModal = (playlist: PlaylistWithPreview) => {
-    setDeletingPlaylist(playlist);
-    setIsDeletePlaylistModalOpen(true);
-  };
-
-  const handleCloseDeleteModal = () => {
-    setIsDeletePlaylistModalOpen(false);
-    setDeletingPlaylist(null);
-  };
-
-  const handleDeletePlaylist = async () => {
-    if (!deletingPlaylist) return;
-
-    setIsDeletingPlaylist(true);
-    const toastId = toast.loading("Deleting playlist...");
-
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) throw new Error("No authentication token found");
-
-      await api.admin.deleteSystemPlaylist(deletingPlaylist.id, token);
-
-      toast.success("Playlist successfully deleted!", { id: toastId });
-      handleCloseDeleteModal();
-      // Refresh data
-      setLocalRefreshTrigger((prev) => prev + 1);
-    } catch (err: any) {
-      console.error("Error deleting playlist:", err);
-      toast.error(err.message || "Could not delete playlist.", { id: toastId });
-    } finally {
-      setIsDeletingPlaylist(false);
-    }
+  const handleRefreshAndCloseModal = () => {
+    handleClosePreviewModal();
+    refreshData(); // Hoặc setLocalRefreshTrigger((prev) => prev + 1);
   };
 
   const renderSortIcon = (key: keyof Playlist) => {
@@ -304,10 +281,9 @@ export const UserSystemPlaylistsTab = ({
     ) : (
       <ArrowUpDown className="ml-2 h-4 w-4" />
     );
-    // Consider using ArrowUp/ArrowDown for clearer indication
   };
 
-  if (loading && playlists.length === 0) {
+  if (loading && playlistsForModal.length === 0) {
     return (
       <div className="flex justify-center items-center h-40">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -323,7 +299,7 @@ export const UserSystemPlaylistsTab = ({
     );
   }
 
-  if (!loading && !error && playlists.length === 0) {
+  if (!loading && !error && playlistsForModal.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -333,8 +309,8 @@ export const UserSystemPlaylistsTab = ({
         </CardHeader>
         <CardContent className="py-10">
           <div className="text-center text-muted-foreground">
-            <p className="text-lg">No System Playlists Found</p>
-            <p>This user doesn't have any system playlists yet.</p>
+            <p className="text-lg">Không tìm thấy System Playlist được tạo</p>
+            <p>Người dùng này hiện chưa có system playlist nào.</p>
           </div>
         </CardContent>
       </Card>
@@ -349,7 +325,6 @@ export const UserSystemPlaylistsTab = ({
             System Generated Playlists ({pagination.totalItems} playlists)
           </CardTitle>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* <Input placeholder="Search AI playlists..." className="sm:w-[250px]" /> */}
             <Button
               variant="outline"
               size="sm"
@@ -365,7 +340,7 @@ export const UserSystemPlaylistsTab = ({
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {error && playlists.length > 0 && (
+        {error && playlistsForModal.length > 0 && (
           <div className="mx-4 my-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm sm:mx-6">
             <p>
               Could not fully refresh data. Displaying last known playlists.
@@ -398,30 +373,51 @@ export const UserSystemPlaylistsTab = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && playlists.length > 0 && (
+              {loading && playlistsForModal.length > 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </TableCell>
                 </TableRow>
               )}
-              {playlists.map((playlist) => (
+              {playlistsForModal.map((playlist) => (
                 <TableRow key={playlist.id} className="hover:bg-muted/50">
                   <TableCell className="pl-4 sm:pl-6 py-2 align-middle">
                     {playlist.tracks && playlist.tracks.length > 0 ? (
                       <div className="flex -space-x-2 overflow-hidden">
-                        {playlist.tracks.slice(0, 3).map(({ track }) =>
-                          track.coverUrl ? (
+                        {playlist.tracks.slice(0, 3).map(({ track }) => {
+                          const isValidUrl =
+                            track.coverUrl &&
+                            typeof track.coverUrl === "string" &&
+                            (track.coverUrl.startsWith("http") ||
+                              track.coverUrl.startsWith("/"));
+                          if (!isValidUrl && track.coverUrl) {
+                            console.warn(
+                              "[UserSystemPlaylistsTab] Invalid track.coverUrl detected:",
+                              track.coverUrl,
+                              "for track:",
+                              track.id
+                            );
+                          }
+                          const imageUrl = isValidUrl
+                            ? track.coverUrl
+                            : "/images/default-track.jpg";
+
+                          return imageUrl ? (
                             <img
                               key={track.id}
-                              src={track.coverUrl}
-                              alt={track.title}
-                              title={`${track.title} by ${
+                              src={imageUrl}
+                              alt={track.title || "Track cover"}
+                              title={`${track.title || "N/A"} by ${
                                 track.artist?.artistName || "Unknown"
                               }`}
-                              className="inline-block h-8 w-8 rounded-full ring-2 ring-background"
+                              className="inline-block h-8 w-8 rounded-full ring-2 ring-background object-cover"
                               onError={(e) => {
-                                // Fallback if image fails to load
+                                console.error(
+                                  "[UserSystemPlaylistsTab] Image onError for src:",
+                                  imageUrl,
+                                  e
+                                );
                                 (e.target as HTMLImageElement).src =
                                   "/images/default-track.jpg";
                               }}
@@ -430,15 +426,16 @@ export const UserSystemPlaylistsTab = ({
                             <div
                               key={track.id}
                               className="h-8 w-8 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs overflow-hidden"
+                              title="Default track cover"
                             >
                               <img
                                 src="/images/default-track.jpg"
-                                alt="Default cover"
+                                alt="Default track cover"
                                 className="w-full h-full object-cover"
                               />
                             </div>
-                          )
-                        )}
+                          );
+                        })}
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">
@@ -460,23 +457,25 @@ export const UserSystemPlaylistsTab = ({
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell py-2 align-middle text-center">
-                    {playlist.totalTracks}
+                    {/* Sử dụng playlist.tracks.length vì totalTracks từ API có thể chưa khớp nếu có lỗi */}
+                    {playlist.tracks.length}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell py-2 align-middle text-center">
                     <Badge
                       variant={
                         playlist.privacy === "PUBLIC" ? "default" : "secondary"
                       }
-                      className={`
-                        ${
-                          playlist.privacy === "PUBLIC"
-                            ? "bg-green-500 hover:bg-green-600"
-                            : "bg-gray-500 hover:bg-gray-600"
-                        }
-                         text-white px-2 py-0.5 text-xs rounded-full transition-colors duration-150
-                      `}
+                      className={`${
+                        playlist.privacy === "PUBLIC"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : "bg-gray-500 hover:bg-gray-600"
+                      } text-white px-2 py-0.5 text-xs rounded-full transition-colors duration-150`}
                     >
-                      {actionLoading === playlist.id ? (
+                      {actionLoading === playlist.id &&
+                      playlist.privacy !==
+                        (actionLoading === playlist.id
+                          ? "PRIVATE"
+                          : "PUBLIC") ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         playlist.privacy
@@ -507,15 +506,6 @@ export const UserSystemPlaylistsTab = ({
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive-foreground hover:bg-destructive"
-                        title="Delete Playlist"
-                        onClick={() => handleOpenDeleteModal(playlist)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -540,18 +530,8 @@ export const UserSystemPlaylistsTab = ({
           isOpen={isPlaylistPreviewModalOpen}
           onClose={handleClosePreviewModal}
           playlist={previewingPlaylist}
-          theme={theme === "dark" ? "dark" : "light"}
-          onRefreshAndClose={handleRefreshAndClosePreviewModal}
-        />
-      )}
-      {deletingPlaylist && (
-        <DeletePlaylistModal
-          isOpen={isDeletePlaylistModalOpen}
-          onClose={handleCloseDeleteModal}
-          onConfirm={handleDeletePlaylist}
-          playlistName={deletingPlaylist.name}
-          isDeleting={isDeletingPlaylist}
           theme={theme}
+          onRefreshAndClose={handleRefreshAndCloseModal}
         />
       )}
     </Card>

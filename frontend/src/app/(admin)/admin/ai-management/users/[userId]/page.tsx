@@ -8,13 +8,14 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { api } from "@/utils/api";
 import type { User } from "@/types";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 
-import { UserAiPlaylistsTab } from "@/components/admin/users/UserAiPlaylistsTab";
+// import { UserSystemPlaylistsTab } from "@/components/admin/users/UserSystemPlaylistsTab";
+import { UserSystemPlaylistsTab } from "@/components/admin/users/UserSystemPlaylistsTab";
 import { UserListeningHistoryTab } from "@/components/admin/users/UserListeningHistoryTab";
+import GeneratePlaylistParamsModal from "@/components/admin/users/GeneratePlaylistParamsModal";
 
-export default function UserDetailPageAiManagement() {
-  // Renamed component
+export default function UserSystemPlaylistDetailPage() {
   const params = useParams();
   const userId = params.userId as string;
   const { theme } = useTheme();
@@ -22,10 +23,11 @@ export default function UserDetailPageAiManagement() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingPlaylist, setGeneratingPlaylist] = useState(false);
-  const [playlistRefreshTrigger, setPlaylistRefreshTrigger] = useState(0); // State to trigger refresh
+  const [isGeneratingPlaylist, setIsGeneratingPlaylist] = useState(false);
+  const [systemPlaylistRefreshTrigger, setSystemPlaylistRefreshTrigger] =
+    useState(0);
+  const [isParamsModalOpen, setIsParamsModalOpen] = useState(false);
 
-  // Wrap fetchUserDetails in useCallback
   const fetchUserDetails = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -33,7 +35,6 @@ export default function UserDetailPageAiManagement() {
     try {
       const token = localStorage.getItem("userToken");
       if (!token) throw new Error("No authentication token found");
-      // Assuming api.admin.getUserById exists and is configured in @/utils/api
       const fetchedUser = await api.admin.getUserById(userId, token);
       setUser(fetchedUser);
     } catch (err: any) {
@@ -47,31 +48,47 @@ export default function UserDetailPageAiManagement() {
 
   useEffect(() => {
     fetchUserDetails();
-  }, [fetchUserDetails]); // Use fetchUserDetails directly
+  }, [fetchUserDetails]);
 
-  const handleGeneratePlaylist = async () => {
+  const handleGenerateWithParams = async (params: {
+    customPromptKeywords: string;
+    requestedTrackCount: number;
+  }) => {
     if (!userId) return;
-    setGeneratingPlaylist(true);
-    const toastId = toast.loading("Generating AI Playlist...");
+    setIsGeneratingPlaylist(true);
+    const toastId = toast.loading("Generating System Playlist...");
     try {
       const token = localStorage.getItem("userToken");
       if (!token) throw new Error("No authentication token found");
-      // Assuming api.admin.generateUserAiPlaylist exists in @/utils/api
-      const result = await api.admin.generateUserAiPlaylist(userId, token);
+
+      const result = await api.admin.generateSystemPlaylist(
+        userId,
+        params,
+        token
+      );
+
       toast.success(
-        `Successfully generated AI playlist: ${result.playlist.name}`,
+        `Successfully generated playlist: ${result.playlist.name}`,
         { id: toastId }
       );
-      // Trigger refresh for the playlist tab
-      setPlaylistRefreshTrigger((prev) => prev + 1);
+      setSystemPlaylistRefreshTrigger((prev) => prev + 1);
+      setIsParamsModalOpen(false);
     } catch (err: any) {
-      console.error("Error generating AI playlist:", err);
-      toast.error(err.message || "Failed to generate AI playlist.", {
-        id: toastId,
-      });
+      console.error("Error generating system playlist:", err);
+      let errorMessage = "Failed to generate system playlist.";
+      if (err.response && err.response.data && err.response.data.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      toast.error(errorMessage, { id: toastId });
     } finally {
-      setGeneratingPlaylist(false);
+      setIsGeneratingPlaylist(false);
     }
+  };
+
+  const handleOpenParamsModal = () => {
+    setIsParamsModalOpen(true);
   };
 
   if (loading) {
@@ -98,45 +115,52 @@ export default function UserDetailPageAiManagement() {
     <div
       className={`container mx-auto space-y-6 p-4 mb-16 md:mb-0 theme-${theme}`}
     >
-      {/* User Header Info - Keep it consistent */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-            {user.name || user.username || "User Details"}
+            {user.name || user.username || "User Details"} - System Playlists
+            Management
           </h1>
-          <p className="text-sm text-secondary">{user.email}</p>
+          <p className="text-sm text-secondary">
+            Manage System Playlists for {user.email}
+          </p>
         </div>
         <div>
           <Button
-            onClick={handleGeneratePlaylist}
-            disabled={generatingPlaylist}
+            onClick={handleOpenParamsModal}
+            disabled={isGeneratingPlaylist}
           >
-            {generatingPlaylist ? (
+            {isGeneratingPlaylist ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Generate AI Playlist
+            Generate System Playlist
           </Button>
         </div>
       </div>
 
-      {/* Tabs for different sections */}
-      <Tabs defaultValue="ai-playlists" className="w-full">
+      <Tabs defaultValue="system-playlists" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="ai-playlists">AI Playlists</TabsTrigger>
+          <TabsTrigger value="system-playlists">System Playlists</TabsTrigger>
           <TabsTrigger value="history">Listening History</TabsTrigger>
         </TabsList>
-        <TabsContent value="ai-playlists" className="mt-4">
-          {/* Use the imported component and pass the refresh trigger */}
-          <UserAiPlaylistsTab
+        <TabsContent value="system-playlists" className="mt-4">
+          <UserSystemPlaylistsTab
             userId={userId}
-            refreshTrigger={playlistRefreshTrigger}
+            refreshTrigger={systemPlaylistRefreshTrigger}
           />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
-          {/* Use the imported history tab component */}
           <UserListeningHistoryTab userId={userId} />
         </TabsContent>
       </Tabs>
+      {user && (
+        <GeneratePlaylistParamsModal
+          isOpen={isParamsModalOpen}
+          onClose={() => setIsParamsModalOpen(false)}
+          onGenerate={handleGenerateWithParams}
+          isLoading={isGeneratingPlaylist}
+        />
+      )}
     </div>
   );
 }

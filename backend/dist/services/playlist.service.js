@@ -218,6 +218,7 @@ const getSystemPlaylists = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {
         type: "SYSTEM",
+        privacy: "PUBLIC",
     };
     if (search && typeof search === "string") {
         whereClause.OR = [
@@ -349,10 +350,26 @@ const getUserSystemPlaylists = async (req) => {
     return formattedPlaylists;
 };
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
+const convertAiOptionsToKeywords = (aiOptions) => {
+    if (!aiOptions || typeof aiOptions !== "object")
+        return "";
+    const keywords = [];
+    if (aiOptions.basedOnMood)
+        keywords.push(`mood: ${aiOptions.basedOnMood}`);
+    if (aiOptions.basedOnGenre)
+        keywords.push(`genre: ${aiOptions.basedOnGenre}`);
+    if (aiOptions.basedOnArtist)
+        keywords.push(`artist: ${aiOptions.basedOnArtist}`);
+    if (aiOptions.basedOnSongLength)
+        keywords.push(`song length: ${aiOptions.basedOnSongLength}`);
+    if (aiOptions.basedOnReleaseTime)
+        keywords.push(`release time: ${aiOptions.basedOnReleaseTime}`);
+    return keywords.join(", ");
+};
 const generateAIPlaylist = async (userId, options) => {
     console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
     try {
-        const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
+        const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(options);
         const playlistWithTracks = await db_1.default.playlist.findUnique({
             where: { id: playlist.id },
             include: {
@@ -514,11 +531,12 @@ const updateAllSystemPlaylists = async () => {
                 }
                 const coverUrl = templatePlaylist.coverUrl ||
                     "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
-                await (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
-                    name: templatePlaylist.name,
-                    description: templatePlaylist.description || undefined,
-                    coverUrl: coverUrl,
-                    ...aiOptions,
+                await (0, ai_service_1.createAIGeneratedPlaylist)({
+                    targetUserId: user.id,
+                    generationMode: "userHistory",
+                    requestedTrackCount: aiOptions.trackCount || 20,
+                    type: client_1.PlaylistType.SYSTEM,
+                    customPromptKeywords: convertAiOptionsToKeywords(aiOptions),
                 });
             }
             catch (error) {
@@ -808,6 +826,6 @@ const reorderPlaylistTracks = async (playlistId, orderedTrackIds, requestingUser
 };
 exports.reorderPlaylistTracks = reorderPlaylistTracks;
 function updateVibeRewindPlaylist(userId) {
-    throw new Error('Function not implemented.');
+    throw new Error("Function not implemented.");
 }
 //# sourceMappingURL=playlist.service.js.map

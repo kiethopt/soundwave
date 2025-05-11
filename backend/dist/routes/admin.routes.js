@@ -72,17 +72,19 @@ router.get("/artist-claims", auth_middleware_1.authenticate, (0, auth_middleware
 router.get("/artist-claims/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getArtistClaimRequestDetail);
 router.post("/artist-claims/:id/approve", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveArtistClaimRequest);
 router.post("/artist-claims/:id/reject", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectArtistClaimRequest);
-router.post("/users/:userId/ai-playlists", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.generateUserAiPlaylistHandler);
+router.post("/users/:userId/ai-playlists", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.generateAndAssignAiPlaylistToUserHandler);
 router.put("/ai-playlists/:playlistId/visibility", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.updateAiPlaylistVisibilityHandler);
 router.get("/users/:userId/ai-playlists", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getUserAiPlaylistsHandler);
 router.get("/users/:userId/history", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getUserListeningHistoryHandler);
+router.delete("/ai-playlists/:playlistId/tracks/:trackId", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.removeTrackFromSystemPlaylistHandler);
+router.delete("/ai-playlists/:playlistId", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deleteSystemPlaylistHandler);
 router.post("/tracks/:trackId/reanalyze", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.reanalyzeTrackHandler);
-router.get('/label-registrations', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllLabelRegistrations);
-router.get('/label-registrations/:registrationId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getLabelRegistrationById);
-router.put('/label-registrations/:registrationId/approve', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveLabelRegistration);
-router.put('/label-registrations/:registrationId/reject', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectLabelRegistration);
+router.get("/label-registrations", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllLabelRegistrations);
+router.get("/label-registrations/:registrationId", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getLabelRegistrationById);
+router.put("/label-registrations/:registrationId/approve", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveLabelRegistration);
+router.put("/label-registrations/:registrationId/reject", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectLabelRegistration);
 router.get("/artist-role-requests", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRoleRequestsHandler);
 router.get("/export/track-artist-data", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.exportTrackAndArtistData);
-router.post('/fix-album-track-types', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.fixAlbumTrackTypes);
+router.post("/fix-album-track-types", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.fixAlbumTrackTypes);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

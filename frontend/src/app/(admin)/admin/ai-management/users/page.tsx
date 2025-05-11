@@ -23,6 +23,7 @@ import {
   Edit,
   Bot,
   Loader2,
+  ListChecks,
 } from "lucide-react";
 import { UserInfoModal } from "@/components/ui/data-table/data-table-modals";
 import {
@@ -30,17 +31,16 @@ import {
   ConfirmDeleteModal,
 } from "@/components/ui/admin-modals";
 import { Input } from "@/components/ui/input";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 
 interface SortConfig {
   key: keyof User | null;
   direction: "asc" | "desc";
 }
 
-export default function AiUserManagementPage() {
-  // Renamed component
+export default function UserSystemPlaylistManagementPage() {
   const { theme } = useTheme();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -202,7 +202,6 @@ export default function AiUserManagementPage() {
 
   const handleAction = (action: string, user: User) => {
     if (action === "view") {
-      // Navigate to the AI management user detail page
       router.push(`/admin/ai-management/users/${user.id}`);
     } else if (action === "edit") {
       setEditingUser(user);
@@ -262,8 +261,6 @@ export default function AiUserManagementPage() {
     }
     setActionLoading(userId);
     try {
-      // Assuming FormData type from types/index.ts is compatible or adjust as needed
-      // For now, we cast to 'any' to bypass strict type checking if FormData here is different
       await api.admin.updateUser(userId, editFormData as any, token);
       toast.success("User updated successfully!");
       setIsEditModalOpen(false);
@@ -314,11 +311,10 @@ export default function AiUserManagementPage() {
       if (currentPage > newTotalPages && newTotalPages > 0) {
         setCurrentPage(newTotalPages);
       } else if (newTotalUsers === 0) {
-        setCurrentPage(1); // Reset to page 1 if no users left
+        setCurrentPage(1);
       }
-      // Trigger a refresh after state update or rely on existing refreshTable if currentPage change triggers it
       refreshTable();
-      setSelectedUserIds(new Set()); // Clear selection
+      setSelectedUserIds(new Set());
     } catch (err: any) {
       console.error("Error during bulk delete:", err);
       toast.error(err.message || "Failed to delete selected users.");
@@ -331,7 +327,6 @@ export default function AiUserManagementPage() {
     user: User,
     e: React.MouseEvent<HTMLTableRowElement>
   ) => {
-    // Prevent navigation if clicking on interactive elements within the row
     const target = e.target as HTMLElement;
     if (
       target.closest('button, input[type="checkbox"], a, [role="menuitem"]')
@@ -360,13 +355,11 @@ export default function AiUserManagementPage() {
     >
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold flex items-center">
-          <Bot className="mr-3 h-8 w-8 text-primary" /> User AI Playlist
-          Management
+          <ListChecks className="mr-3 h-8 w-8 text-primary" />
+          User System Playlist Management
         </h1>
-        {/* Add any specific buttons for this page, e.g., "Create User with AI Playlist" if needed */}
       </div>
 
-      {/* Filters and Search */}
       <div className="mb-6 p-4 rounded-lg shadow-md bg-card border">
         <form
           onSubmit={handleSearchSubmit}
@@ -447,7 +440,6 @@ export default function AiUserManagementPage() {
         </form>
       </div>
 
-      {/* Bulk Actions - kept for consistency, review if needed for AI context */}
       {selectedUserIds.size > 0 && (
         <div className="mb-4 flex items-center gap-2 p-3 bg-muted rounded-md border">
           <p className="text-sm font-medium">
@@ -469,7 +461,6 @@ export default function AiUserManagementPage() {
         </div>
       )}
 
-      {/* Users Table */}
       <div className="overflow-x-auto rounded-lg border shadow-md">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted/50">
@@ -568,7 +559,7 @@ export default function AiUserManagementPage() {
                       handleSelectRow(user.id, checked)
                     }
                     aria-labelledby={`user-name-${user.id}`}
-                    onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -626,7 +617,7 @@ export default function AiUserManagementPage() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-primary"
-                    title="View User Details & AI Playlists"
+                    title="View User Details & System Playlists"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAction("view", user);
@@ -676,7 +667,6 @@ export default function AiUserManagementPage() {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-6 flex justify-center items-center space-x-2">
           <Button
@@ -701,7 +691,6 @@ export default function AiUserManagementPage() {
         </div>
       )}
 
-      {/* Modals */}
       {viewingUser && (
         <UserInfoModal
           user={viewingUser}

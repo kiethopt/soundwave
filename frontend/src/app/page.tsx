@@ -95,32 +95,21 @@ export default function Home() {
             setTrendingPlaylist(trending || null);
           }
 
-          let combinedAiPlaylists: Playlist[] = [];
-
-          if (
-            personalizedSystemPlaylists &&
-            personalizedSystemPlaylists.length > 0
-          ) {
-            combinedAiPlaylists = [...personalizedSystemPlaylists];
-          }
-
-          if (isAuthenticated && userPlaylists && userPlaylists.length > 0) {
-            const adminGeneratedPublicAi = userPlaylists.filter(
-              (playlist: Playlist) =>
-                playlist.isAIGenerated &&
-                playlist.type === "NORMAL" &&
-                playlist.privacy === PlaylistPrivacy.PUBLIC
+          if (isAuthenticated) {
+            let processedPlaylists = personalizedSystemPlaylists || [];
+            const welcomeMixIndex = processedPlaylists.findIndex(
+              (p: Playlist) => p.name === "Welcome Mix"
             );
-            adminGeneratedPublicAi.forEach((adminP: Playlist) => {
-              if (!combinedAiPlaylists.find((p) => p.id === adminP.id)) {
-                combinedAiPlaylists.push(adminP);
-              }
-            });
-          }
 
-          if (isAuthenticated && combinedAiPlaylists.length > 0) {
-            setPersonalizedPlaylists(combinedAiPlaylists);
-          } else if (isAuthenticated) {
+            if (welcomeMixIndex > -1) {
+              const welcomeMixItem = processedPlaylists.splice(
+                welcomeMixIndex,
+                1
+              )[0];
+              processedPlaylists = [welcomeMixItem, ...processedPlaylists];
+            }
+            setPersonalizedPlaylists(processedPlaylists);
+          } else {
             setPersonalizedPlaylists([]);
           }
         }

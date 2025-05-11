@@ -495,8 +495,10 @@ export const api = {
 
     deleteSystemPlaylist: async (playlistId: string, token: string) => {
       return fetchWithAuth(
-        `/api/playlists/admin/system/base/${playlistId}`,
-        { method: "DELETE" },
+        `/api/admin/ai-playlists/${playlistId}`,
+        {
+          method: "DELETE",
+        },
         token
       );
     },
@@ -591,10 +593,21 @@ export const api = {
       ),
 
     // --- User AI Playlist Management by Admin ---
-    generateUserAiPlaylist: async (userId: string, token: string) => {
+    generateSystemPlaylist: async (
+      userId: string,
+      params?: { requestedTrackCount?: number; customPromptKeywords?: string },
+      token?: string
+    ) => {
       return fetchWithAuth(
         `/api/admin/users/${userId}/ai-playlists`,
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // Send params in the body if they exist
+          body: params ? JSON.stringify(params) : undefined,
+        },
         token
       );
     },
@@ -614,6 +627,21 @@ export const api = {
       );
     },
 
+    updateSystemPlaylistVisibility: async (
+      playlistId: string,
+      newVisibility: "PUBLIC" | "PRIVATE",
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/admin/ai-playlists/${playlistId}/visibility`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ newVisibility }),
+        },
+        token
+      );
+    },
+
     getUserAiPlaylists: async (
       userId: string,
       token: string,
@@ -625,17 +653,44 @@ export const api = {
       return fetchWithAuth(url, { method: "GET" }, token);
     },
 
+    getUserSystemPlaylists: async (
+      userId: string,
+      token: string,
+      queryParams?: string
+    ) => {
+      const url = queryParams
+        ? `/api/admin/users/${userId}/ai-playlists?${queryParams}`
+        : `/api/admin/users/${userId}/ai-playlists`;
+      return fetchWithAuth(url, { method: "GET" }, token);
+    },
+
     getUserListeningHistory: async (
       userId: string,
       token: string,
-      queryParams?: string // Pass URLSearchParams string e.g., "page=1&limit=10&sortBy=createdAt"
+      params?: { [key: string]: string | number }
     ) => {
-      const url = queryParams
-        ? `/api/admin/users/${userId}/history?${queryParams}`
-        : `/api/admin/users/${userId}/history`;
-      return fetchWithAuth(url, { method: "GET" }, token);
+      const queryParams = new URLSearchParams(
+        params as Record<string, string>
+      ).toString();
+      return fetchWithAuth(
+        `/api/admin/users/${userId}/history?${queryParams}`,
+        { method: "GET" },
+        token
+      );
     },
-    // --- End User AI Playlist Management ---
+
+    // Hàm mới để xóa một track khỏi system playlist
+    removeTrackFromSystemPlaylist: async (
+      playlistId: string,
+      trackId: string,
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/admin/ai-playlists/${playlistId}/tracks/${trackId}`,
+        { method: "DELETE" },
+        token
+      );
+    },
 
     // Method to re-analyze track audio features by admin
     async reanalyzeTrack(
@@ -685,7 +740,7 @@ export const api = {
       token: string,
       page: number = 1,
       limit: number = 10,
-      filters?: ArtistRequestFilters 
+      filters?: ArtistRequestFilters
     ) => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -702,7 +757,7 @@ export const api = {
         if (filters.search) {
           params.append("search", filters.search);
         }
-        if (filters.status) { 
+        if (filters.status) {
           params.append("status", filters.status);
         }
       }
@@ -717,7 +772,7 @@ export const api = {
     getLabelRegistrationById: async (token: string, registrationId: string) => {
       return fetchWithAuth(
         `/api/admin/label-registrations/${registrationId}`,
-        { method: 'GET' }, 
+        { method: "GET" },
         token
       );
     },
@@ -725,18 +780,22 @@ export const api = {
     approveLabelRegistration: async (token: string, registrationId: string) => {
       return fetchWithAuth(
         `/api/admin/label-registrations/${registrationId}/approve`,
-        { method: 'PUT' }, 
+        { method: "PUT" },
         token
       );
     },
 
-    rejectLabelRegistration: async (token: string, registrationId: string, reason: string) => {
+    rejectLabelRegistration: async (
+      token: string,
+      registrationId: string,
+      reason: string
+    ) => {
       return fetchWithAuth(
         `/api/admin/label-registrations/${registrationId}/reject`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: JSON.stringify({ reason }),
-        }, 
+        },
         token
       );
     },
@@ -760,7 +819,8 @@ export const api = {
         if (filters.endDate) {
           params.append("endDate", filters.endDate);
         }
-        if (filters.status) { // This will now be RequestStatus for ArtistRequest
+        if (filters.status) {
+          // This will now be RequestStatus for ArtistRequest
           params.append("status", filters.status);
         }
         if (filters.search) {
@@ -776,17 +836,20 @@ export const api = {
 
     // Add this new method for exporting track and artist data
     async exportTrackArtistData(token: string): Promise<Blob> {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/export/track-artist-data`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/export/track-artist-data`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
-      
+      );
+
       if (!response.ok) {
         throw new Error(`Export failed: ${response.statusText}`);
       }
-      
+
       return response.blob();
     },
   },
@@ -1531,14 +1594,18 @@ export const api = {
     requestRegistration: async (formData: FormData, token: string) => {
       return fetchWithAuth(
         `/api/labels/registrations`,
-        { method: 'POST', body: formData },
+        { method: "POST", body: formData },
         token
       );
     },
 
     // New function to get labels selectable by the current artist
     getSelectableByArtist: async (token: string) => {
-      return fetchWithAuth('/api/labels/selectable/by-artist', { method: 'GET' }, token);
+      return fetchWithAuth(
+        "/api/labels/selectable/by-artist",
+        { method: "GET" },
+        token
+      );
     },
   },
 
@@ -1862,7 +1929,7 @@ export const api = {
       );
     },
 
-    // --- NEW FUNCTION for Suggesting and Adding Tracks --- 
+    // --- NEW FUNCTION for Suggesting and Adding Tracks ---
     suggestAndAddTracksByPrompt: async (
       playlistId: string,
       prompt: string,
@@ -1977,7 +2044,7 @@ export const api = {
       if (filters.status) {
         params.append("status", filters.status);
       }
-      
+
       if (filters.search) {
         params.append("search", filters.search);
       }
@@ -2004,14 +2071,10 @@ export const api = {
         token
       );
     },
-    
+
     // Admin only - delete a report
     deleteReport: async (id: string, token: string) => {
-      return fetchWithAuth(
-        `/api/reports/${id}`,
-        { method: "DELETE" },
-        token
-      );
+      return fetchWithAuth(`/api/reports/${id}`, { method: "DELETE" }, token);
     },
   },
 

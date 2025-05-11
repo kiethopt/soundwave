@@ -16,7 +16,7 @@ import {
 } from "@prisma/client";
 import { getIO, getUserSockets } from "../config/socket";
 import * as trackService from "../services/track.service";
-import ExcelJS from 'exceljs';
+import ExcelJS from "exceljs";
 
 // Define User type including adminLevel for controller scope
 type UserWithAdminLevel = PrismaUser;
@@ -376,7 +376,9 @@ export const approveArtistRequest = async (
     const adminUserId = req.user?.id;
 
     if (!adminUserId) {
-      res.status(401).json({ message: "Admin not authenticated or user ID not found." });
+      res
+        .status(401)
+        .json({ message: "Admin not authenticated or user ID not found." });
       return;
     }
 
@@ -385,7 +387,10 @@ export const approveArtistRequest = async (
       return;
     }
 
-    const result = await adminService.approveArtistRequest(adminUserId, requestId);
+    const result = await adminService.approveArtistRequest(
+      adminUserId,
+      requestId
+    );
 
     res.json({
       message: result.message,
@@ -394,10 +399,12 @@ export const approveArtistRequest = async (
   } catch (error: any) {
     if (
       error instanceof Error &&
-      (error.message.includes("not found") || error.message.includes("cannot be approved") || error.message.includes("User ID missing"))
+      (error.message.includes("not found") ||
+        error.message.includes("cannot be approved") ||
+        error.message.includes("User ID missing"))
     ) {
       res.status(404).json({
-        message: error.message, 
+        message: error.message,
       });
       return;
     }
@@ -433,11 +440,12 @@ export const rejectArtistRequest = async (
   } catch (error) {
     if (
       error instanceof Error &&
-      (error.message.includes("not found") || error.message.includes("cannot be rejected"))
+      (error.message.includes("not found") ||
+        error.message.includes("cannot be rejected"))
     ) {
       // More specific error message from the service
       res.status(404).json({
-        message: error.message, 
+        message: error.message,
       });
       return;
     }
@@ -685,29 +693,42 @@ export const bulkUploadTracks = async (
 };
 
 // --- User AI Playlist Management Handlers ---
-export const generateUserAiPlaylistHandler = async (
+export const generateAndAssignAiPlaylistToUserHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
+  const { userId: targetUserId } = req.params;
+  const adminUserId = req.user!.id; // Assuming admin user is authenticated
+  const { customPromptKeywords, requestedTrackCount } = req.body; // Extract new params
+
+  // Basic validation for new params (optional, but good practice)
+  if (
+    requestedTrackCount !== undefined &&
+    (typeof requestedTrackCount !== "number" ||
+      requestedTrackCount < 5 ||
+      requestedTrackCount > 100)
+  ) {
+    res.status(400).json({
+      message: "requestedTrackCount must be a number between 5 and 100.",
+    });
+    return;
+  }
+  if (
+    customPromptKeywords !== undefined &&
+    typeof customPromptKeywords !== "string"
+  ) {
+    res.status(400).json({ message: "customPromptKeywords must be a string." });
+    return;
+  }
+
   try {
-    const adminId = req.user?.id;
-    const { userId: targetUserId } = req.params;
-
-    if (!adminId) {
-      res.status(401).json({ message: "Unauthorized: Admin ID missing." });
-      return;
-    }
-    if (!targetUserId) {
-      res.status(400).json({ message: "Target User ID is required." });
-      return;
-    }
-
     const playlist = await adminService.generateAndAssignAiPlaylistToUser(
-      adminId,
-      targetUserId
+      adminUserId,
+      targetUserId,
+      { customPromptKeywords, requestedTrackCount } // Pass as an object
     );
     res.status(201).json({
-      message: "AI Playlist generated successfully for user.",
+      message: "AI-generated playlist created and assigned successfully.",
       playlist,
     });
   } catch (error) {
@@ -865,7 +886,7 @@ export const getAllLabelRegistrations = async (
       pagination: result.pagination,
     });
   } catch (error) {
-    handleError(res, error, 'Admin: Get all label registrations');
+    handleError(res, error, "Admin: Get all label registrations");
   }
 };
 
@@ -879,7 +900,7 @@ export const getLabelRegistrationById = async (
     const request = await adminService.getLabelRegistrationById(registrationId);
     res.json({ data: request });
   } catch (error) {
-    handleError(res, error, 'Admin: Get label registration by ID');
+    handleError(res, error, "Admin: Get label registration by ID");
   }
 };
 
@@ -891,17 +912,22 @@ export const approveLabelRegistration = async (
   try {
     const adminUserId = req.user?.id;
     if (!adminUserId) {
-      res.status(401).json({ message: 'Admin not authenticated or user ID not found.' });
+      res
+        .status(401)
+        .json({ message: "Admin not authenticated or user ID not found." });
       return;
     }
     const { registrationId } = req.params;
-    const result = await adminService.approveLabelRegistration(adminUserId, registrationId);
+    const result = await adminService.approveLabelRegistration(
+      adminUserId,
+      registrationId
+    );
     res.json({
-      message: 'Label registration approved successfully.',
+      message: "Label registration approved successfully.",
       data: result,
     });
   } catch (error) {
-    handleError(res, error, 'Admin: Approve label registration');
+    handleError(res, error, "Admin: Approve label registration");
   }
 };
 
@@ -913,24 +939,30 @@ export const rejectLabelRegistration = async (
   try {
     const adminUserId = req.user?.id;
     if (!adminUserId) {
-      res.status(401).json({ message: 'Admin not authenticated or user ID not found.' });
+      res
+        .status(401)
+        .json({ message: "Admin not authenticated or user ID not found." });
       return;
     }
     const { registrationId } = req.params;
     const { reason } = req.body;
 
     if (!reason) {
-        res.status(400).json({ message: 'Rejection reason is required.' });
-        return;
+      res.status(400).json({ message: "Rejection reason is required." });
+      return;
     }
 
-    const result = await adminService.rejectLabelRegistration(adminUserId, registrationId, reason);
+    const result = await adminService.rejectLabelRegistration(
+      adminUserId,
+      registrationId,
+      reason
+    );
     res.json({
-      message: 'Label registration rejected successfully.',
+      message: "Label registration rejected successfully.",
       data: result,
     });
   } catch (error) {
-    handleError(res, error, 'Admin: Reject label registration');
+    handleError(res, error, "Admin: Reject label registration");
   }
 };
 // --- End Label Registration Request Management Controllers ---
@@ -942,7 +974,8 @@ export const getArtistRoleRequestsHandler = async (
 ): Promise<void> => {
   try {
     // Assuming authentication/authorization (admin check) is done by middleware
-    const { requests, pagination } = await adminService.getPendingArtistRoleRequests(req);
+    const { requests, pagination } =
+      await adminService.getPendingArtistRoleRequests(req);
     res.json({ requests, pagination }); // Keep the structure consistent with other list endpoints
   } catch (error) {
     handleError(res, error, "Get artist role requests");
@@ -957,94 +990,106 @@ export const exportTrackAndArtistData = async (
 ): Promise<void> => {
   try {
     const data = await adminService.extractTrackAndArtistData();
-    
+
     // Create a new Excel workbook and worksheets
     const workbook = new ExcelJS.Workbook();
-    
+
     // Add a worksheet for artists
-    const artistsSheet = workbook.addWorksheet('Artists');
+    const artistsSheet = workbook.addWorksheet("Artists");
     artistsSheet.columns = [
-      { header: 'ID', key: 'id', width: 30 },
-      { header: 'Name', key: 'artistName', width: 30 },
-      { header: 'User ID', key: 'userId', width: 30 },
-      { header: 'User Email', key: 'userEmail', width: 30 },
-      { header: 'User Username', key: 'userUsername', width: 25 },
-      { header: 'User Name', key: 'userName', width: 25 },
-      { header: 'Bio', key: 'bio', width: 60 },
-      { header: 'Avatar', key: 'avatar', width: 40 },
-      { header: 'Social Media Links', key: 'socialMediaLinks', width: 40 },
-      { header: 'Monthly Listeners', key: 'monthlyListeners', width: 15 },
-      { header: 'Verified', key: 'verified', width: 10 },
-      { header: 'Label', key: 'label', width: 25 },
-      { header: 'Genres', key: 'genres', width: 30 },
-      { header: 'Track Count', key: 'trackCount', width: 15 },
-      { header: 'Created At', key: 'createdAt', width: 15 }
+      { header: "ID", key: "id", width: 30 },
+      { header: "Name", key: "artistName", width: 30 },
+      { header: "User ID", key: "userId", width: 30 },
+      { header: "User Email", key: "userEmail", width: 30 },
+      { header: "User Username", key: "userUsername", width: 25 },
+      { header: "User Name", key: "userName", width: 25 },
+      { header: "Bio", key: "bio", width: 60 },
+      { header: "Avatar", key: "avatar", width: 40 },
+      { header: "Social Media Links", key: "socialMediaLinks", width: 40 },
+      { header: "Monthly Listeners", key: "monthlyListeners", width: 15 },
+      { header: "Verified", key: "verified", width: 10 },
+      { header: "Label", key: "label", width: 25 },
+      { header: "Genres", key: "genres", width: 30 },
+      { header: "Track Count", key: "trackCount", width: 15 },
+      { header: "Created At", key: "createdAt", width: 15 },
     ];
-    
+
     // Add the data to the artists worksheet
     artistsSheet.addRows(data.artists);
-    
+
     // Add a worksheet for albums
-    const albumsSheet = workbook.addWorksheet('Albums');
+    const albumsSheet = workbook.addWorksheet("Albums");
     albumsSheet.columns = [
-      { header: 'ID', key: 'id', width: 30 },
-      { header: 'Title', key: 'title', width: 40 },
-      { header: 'Artist', key: 'artistName', width: 30 },
-      { header: 'Artist ID', key: 'artistId', width: 30 },
-      { header: 'Album Type', key: 'albumType', width: 15 },
-      { header: 'Release Date', key: 'releaseDate', width: 15 },
-      { header: 'Total Tracks', key: 'totalTracks', width: 15 },
-      { header: 'Duration (sec)', key: 'duration', width: 15 },
-      { header: 'Label', key: 'labelName', width: 25 },
-      { header: 'Cover URL', key: 'coverUrl', width: 40 },
-      { header: 'Genres', key: 'genres', width: 30 },
-      { header: 'Created At', key: 'createdAt', width: 15 }
+      { header: "ID", key: "id", width: 30 },
+      { header: "Title", key: "title", width: 40 },
+      { header: "Artist", key: "artistName", width: 30 },
+      { header: "Artist ID", key: "artistId", width: 30 },
+      { header: "Album Type", key: "albumType", width: 15 },
+      { header: "Release Date", key: "releaseDate", width: 15 },
+      { header: "Total Tracks", key: "totalTracks", width: 15 },
+      { header: "Duration (sec)", key: "duration", width: 15 },
+      { header: "Label", key: "labelName", width: 25 },
+      { header: "Cover URL", key: "coverUrl", width: 40 },
+      { header: "Genres", key: "genres", width: 30 },
+      { header: "Created At", key: "createdAt", width: 15 },
     ];
-    
+
     // Add the data to the albums worksheet
     albumsSheet.addRows(data.albums);
-    
+
     // Add a worksheet for tracks
-    const tracksSheet = workbook.addWorksheet('Tracks');
+    const tracksSheet = workbook.addWorksheet("Tracks");
     tracksSheet.columns = [
-      { header: 'ID', key: 'id', width: 30 },
-      { header: 'Title', key: 'title', width: 40 },
-      { header: 'Artist', key: 'artist', width: 30 },
-      { header: 'Album', key: 'album', width: 30 },
-      { header: 'Album ID', key: 'albumId', width: 30 },
-      { header: 'Album Type', key: 'albumType', width: 15 },
-      { header: 'Album Release Date', key: 'albumReleaseDate', width: 15 },
-      { header: 'Album Total Tracks', key: 'albumTotalTracks', width: 15 },
-      { header: 'Audio URL', key: 'audioUrl', width: 40 },
-      { header: 'Label Name', key: 'labelName', width: 30 },
-      { header: 'Featured Artist Names', key: 'featuredArtistNames', width: 40 },
-      { header: 'Duration (sec)', key: 'duration', width: 15 },
-      { header: 'Release Date', key: 'releaseDate', width: 15 },
-      { header: 'Play Count', key: 'playCount', width: 15 },
-      { header: 'Tempo', key: 'tempo', width: 10 },
-      { header: 'Mood', key: 'mood', width: 20 },
-      { header: 'Key', key: 'key', width: 10 },
-      { header: 'Scale', key: 'scale', width: 10 },
-      { header: 'Danceability', key: 'danceability', width: 15 },
-      { header: 'Energy', key: 'energy', width: 15 },
-      { header: 'Genres', key: 'genres', width: 30 },
-      { header: 'Cover URL', key: 'coverUrl', width: 40 }
+      { header: "ID", key: "id", width: 30 },
+      { header: "Title", key: "title", width: 40 },
+      { header: "Artist", key: "artist", width: 30 },
+      { header: "Album", key: "album", width: 30 },
+      { header: "Album ID", key: "albumId", width: 30 },
+      { header: "Album Type", key: "albumType", width: 15 },
+      { header: "Album Release Date", key: "albumReleaseDate", width: 15 },
+      { header: "Album Total Tracks", key: "albumTotalTracks", width: 15 },
+      { header: "Audio URL", key: "audioUrl", width: 40 },
+      { header: "Label Name", key: "labelName", width: 30 },
+      {
+        header: "Featured Artist Names",
+        key: "featuredArtistNames",
+        width: 40,
+      },
+      { header: "Duration (sec)", key: "duration", width: 15 },
+      { header: "Release Date", key: "releaseDate", width: 15 },
+      { header: "Play Count", key: "playCount", width: 15 },
+      { header: "Tempo", key: "tempo", width: 10 },
+      { header: "Mood", key: "mood", width: 20 },
+      { header: "Key", key: "key", width: 10 },
+      { header: "Scale", key: "scale", width: 10 },
+      { header: "Danceability", key: "danceability", width: 15 },
+      { header: "Energy", key: "energy", width: 15 },
+      { header: "Genres", key: "genres", width: 30 },
+      { header: "Cover URL", key: "coverUrl", width: 40 },
     ];
 
     // Add the data to the tracks worksheet
     tracksSheet.addRows(data.tracks);
-    
+
     // Set the content type for Excel download
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=soundwave_data_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=soundwave_data_export_${new Date()
+        .toISOString()
+        .slice(0, 10)}.xlsx`
+    );
 
     // Write the workbook to the response
     await workbook.xlsx.write(res);
-    
+
     // End the response
     res.end();
   } catch (error) {
-    handleError(res, error, 'Export track and artist data');
+    handleError(res, error, "Export track and artist data");
   }
 };
 // --- End Data Export Controllers ---
@@ -1055,12 +1100,89 @@ export const fixAlbumTrackTypes = async (
   res: Response
 ): Promise<void> => {
   try {
+    if (!req.user || (req.user as UserWithAdminLevel).role !== Role.ADMIN) {
+      res.status(403).json({ message: "Forbidden: Admin access required." });
+      return;
+    }
     const result = await adminService.fixAlbumTrackTypeConsistency();
-    res.json({
-      message: 'Album track types fixed successfully.',
-      data: result,
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    handleError(res, error, "Fix album track types");
+  }
+};
+
+export const removeTrackFromSystemPlaylistHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const adminUser = req.user as UserWithAdminLevel;
+    if (!adminUser || adminUser.role !== Role.ADMIN) {
+      res.status(403).json({ message: "Forbidden: Admin access required." });
+      return;
+    }
+
+    const { playlistId, trackId } = req.params;
+
+    if (!playlistId || !trackId) {
+      res
+        .status(400)
+        .json({ message: "Playlist ID and Track ID are required." });
+      return;
+    }
+
+    const updatedPlaylist = await adminService.removeTrackFromSystemPlaylist(
+      adminUser.id,
+      playlistId,
+      trackId
+    );
+
+    res.status(200).json({
+      message: "Track removed from system playlist successfully.",
+      playlist: updatedPlaylist,
     });
   } catch (error) {
-    handleError(res, error, 'Fix album track types');
+    handleError(res, error, "Remove track from system playlist");
+  }
+};
+
+export const deleteSystemPlaylistHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const adminUser = req.user as UserWithAdminLevel;
+    if (!adminUser || adminUser.role !== Role.ADMIN) {
+      res.status(403).json({ message: "Forbidden: Admin access required." });
+      return;
+    }
+
+    const { playlistId } = req.params;
+    if (!playlistId) {
+      res.status(400).json({ message: "Playlist ID is required." });
+      return;
+    }
+
+    // Gọi service để xóa system playlist
+    // Giả định adminService.deleteSystemPlaylist sẽ throw lỗi nếu có vấn đề
+    await adminService.deleteSystemPlaylist(playlistId, adminUser.id);
+
+    res.status(200).json({ message: "System playlist deleted successfully." });
+  } catch (error) {
+    // Kiểm tra các loại lỗi cụ thể từ service nếu cần
+    if (error instanceof Error && error.message.includes("not found")) {
+      res.status(404).json({ message: error.message });
+    } else if (
+      error instanceof Error &&
+      error.message.includes("not allowed")
+    ) {
+      res.status(403).json({ message: error.message });
+    } else {
+      handleError(res, error, "Delete system playlist");
+    }
   }
 };

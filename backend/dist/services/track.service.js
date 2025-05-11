@@ -1511,7 +1511,7 @@ const playTrack = async (req, trackId) => {
     const user = req.user;
     if (!user)
         throw new Error("Unauthorized");
-    const track = await db_1.default.track.findFirst({
+    const trackData = await db_1.default.track.findFirst({
         where: {
             id: trackId,
             isActive: true,
@@ -1519,79 +1519,68 @@ const playTrack = async (req, trackId) => {
         },
         select: prisma_selects_1.trackSelect,
     });
-    if (!track)
+    if (!trackData) {
         throw new Error("Track not found");
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    const existingListen = await db_1.default.history.findFirst({
+    }
+    const track = trackData;
+    if (!track.genres || track.genres.length === 0) {
+        console.log(`[TrackService] Track ${track.id} is missing genres. Triggering re-analysis.`);
+        try {
+            await (0, exports.reanalyzeTrackAudioFeatures)(track.id);
+            console.log(`[TrackService] Successfully re-analyzed genres for track ${track.id}.`);
+        }
+        catch (reanalyzeError) {
+            console.error(`[TrackService] Error re-analyzing genres for track ${track.id}:`, reanalyzeError);
+        }
+    }
+    if (!track.artistId) {
+        console.error(`[TrackService] Critical: Track ${track.id} is missing artistId after initial fetch.`);
+        throw new Error("Track is missing artistId");
+    }
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const existingListenForArtistThisMonth = await db_1.default.history.findFirst({
         where: {
             userId: user.id,
             track: { artistId: track.artistId },
-            createdAt: { gte: lastMonth },
-        },
-    });
-    if (!existingListen) {
-        await db_1.default.artistProfile.update({
-            where: { id: track.artistId },
-            data: { monthlyListeners: { increment: 1 } },
-        });
-    }
-    const existingHistoryRecord = await db_1.default.history.findFirst({
-        where: {
-            userId: user.id,
-            trackId: track.id,
+            createdAt: { gte: oneMonthAgo },
             type: "PLAY",
         },
         select: { id: true },
     });
-    if (existingHistoryRecord) {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour12: false,
+    if (!existingListenForArtistThisMonth) {
+        await db_1.default.artistProfile.update({
+            where: { id: track.artistId },
+            data: { monthlyListeners: { increment: 1 } },
         });
-        console.log(`[TrackService] Updating existing History record ID: ${existingHistoryRecord.id} for user ${user.id}, track ${track.id} at ${formattedTimestamp}`);
-        await db_1.default.history.update({
-            where: { id: existingHistoryRecord.id },
-            data: {
-                playCount: { increment: 1 },
-                updatedAt: new Date(),
-            },
-        });
-    }
-    else {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour12: false,
-        });
-        console.log(`[TrackService] Creating NEW History record for user ${user.id}, track ${track.id} at ${formattedTimestamp}`);
-        await db_1.default.history.create({
-            data: {
-                type: "PLAY",
-                trackId: track.id,
-                userId: user.id,
-                duration: track.duration,
-                completed: true,
-                playCount: 1,
-            },
-        });
+        console.log(`[TrackService] Incremented monthlyListeners for artist ${track.artistId} by user ${user.id}`);
     }
     await db_1.default.track.update({
         where: { id: track.id },
         data: { playCount: { increment: 1 } },
     });
-    return { message: "Play count updated", track };
+    const now = new Date();
+    const formattedTimestamp = now.toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour12: false,
+    });
+    console.log(`[TrackService] Creating NEW History record for user ${user.id}, track ${track.id} at ${formattedTimestamp}`);
+    await db_1.default.history.create({
+        data: {
+            type: "PLAY",
+            trackId: track.id,
+            userId: user.id,
+            duration: track.duration ?? null,
+            completed: true,
+            playCount: 1,
+        },
+    });
+    return { message: "Play count updated and history recorded", track };
 };
 exports.playTrack = playTrack;
 const checkTrackLiked = async (userId, trackId) => {
@@ -1632,7 +1621,9 @@ const reanalyzeTrackAudioFeatures = async (trackId) => {
         where: { id: trackId },
         include: {
             artist: {
-                include: {
+                select: {
+                    id: true,
+                    artistName: true,
                     user: {
                         select: {
                             id: true,
@@ -1647,16 +1638,89 @@ const reanalyzeTrackAudioFeatures = async (trackId) => {
     if (!track) {
         throw new Error("Track not found");
     }
+    if (!track.artist) {
+        throw new Error("Track artist information is missing");
+    }
     const audioBuffer = await downloadAudioBuffer(track.audioUrl);
-    const analysis = await analyzeAudioFeatures(audioBuffer);
-    const updatedTrack = await db_1.default.track.update({
-        where: { id: trackId },
-        data: {
-            ...analysis,
-            albumId: track.album?.id || null,
-        },
+    const reccoAnalysis = await (0, upload_service_1.analyzeAudioWithReccoBeats)(audioBuffer, track.title, track.artist.artistName);
+    const essentiaAnalysis = await analyzeAudioFeatures(audioBuffer);
+    return db_1.default.$transaction(async (tx) => {
+        await tx.trackGenre.deleteMany({
+            where: { trackId: trackId },
+        });
+        const dataToUpdate = {
+            tempo: essentiaAnalysis.tempo ?? reccoAnalysis.tempo,
+            mood: essentiaAnalysis.mood ?? reccoAnalysis.mood,
+            key: essentiaAnalysis.key ?? reccoAnalysis.key,
+            scale: essentiaAnalysis.scale ?? reccoAnalysis.scale,
+            danceability: essentiaAnalysis.danceability ?? reccoAnalysis.danceability,
+            energy: essentiaAnalysis.energy ?? reccoAnalysis.energy,
+        };
+        const newGenreIds = reccoAnalysis.genreIds;
+        if (newGenreIds && newGenreIds.length > 0) {
+            dataToUpdate.genres = {
+                create: newGenreIds.map((genreId) => ({
+                    genre: { connect: { id: genreId } },
+                })),
+            };
+        }
+        const updatedTrackInTx = await tx.track.update({
+            where: { id: trackId },
+            data: dataToUpdate,
+            select: {
+                id: true,
+                title: true,
+                duration: true,
+                releaseDate: true,
+                audioUrl: true,
+                coverUrl: true,
+                type: true,
+                isActive: true,
+                playCount: true,
+                createdAt: true,
+                updatedAt: true,
+                trackNumber: true,
+                tempo: true,
+                mood: true,
+                key: true,
+                scale: true,
+                danceability: true,
+                energy: true,
+                artist: {
+                    select: {
+                        id: true,
+                        artistName: true,
+                    },
+                },
+                album: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
+                genres: {
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+                featuredArtists: {
+                    select: {
+                        artistProfile: { select: { id: true, artistName: true } },
+                    },
+                },
+                label: { select: { id: true, name: true } },
+            },
+        });
+        if (!updatedTrackInTx) {
+            throw new Error("Failed to update or retrieve track after re-analysis in transaction.");
+        }
+        return updatedTrackInTx;
     });
-    return updatedTrack;
 };
 exports.reanalyzeTrackAudioFeatures = reanalyzeTrackAudioFeatures;
 //# sourceMappingURL=track.service.js.map
