@@ -97,10 +97,15 @@ export default function Home() {
 
           if (isAuthenticated) {
             let processedPlaylists = personalizedSystemPlaylists || [];
+            processedPlaylists = processedPlaylists.filter((p: Playlist) => {
+              if (p.type === "SYSTEM" && p.isAIGenerated) {
+                return p.privacy === "PUBLIC";
+              }
+              return true;
+            });
             const welcomeMixIndex = processedPlaylists.findIndex(
               (p: Playlist) => p.name === "Welcome Mix"
             );
-
             if (welcomeMixIndex > -1) {
               const welcomeMixItem = processedPlaylists.splice(
                 welcomeMixIndex,

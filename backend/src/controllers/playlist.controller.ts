@@ -166,10 +166,6 @@ export const getPlaylists = async (
       const playlists = await prisma.playlist.findMany({
         where: {
           userId,
-          OR: [
-            { isAIGenerated: false },
-            { isAIGenerated: true, privacy: 'PUBLIC' },
-          ],
         },
         include: {
           _count: {

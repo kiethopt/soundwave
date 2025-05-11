@@ -3116,6 +3116,7 @@ export const getUserAiPlaylists = async (
   // 3. Query AI Playlists with pagination
   const where: Prisma.PlaylistWhereInput = {
     userId: targetUserId,
+    type: PlaylistType.SYSTEM,  
     isAIGenerated: true,
   };
 

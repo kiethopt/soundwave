@@ -278,15 +278,13 @@ ${historyTracksString}
 Analyze this user's taste based on their listening history (preferred genres, artists, moods, energy levels, danceability, tempo ranges, keys).
 Ensure your recommendations are fresh, diverse, and explore different facets of the user's potential taste, not just repeating the most obvious patterns.
 Your task is to recommend EXACTLY ${requestedTrackCount} NEW and DIVERSE songs that would fit this user's taste.
-It is crucial that you return exactly ${requestedTrackCount} unique track IDs.
-The recommended songs MUST NOT be from their listening history (IDs: ${historyTrackIds.join(
-        ", "
-      )}).
+You MUST return exactly ${requestedTrackCount} unique track IDs from the provided pool. If you cannot, explain why in the explanation field, but always try to return exactly ${requestedTrackCount} IDs.
+The recommended songs MUST NOT be from their listening history (IDs: ${historyTrackIds.join(", ")}).
 The songs you recommend MUST be chosen EXCLUSIVELY from the following list of available track IDs in our system: ${allAvailableTracksString}.
 Do not invent new track IDs. Only use IDs from the provided list.
 If finding ${requestedTrackCount} distinct tracks that perfectly match all aspects of the user's history is challenging from the available list, slightly broaden your interpretation of 'fitting the user's taste' to ensure the list contains ${requestedTrackCount} tracks. Prioritize variety and discovery.
 Please provide your recommendations as a JSON array of ${requestedTrackCount} track IDs. Example: ["trackId1", ..., "trackId${requestedTrackCount}"]
-Additionally, very briefly (1-2 sentences total for the whole playlist), explain your choices based on the user's history.
+Additionally, very briefly (1-2 sentences total for the whole playlist), explain your choices based on the user's history. If you cannot return exactly ${requestedTrackCount} tracks, explain the reason in the explanation field.
 Output format should be a JSON object like this:
 {
   "recommended_track_ids": ["id1", ..., "id${requestedTrackCount}"],
@@ -474,10 +472,16 @@ Output format should be a JSON object like this:
 
     // Ensure uniqueness and correct count (but only cap, don't add)
     finalTrackIds = Array.from(new Set(finalTrackIds)); // Make unique
-    // If Gemini provided more than requested (after filtering), cap it.
-    // If it provided less, we now accept that and do not add more.
     if (finalTrackIds.length > requestedTrackCount) {
       finalTrackIds = finalTrackIds.slice(0, requestedTrackCount);
+    }
+    if (finalTrackIds.length < requestedTrackCount) {
+      console.warn(
+        `[AI Service][WARNING] Gemini/AI did NOT return enough tracks: requested ${requestedTrackCount}, got ${finalTrackIds.length}. Explanation from AI:`,
+        explanationFromAI || "(no explanation)"
+      );
+      // Bạn có thể throw error ở đây nếu muốn bắt buộc AI phải trả đủ:
+      // throw new Error(`AI did not return enough tracks. Requested: ${requestedTrackCount}, got: ${finalTrackIds.length}`);
     }
 
     if (finalTrackIds.length === 0) {
@@ -523,7 +527,7 @@ Output format should be a JSON object like this:
         const firstTrackArtistName =
           orderedDetailedTracks[0].artist?.artistName;
         if (firstTrackArtistName) {
-          finalPlaylistName = `${firstTrackArtistName} Radio`;
+          finalPlaylistName = `${firstTrackArtistName} Playlist`;
         }
 
         const distinctArtistNames = Array.from(
