@@ -19,9 +19,9 @@ const createReport = async (req, res) => {
             res.status(400).json({ message: 'Description is required' });
             return;
         }
-        if (!trackId && !playlistId && !albumId) {
+        if (type !== client_1.ReportType.OTHER && !trackId && !playlistId && !albumId) {
             res.status(400).json({
-                message: 'A report must be associated with a track, playlist, or album'
+                message: 'A report must be associated with a track, playlist, or album, unless it is of type OTHER.'
             });
             return;
         }

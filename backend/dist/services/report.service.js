@@ -6,8 +6,8 @@ const prisma_selects_1 = require("../utils/prisma-selects");
 const prisma = new client_1.PrismaClient();
 class ReportService {
     static async createReport(userId, data) {
-        if (!data.trackId && !data.playlistId && !data.albumId) {
-            throw new Error('A report must be associated with a track, playlist, or album');
+        if (!data.trackId && !data.playlistId && !data.albumId && data.type !== client_1.ReportType.OTHER) {
+            throw new Error('A report must be associated with a track, playlist, or album, unless it is of type OTHER.');
         }
         if (data.trackId) {
             const track = await prisma.track.findUnique({
@@ -70,6 +70,10 @@ class ReportService {
             entityName = playlist?.name || 'playlist';
             entityType = 'playlist';
         }
+        else if (data.type === client_1.ReportType.OTHER) {
+            entityName = 'Platform Issue/General Feedback';
+            entityType = 'platform';
+        }
         const admins = await prisma.user.findMany({
             where: { role: client_1.Role.ADMIN }
         });
@@ -77,7 +81,7 @@ class ReportService {
             await prisma.notification.create({
                 data: {
                     type: client_1.NotificationType.NEW_REPORT_SUBMITTED,
-                    message: `New ${data.type} report submitted for ${entityType} "${entityName}"`,
+                    message: `New ${data.type} report submitted for ${entityType === 'platform' ? entityName : `${entityType} "${entityName}"`}`,
                     recipientType: client_1.RecipientType.USER,
                     userId: admin.id,
                     senderId: userId,
@@ -211,6 +215,10 @@ class ReportService {
             entityName = report.playlist.name || 'playlist';
             entityType = 'playlist';
         }
+        else if (report.type === client_1.ReportType.OTHER) {
+            entityName = 'Platform Issue/General Feedback';
+            entityType = 'platform';
+        }
         if (data.status === client_1.ReportStatus.RESOLVED) {
             if (report.trackId && report.track?.isActive) {
                 await prisma.track.update({
@@ -233,7 +241,7 @@ class ReportService {
         await prisma.notification.create({
             data: {
                 type: client_1.NotificationType.REPORT_RESOLVED,
-                message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+                message: `Your report for ${entityType === 'platform' ? entityName : `${entityType} "${entityName}"`} has been ${statusText}`,
                 recipientType: client_1.RecipientType.USER,
                 userId: report.reporter.id,
                 senderId: adminId,
