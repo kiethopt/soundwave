@@ -73,11 +73,41 @@ const toBooleanValue = (value) => {
 };
 exports.toBooleanValue = toBooleanValue;
 const handleError = (res, error, operation) => {
-    console.error(`${operation} error:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    res.status(500).json({
-        message: 'Internal server error',
-        error: errorMessage,
+    let statusCode = 500;
+    let message = 'Internal server error';
+    console.error(`Error in ${operation}:`, error);
+    if (error instanceof Error) {
+        if (error.message.startsWith('INVALID_PROMPT:')) {
+            statusCode = 400;
+            message = error.message.replace('INVALID_PROMPT:', '').trim();
+            console.log(`[AI Error] Invalid prompt detected: ${message}`);
+        }
+        else if (error.message.includes('Not Found') || error.name === 'NotFoundError') {
+            statusCode = 404;
+            message = error.message || 'Resource not found';
+        }
+        else if (error.message.includes('Forbidden') || error.message.includes('Not authorized')) {
+            statusCode = 403;
+            message = error.message;
+        }
+        else if (error.message.includes('Unauthorized') || error.message.includes('authentication failed')) {
+            statusCode = 401;
+            message = error.message;
+        }
+        else if (error.message.includes('Invalid') ||
+            error.message.includes('already exists') ||
+            error.message.includes('validation failed') ||
+            error.name === 'ValidationError') {
+            statusCode = 400;
+            message = error.message;
+        }
+        if (statusCode === 500) {
+            message = error.message || 'Internal server error';
+        }
+    }
+    res.status(statusCode).json({
+        success: false,
+        message,
     });
 };
 exports.handleError = handleError;
