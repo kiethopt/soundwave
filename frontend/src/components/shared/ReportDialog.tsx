@@ -44,7 +44,7 @@ export function ReportDialog({
 }: ReportDialogProps) {
   // For playlists, default to AI_GENERATION_ISSUE
   const [reportType, setReportType] = useState<ReportType>(
-    entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION'
+    entityType === 'playlist' ? ReportType.AI_GENERATION_ISSUE : ReportType.COPYRIGHT_VIOLATION
   );
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,13 +56,13 @@ export function ReportDialog({
   // Reset the form when the dialog opens with the appropriate default
   useEffect(() => {
     if (open) {
-      setReportType(entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION');
+      setReportType(entityType === 'playlist' ? ReportType.AI_GENERATION_ISSUE : ReportType.COPYRIGHT_VIOLATION);
       setDescription('');
     }
   }, [open, entityType]);
 
   const resetForm = () => {
-    setReportType(entityType === 'playlist' ? 'AI_GENERATION_ISSUE' : 'COPYRIGHT_VIOLATION');
+    setReportType(entityType === 'playlist' ? ReportType.AI_GENERATION_ISSUE : ReportType.COPYRIGHT_VIOLATION);
     setDescription('');
   };
 

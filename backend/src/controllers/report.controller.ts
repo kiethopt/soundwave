@@ -2,10 +2,26 @@ import { Request, Response } from 'express';
 import { ReportType, ReportStatus, Role } from '@prisma/client';
 import { ReportService } from '../services/report.service';
 
+// Define an array of report types that do not require an entity
+// Using string literals cast to ReportType to address potential linter/TS server cache issues
+const platformReportTypes: ReportType[] = [
+  'ACCOUNT_ISSUE' as ReportType,
+  'BUG_REPORT' as ReportType,
+  'GENERAL_FEEDBACK' as ReportType,
+  'UI_UX_ISSUE' as ReportType,
+  ReportType.OTHER, // OTHER was already recognized, so direct enum usage should be fine
+];
+
 // Create a new report
 export const createReport = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { type, description, trackId, playlistId, albumId } = req.body;
+    const { type, description, trackId, playlistId, albumId } = req.body as { 
+      type: ReportType, 
+      description: string, 
+      trackId?: string, 
+      playlistId?: string, 
+      albumId?: string 
+    };
     const user = req.user;
 
     if (!user) {
@@ -25,10 +41,10 @@ export const createReport = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Need at least one entity to report
-    if (!trackId && !playlistId && !albumId) {
+    // Allow platform-specific report types to not have an entity
+    if (!platformReportTypes.includes(type) && !trackId && !playlistId && !albumId) {
       res.status(400).json({ 
-        message: 'A report must be associated with a track, playlist, or album' 
+        message: 'This type of report must be associated with a track, playlist, or album.' 
       });
       return;
     }
