@@ -21,8 +21,8 @@ import {
   ArrowUp,
   ArrowDown,
   Edit,
-  ShieldCheck,
-  ShieldAlert,
+  Bot,
+  Loader2,
 } from "lucide-react";
 import { UserInfoModal } from "@/components/ui/data-table/data-table-modals";
 import {
@@ -30,14 +30,25 @@ import {
   ConfirmDeleteModal,
 } from "@/components/ui/admin-modals";
 import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation"; // Import useRouter
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface SortConfig {
   key: keyof User | null;
   direction: "asc" | "desc";
 }
 
-export default function UserManagement() {
+export default function AiUserManagementPage() {
+  // Renamed component
   const { theme } = useTheme();
+  const router = useRouter(); // Initialize useRouter
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -199,7 +210,8 @@ export default function UserManagement() {
 
   const handleAction = (action: string, user: User) => {
     if (action === "view") {
-      setViewingUser(user);
+      // Navigate to the AI management user detail page
+      router.push(`/admin/ai-management/users/${user.id}`);
     } else if (action === "edit") {
       setEditingUser(user);
       setIsEditModalOpen(true);
@@ -258,7 +270,9 @@ export default function UserManagement() {
     }
     setActionLoading(userId);
     try {
-      await api.admin.updateUser(userId, editFormData, token);
+      // Assuming FormData type from types/index.ts is compatible or adjust as needed
+      // For now, we cast to 'any' to bypass strict type checking if FormData here is different
+      await api.admin.updateUser(userId, editFormData as any, token);
       toast.success("User updated successfully!");
       setIsEditModalOpen(false);
       setEditingUser(null);
@@ -305,23 +319,17 @@ export default function UserManagement() {
       const newTotalUsers = response.pagination?.totalItems || 0;
       const newTotalPages = Math.ceil(newTotalUsers / limit) || 1;
 
-      let targetPage = currentPage;
-      if (currentPage > newTotalPages) {
-        targetPage = newTotalPages;
-      } else if (users.length === userIds.length && currentPage > 1) {
-        targetPage = currentPage - 1;
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      } else if (newTotalUsers === 0) {
+        setCurrentPage(1); // Reset to page 1 if no users left
       }
-
-      if (targetPage !== currentPage) {
-        setCurrentPage(targetPage);
-      } else {
-        refreshTable();
-      }
-
-      setSelectedUserIds(new Set());
+      // Trigger a refresh after state update or rely on existing refreshTable if currentPage change triggers it
+      refreshTable();
+      setSelectedUserIds(new Set()); // Clear selection
     } catch (err: any) {
-      console.error("Error deleting users:", err);
-      toast.error(err.message || "Failed to delete users.");
+      console.error("Error during bulk delete:", err);
+      toast.error(err.message || "Failed to delete selected users.");
     } finally {
       setActionLoading(null);
     }
@@ -331,476 +339,430 @@ export default function UserManagement() {
     user: User,
     e: React.MouseEvent<HTMLTableRowElement>
   ) => {
+    // Prevent navigation if clicking on interactive elements within the row
     const target = e.target as HTMLElement;
     if (
-      target.closest('[role="checkbox"]') ||
-      target.closest("[data-radix-dropdown-menu-trigger]") ||
-      target.closest("button")
+      target.closest('button, input[type="checkbox"], a, [role="menuitem"]')
     ) {
       return;
     }
-    setViewingUser(user);
+    router.push(`/admin/ai-management/users/${user.id}`);
   };
 
-  const isAllSelected =
-    users.length > 0 && selectedUserIds.size === users.length;
-  const isIndeterminate =
-    selectedUserIds.size > 0 && selectedUserIds.size < users.length;
+  const renderSortIcon = (key: keyof User | null) => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+    }
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="ml-2 h-4 w-4 text-primary" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4 text-primary" />
+    );
+  };
 
   return (
     <div
-      className={`container mx-auto space-y-6 p-4 pb-20 ${
+      className={`container mx-auto px-4 py-8 ${
         theme === "dark" ? "text-white" : "text-gray-900"
       }`}
     >
-      <div className="mb-6">
-        <h1
-          className={`text-2xl md:text-3xl font-bold tracking-tight ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}
-        >
-          User Management
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h1 className="text-3xl font-bold flex items-center">
+          <Bot className="mr-3 h-8 w-8 text-primary" /> AI Playlist Management
         </h1>
-        <p
-          className={`text-muted-foreground ${
-            theme === "dark" ? "text-white/60" : "text-gray-600"
-          }`}
-        >
-          Manage and monitor user accounts
-        </p>
+        {/* Add any specific buttons for this page, e.g., "Create User with AI Playlist" if needed */}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
-        <form onSubmit={handleSearchSubmit} className="relative flex-grow">
-          <Search
-            className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${
-              theme === "dark" ? "text-gray-400" : "text-gray-500"
-            }`}
-          />
-          <Input
-            type="text"
-            placeholder="Search and press Enter..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${
-              theme === "dark"
-                ? "bg-[#3a3a3a] border-gray-600 text-white"
-                : "border-gray-300"
-            }`}
-          />
-          <button type="submit" className="hidden">
-            Search
-          </button>
-        </form>
-        <div className="flex gap-2">
-          <Select
-            value={statusFilter}
-            onValueChange={(value: "ALL" | "ACTIVE" | "INACTIVE") =>
-              setStatusFilter(value)
-            }
-          >
-            <SelectTrigger
-              className={`w-[140px] rounded-md h-10 ${
-                theme === "dark"
-                  ? "bg-[#3a3a3a] border-gray-600 text-white"
-                  : "border-gray-300"
-              }`}
+      {/* Filters and Search */}
+      <div className="mb-6 p-4 rounded-lg shadow-md bg-card border">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+        >
+          <div className="md:col-span-2">
+            <label
+              htmlFor="search-users"
+              className="block text-sm font-medium mb-1"
             >
-              <SelectValue placeholder="Filter by Status" />
-            </SelectTrigger>
-            <SelectContent
-              className={
-                theme === "dark"
-                  ? "bg-[#2a2a2a] border-gray-600 text-white"
-                  : ""
+              Search Users
+            </label>
+            <div className="relative">
+              <Input
+                id="search-users"
+                type="text"
+                placeholder="Search by name, email, username..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pr-10"
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div>
+            <label
+              htmlFor="role-filter"
+              className="block text-sm font-medium mb-1"
+            >
+              Filter by Role
+            </label>
+            <Select
+              value={roleFilter}
+              onValueChange={(value: "ALL" | "ADMIN" | "USER") =>
+                setRoleFilter(value)
               }
             >
-              <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="INACTIVE">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+              <SelectTrigger id="role-filter">
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Roles</SelectItem>
+                <SelectItem value="USER">User</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label
+              htmlFor="status-filter"
+              className="block text-sm font-medium mb-1"
+            >
+              Filter by Status
+            </label>
+            <Select
+              value={statusFilter}
+              onValueChange={(value: "ALL" | "ACTIVE" | "INACTIVE") =>
+                setStatusFilter(value)
+              }
+            >
+              <SelectTrigger id="status-filter">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </form>
       </div>
 
-      {loading && !viewingUser && !editingUser && !deletingUser && (
-        <p>Loading users...</p>
+      {/* Bulk Actions - kept for consistency, review if needed for AI context */}
+      {selectedUserIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-2 p-3 bg-muted rounded-md border">
+          <p className="text-sm font-medium">
+            {selectedUserIds.size} user(s) selected.
+          </p>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleBulkDeleteClick}
+            disabled={actionLoading === "bulk-delete"}
+          >
+            {actionLoading === "bulk-delete" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
+            Delete Selected
+          </Button>
+        </div>
       )}
-      {error && <p className="text-red-500">{error}</p>}
 
-      {!error && (
-        <>
-          <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
-            <table
-              className={`w-full text-sm text-left ${
-                theme === "dark" ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              <thead
-                className={`text-xs uppercase ${
-                  theme === "dark"
-                    ? "bg-gray-700 text-gray-400"
-                    : "bg-gray-50 text-gray-700"
-                }`}
+      {/* Users Table */}
+      <div className="overflow-x-auto rounded-xl border shadow-lg">
+        <Table className="min-w-full divide-y divide-border">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[50px] px-6 py-3 text-center">
+                <Checkbox
+                  checked={
+                    selectedUserIds.size === users.length && users.length > 0
+                      ? true
+                      : selectedUserIds.size > 0
+                      ? "indeterminate"
+                      : false
+                  }
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all users"
+                />
+              </TableHead>
+              <TableHead
+                className="w-[200px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort("name")}
               >
-                <tr>
-                  <th scope="col" className="p-4 rounded-tl-md">
-                    <Checkbox
-                      id="select-all-checkbox"
-                      checked={
-                        isAllSelected
-                          ? true
-                          : isIndeterminate
-                          ? "indeterminate"
-                          : false
-                      }
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all rows on this page"
-                      className={`${
-                        theme === "dark" ? "border-gray-600" : "border-gray-300"
-                      }`}
-                      disabled={loading || actionLoading !== null}
+                <div className="flex items-center pl-16">
+                  Name {renderSortIcon("name")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[250px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort("email")}
+              >
+                <div className="flex items-center">
+                  Email {renderSortIcon("email")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort("role")}
+              >
+                <div className="flex items-center">
+                  Role {renderSortIcon("role")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort("isActive")}
+              >
+                <div className="flex items-center">
+                  Status {renderSortIcon("isActive")}
+                </div>
+              </TableHead>
+              <TableHead
+                className="w-[100px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort("createdAt")}
+              >
+                <div className="flex items-center">
+                  Joined {renderSortIcon("createdAt")}
+                </div>
+              </TableHead>
+              <TableHead className="w-[120px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                Actions
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-border bg-card">
+            {loading && users.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="px-6 py-10 text-center text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                    <span>Loading users...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && users.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="px-6 py-10 text-center text-muted-foreground"
+                >
+                  No users found matching your criteria.
+                </TableCell>
+              </TableRow>
+            )}
+            {users.map((user) => (
+              <TableRow
+                key={user.id}
+                onClick={(e) => handleRowClick(user, e)}
+                className="hover:bg-muted/50 cursor-pointer group rounded-lg transition-colors"
+                aria-selected={selectedUserIds.has(user.id)}
+              >
+                <TableCell className="w-[50px] px-6 py-4 text-center">
+                  <Checkbox
+                    checked={selectedUserIds.has(user.id)}
+                    onCheckedChange={(checked) =>
+                      handleSelectRow(user.id, checked)
+                    }
+                    aria-labelledby={`user-name-${user.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </TableCell>
+                <TableCell className="px-6 py-4">
+                  <div className="flex items-center space-x-4">
+                    <img
+                      className="h-12 w-12 rounded-full object-cover border-2 border-primary/30 shadow"
+                      src={user.avatar || "/images/default-avatar.jpg"}
+                      alt={user.name || user.username || "User"}
                     />
-                  </th>
-
-                  {/* Name column */}
-                  <th
-                    scope="col"
-                    className={`py-3 px-6 cursor-pointer ${
-                      theme === "dark"
-                        ? "hover:bg-white/10"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => handleSort("name")}
-                  >
-                    <div className="flex items-center">
-                      Name
-                      {sortConfig.key === "name" ? (
-                        sortConfig.direction === "asc" ? (
-                          <ArrowUp className="ml-2 h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-
-                  {/* Email column */}
-                  <th
-                    scope="col"
-                    className={`py-3 px-6 cursor-pointer ${
-                      theme === "dark"
-                        ? "hover:bg-white/10"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => handleSort("email")}
-                  >
-                    <div className="flex items-center">
-                      Email
-                      {sortConfig.key === "email" ? (
-                        sortConfig.direction === "asc" ? (
-                          <ArrowUp className="ml-2 h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-
-                  {/* Role column */}
-                  <th
-                    scope="col"
-                    className={`py-3 px-6 cursor-pointer ${
-                      theme === "dark"
-                        ? "hover:bg-white/10"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => handleSort("role")}
-                  >
-                    <div className="flex items-center">
-                      Role
-                      {sortConfig.key === "role" ? (
-                        sortConfig.direction === "asc" ? (
-                          <ArrowUp className="ml-2 h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-
-                  {/* Status column */}
-                  <th
-                    scope="col"
-                    className={`py-3 px-6 cursor-pointer ${
-                      theme === "dark"
-                        ? "hover:bg-white/10"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => handleSort("isActive")}
-                  >
-                    <div className="flex items-center">
-                      Status
-                      {sortConfig.key === "isActive" ? (
-                        sortConfig.direction === "asc" ? (
-                          <ArrowUp className="ml-2 h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-
-                  {/* Created At column */}
-                  <th
-                    scope="col"
-                    className={`py-3 px-6 cursor-pointer ${
-                      theme === "dark"
-                        ? "hover:bg-white/10"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => handleSort("createdAt")}
-                  >
-                    <div className="flex items-center">
-                      Created At
-                      {sortConfig.key === "createdAt" ? (
-                        sortConfig.direction === "asc" ? (
-                          <ArrowUp className="ml-2 h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-
-                  <th
-                    scope="col"
-                    className="py-3 px-6 rounded-tr-md text-center"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.length > 0 ? (
-                  users.map((user) => (
-                    <tr
-                      key={user.id}
-                      onClick={(e) => handleRowClick(user, e)}
-                      className={`border-b cursor-pointer ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 hover:bg-gray-600"
-                          : "bg-white border-gray-200 hover:bg-gray-50"
-                      } ${
-                        selectedUserIds.has(user.id)
-                          ? theme === "dark"
-                            ? "bg-gray-700/50"
-                            : "bg-blue-50"
-                          : ""
-                      } ${
-                        actionLoading === user.id
-                          ? "opacity-50 pointer-events-none"
-                          : ""
-                      }`}
-                    >
-                      <td className="w-4 p-4">
-                        <Checkbox
-                          id={`select-row-${user.id}`}
-                          checked={selectedUserIds.has(user.id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectRow(user.id, checked)
-                          }
-                          aria-label={`Select row for user ${
-                            user.name || user.email
-                          }`}
-                          className={`${
-                            theme === "dark"
-                              ? "border-gray-600"
-                              : "border-gray-300"
-                          }`}
-                          disabled={loading || actionLoading !== null}
-                        />
-                      </td>
-                      <td
-                        className={`py-4 px-6 font-medium whitespace-nowrap ${
-                          theme === "dark" ? "text-white" : "text-gray-900"
-                        }`}
+                    <div>
+                      <div
+                        id={`user-name-${user.id}`}
+                        className="text-sm font-semibold group-hover:text-primary transition-colors"
                       >
                         {user.name || user.username || "N/A"}
-                      </td>
-                      <td className="py-4 px-6">{user.email}</td>
-                      <td className="py-4 px-6">{user.role}</td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.isActive
-                              ? theme === "dark"
-                                ? "bg-green-900 text-green-300"
-                                : "bg-green-100 text-green-800"
-                              : theme === "dark"
-                              ? "bg-red-900 text-red-300"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {user.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        {formatDate(user.createdAt)}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${
-                              theme === "dark"
-                                ? "hover:bg-blue-500/20"
-                                : "hover:bg-blue-100"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAction("edit", user);
-                            }}
-                            aria-label={`Edit user ${user.name || user.email}`}
-                            disabled={loading || actionLoading !== null}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${
-                              theme === "dark"
-                                ? "hover:bg-red-500/20"
-                                : "hover:bg-red-100"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAction("delete", user);
-                            }}
-                            aria-label={`Delete user ${
-                              user.name || user.email
-                            }`}
-                            disabled={loading || actionLoading !== null}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="py-4 px-6 text-center">
-                      No users found{" "}
-                      {activeSearchTerm || statusFilter !== "ALL"
-                        ? "matching your criteria"
-                        : ""}
-                      .
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-between items-center mt-4">
-            <div className="min-w-[200px]">
-              {selectedUserIds.size > 0 && (
-                <Button
-                  onClick={handleBulkDeleteClick}
-                  variant="destructive"
-                  size="default"
-                  disabled={loading || actionLoading !== null}
-                  className={`${
-                    theme === "dark" ? "bg-red-700 hover:bg-red-800" : ""
-                  }`}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Selected ({selectedUserIds.size})
-                </Button>
-              )}
-            </div>
-            <div className="flex justify-end">
-              {totalPages > 1 && (
-                <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={
-                      currentPage === 1 || loading || actionLoading !== null
-                    }
-                    variant="outline"
-                    size="sm"
-                  >
-                    Previous
-                  </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {user.username || user.name || "-"}
+                      </div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="px-6 py-4 text-sm text-muted-foreground">
+                  {user.email}
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
                   <span
-                    className={`text-sm ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-600"
+                    className={`inline-block text-xs font-semibold ${
+                      user.role === "ADMIN"
+                        ? "text-primary"
+                        : "text-secondary-foreground"
                     }`}
                   >
-                    Page {currentPage} of {totalPages}
+                    {user.role}
                   </span>
-                  <Button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={
-                      currentPage === totalPages ||
-                      loading ||
-                      actionLoading !== null
-                    }
-                    variant="outline"
-                    size="sm"
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
+                  <span
+                    className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      user.isActive
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                    style={{ marginLeft: "-6px" }}
                   >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
+                    {user.isActive ? "Active" : "Inactive"}
+                  </span>
+                </TableCell>
+                <TableCell className="w-[100px] px-6 py-4">
+                  <span className="inline-block text-sm text-muted-foreground">
+                    {formatDate(user.createdAt)}
+                  </span>
+                </TableCell>
+                <TableCell className="w-[120px] px-6 py-4">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      title="View User Details & AI Playlists"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("view", user);
+                      }}
+                    >
+                      <Bot className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                      title="Edit User"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("edit", user);
+                      }}
+                    >
+                      {actionLoading === user.id &&
+                      editingUser?.id === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Edit className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      title="Delete User"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("delete", user);
+                      }}
+                      disabled={actionLoading === user.id}
+                    >
+                      {actionLoading === user.id &&
+                      deletingUser?.id === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || loading}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages || loading}
+          >
+            Next
+          </Button>
+        </div>
       )}
 
-      <UserInfoModal
-        user={viewingUser}
-        onClose={() => setViewingUser(null)}
-        theme={theme}
-      />
-
-      <EditUserModal
-        user={editingUser}
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingUser(null);
-        }}
-        onSubmit={handleEditUserSubmit}
-        theme={theme}
-      />
-
-      <ConfirmDeleteModal
-        item={isBulkDeleteConfirm ? null : deletingUser}
-        count={isBulkDeleteConfirm ? selectedUserIds.size : undefined}
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setDeletingUser(null);
-          setIsBulkDeleteConfirm(false);
-        }}
-        onConfirm={handleDeleteConfirm}
-        theme={theme}
-        entityType="user"
-      />
+      {/* Modals */}
+      {viewingUser && (
+        <UserInfoModal
+          user={viewingUser}
+          onClose={() => setViewingUser(null)}
+        />
+      )}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingUser(null);
+          }}
+          onSubmit={handleEditUserSubmit}
+        />
+      )}
+      {isDeleteModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setDeletingUser(null);
+            setIsBulkDeleteConfirm(false);
+          }}
+          onConfirm={() =>
+            handleDeleteConfirm(
+              isBulkDeleteConfirm && selectedUserIds.size > 0
+                ? Array.from(selectedUserIds)
+                : deletingUser
+                ? [deletingUser.id]
+                : []
+            )
+          }
+          item={
+            deletingUser
+              ? {
+                  id: deletingUser.id,
+                  name: deletingUser.name || deletingUser.username || "user",
+                  email: deletingUser.email,
+                }
+              : {
+                  id: "bulk-delete-users",
+                  name: `${selectedUserIds.size} user(s)`,
+                  email: "",
+                }
+          }
+        />
+      )}
     </div>
   );
 }
