@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { api } from '@/utils/api';
 import { Report, ReportStatus, ReportType } from '@/types';
 import { toast } from 'react-hot-toast';
@@ -12,12 +12,15 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, Music, Album } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Music, Album, AlertCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 export default function UserReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -26,6 +29,9 @@ export default function UserReportsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isGeneralReportOpen, setIsGeneralReportOpen] = useState(false);
+  const [generalReportDescription, setGeneralReportDescription] = useState('');
+  const [submittingGeneralReport, setSubmittingGeneralReport] = useState(false);
   const { theme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -195,15 +201,70 @@ export default function UserReportsPage() {
           <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
         </div>
       );
+    } else if (report.type === 'OTHER') {
+      return (
+        <div className="flex flex-col">
+          <span className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>Other (Platform Feedback)</span>
+          <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>General feedback</span>
+        </div>
+      );
     }
-    return <span className={`${theme === 'dark' ? 'text-neutral-100' : ''}`}>Unknown Entity</span>;
+    return <span className={`${theme === 'dark' ? 'text-neutral-100' : ''}`}>Uncategorized</span>;
+  };
+
+  const handleOpenGeneralReportDialog = () => {
+    setGeneralReportDescription('');
+    setIsGeneralReportOpen(true);
+  };
+
+  const handleSubmitGeneralReport = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!generalReportDescription.trim()) {
+      toast.error('Please provide a description for your report.');
+      return;
+    }
+    setSubmittingGeneralReport(true);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Authentication required');
+        router.push('/login');
+        return;
+      }
+      await api.reports.create(
+        {
+          type: 'OTHER' as ReportType,
+          description: generalReportDescription,
+        },
+        token
+      );
+      toast.success('Your report has been submitted. Thank you!');
+      setIsGeneralReportOpen(false);
+      setGeneralReportDescription('');
+      fetchReports();
+    } catch (error: any) {
+      console.error('Error submitting general report:', error);
+      toast.error(error.message || 'Failed to submit report');
+    } finally {
+      setSubmittingGeneralReport(false);
+    }
   };
 
   return (
     <div className="container mx-auto py-8">
       <Card className={theme === 'dark' ? 'bg-neutral-800/70 border-neutral-700' : undefined}>
         <CardHeader>
-          <CardTitle className={theme === 'dark' ? 'text-neutral-100' : undefined}>My Reports</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className={theme === 'dark' ? 'text-neutral-100' : undefined}>My Reports</CardTitle>
+            <Button 
+              variant="outline"
+              onClick={handleOpenGeneralReportDialog}
+              className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 hover:bg-neutral-600 text-neutral-50' : undefined}
+            >
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Report a Platform Issue
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -338,7 +399,7 @@ export default function UserReportsPage() {
                           className="w-full h-full object-cover rounded"
                         />
                       ) : (
-                        <Album className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                        <Music className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
                       )}
                     </div>
                     <div className="flex-1">
@@ -447,6 +508,54 @@ export default function UserReportsPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* General Report Dialog */}
+      <Dialog open={isGeneralReportOpen} onOpenChange={setIsGeneralReportOpen}>
+        <DialogContent className={`sm:max-w-[525px] ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700 text-neutral-100' : ''}`}>
+          <form onSubmit={handleSubmitGeneralReport}>
+            <DialogHeader>
+              <DialogTitle className={theme === 'dark' ? 'text-neutral-100' : undefined}>Report a Platform Issue</DialogTitle>
+              <DialogDescription className={theme === 'dark' ? 'text-neutral-400' : 'text-neutral-500'}>
+                Please describe the issue you are experiencing with the platform or your account.
+                This could be about incorrect information, bugs, or general feedback.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid w-full gap-1.5">
+                <Label htmlFor="general-report-description" className={theme === 'dark' ? 'text-neutral-300' : undefined}>
+                  Description
+                </Label>
+                <Textarea
+                  id="general-report-description"
+                  placeholder="Tell us about the issue..."
+                  value={generalReportDescription}
+                  onChange={(e) => setGeneralReportDescription(e.target.value)}
+                  rows={5}
+                  className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 text-neutral-100 placeholder:text-neutral-400' : undefined}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => setIsGeneralReportOpen(false)}
+                className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 hover:bg-neutral-600 text-neutral-100' : undefined}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={submittingGeneralReport || !generalReportDescription.trim()}
+                className={theme === 'dark' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white'}
+              >
+                {submittingGeneralReport ? 'Submitting...' : 'Submit Report'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

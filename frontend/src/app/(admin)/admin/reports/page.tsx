@@ -302,8 +302,15 @@ export default function ReportsPage() {
           <span className={`text-sm ${textMutedClass}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
         </div>
       );
+    } else if (report.type === 'OTHER') {
+      return (
+        <div className="flex flex-col">
+          <span className={`font-medium ${textPrimaryClass}`}>Other (Platform Issue / Feedback)</span>
+          <span className={`text-sm ${textMutedClass}`}>General report</span>
+        </div>
+      );
     }
-    return <span className={textPrimaryClass}>Unknown Entity</span>;
+    return <span className={textPrimaryClass}>Uncategorized Entity</span>;
   };
 
   const handleRowClick = (report: Report, e: React.MouseEvent<HTMLTableRowElement>) => {

@@ -18,11 +18,12 @@ interface ResolveReportData {
 
 export class ReportService {
   static async createReport(userId: string, data: CreateReportData) {
-    if (!data.trackId && !data.playlistId && !data.albumId) {
-      throw new Error('A report must be associated with a track, playlist, or album');
+    // Allow OTHER type reports to not have an entity
+    if (!data.trackId && !data.playlistId && !data.albumId && data.type !== ReportType.OTHER) {
+      throw new Error('A report must be associated with a track, playlist, or album, unless it is of type OTHER.');
     }
 
-    // Check if entity exists
+    // Check if entity exists, only if an ID is provided
     if (data.trackId) {
       const track = await prisma.track.findUnique({
         where: { id: data.trackId }
@@ -88,6 +89,10 @@ export class ReportService {
       });
       entityName = playlist?.name || 'playlist';
       entityType = 'playlist';
+    } else if (data.type === ReportType.OTHER) {
+      // For general feedback/platform issues
+      entityName = 'Platform Issue/General Feedback';
+      entityType = 'platform';
     }
 
     // Send notification to all admins
@@ -100,12 +105,15 @@ export class ReportService {
       await prisma.notification.create({
         data: {
           type: NotificationType.NEW_REPORT_SUBMITTED,
-          message: `New ${data.type} report submitted for ${entityType} "${entityName}"`,
+          message: `New ${data.type} report submitted for ${entityType === 'platform' ? entityName : `${entityType} "${entityName}"`}`,
           recipientType: RecipientType.USER,
           userId: admin.id,
           senderId: userId,
-          trackId: data.trackId,
-          albumId: data.albumId,
+          trackId: data.trackId, // Will be null for general reports
+          albumId: data.albumId, // Will be null for general reports
+          // playlistId is missing in the original notification data, adding it if it exists in schema.prisma
+          // Let's check schema.prisma for Notification model, it doesn't have playlistId.
+          // So we keep it as is for now.
         }
       });
     }
@@ -266,6 +274,10 @@ export class ReportService {
         } else if (report.playlistId && report.playlist) {
           entityName = report.playlist.name || 'playlist';
           entityType = 'playlist';
+        } else if (report.type === ReportType.OTHER) {
+          // For general feedback/platform issues that were resolved/rejected
+          entityName = 'Platform Issue/General Feedback';
+          entityType = 'platform';
         }
 
         // Different handling based on entity type and report status
@@ -296,12 +308,13 @@ export class ReportService {
         await prisma.notification.create({
           data: {
             type: NotificationType.REPORT_RESOLVED,
-            message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+            message: `Your report for ${entityType === 'platform' ? entityName : `${entityType} "${entityName}"`} has been ${statusText}`,
             recipientType: RecipientType.USER,
             userId: report.reporter.id,
             senderId: adminId,
             trackId: report.trackId,
             albumId: report.albumId,
+            // Again, playlistId not in Notification model as per schema.prisma
           }
         });
 

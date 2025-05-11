@@ -25,10 +25,10 @@ export const createReport = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Need at least one entity to report
-    if (!trackId && !playlistId && !albumId) {
+    // Allow OTHER type reports to not have an entity
+    if (type !== ReportType.OTHER && !trackId && !playlistId && !albumId) {
       res.status(400).json({ 
-        message: 'A report must be associated with a track, playlist, or album' 
+        message: 'A report must be associated with a track, playlist, or album, unless it is of type OTHER.' 
       });
       return;
     }
