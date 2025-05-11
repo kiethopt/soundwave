@@ -608,7 +608,7 @@ export const api = {
         `/api/admin/ai-playlists/${playlistId}/visibility`,
         {
           method: "PUT",
-          body: JSON.stringify({ visibility }),
+          body: JSON.stringify({ newVisibility: visibility }),
         },
         token
       );
