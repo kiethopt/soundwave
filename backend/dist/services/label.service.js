@@ -442,9 +442,10 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
             await tx.notification.create({
                 data: {
                     userId: registrationRequest.requestingArtist.userId,
-                    recipientType: client_1.RecipientType.USER,
+                    recipientType: client_1.RecipientType.ARTIST,
                     type: client_1.NotificationType.LABEL_REGISTRATION_APPROVED,
                     message: approvalMessage,
+                    artistId: registrationRequest.requestingArtistId,
                 },
             });
         }
@@ -486,9 +487,10 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
         await db_1.default.notification.create({
             data: {
                 userId: registrationRequest.requestingArtist.userId,
-                recipientType: client_1.RecipientType.USER,
+                recipientType: client_1.RecipientType.ARTIST,
                 type: client_1.NotificationType.LABEL_REGISTRATION_REJECTED,
                 message: `We regret to inform you that your request to register the label "${registrationRequest.requestedLabelName}" has been rejected. Reason: ${rejectionReason}`,
+                artistId: registrationRequest.requestingArtistId,
             },
         });
     }
