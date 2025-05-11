@@ -3,6 +3,16 @@ import { reportSelect } from '../utils/prisma-selects';
 
 const prisma = new PrismaClient();
 
+// Define an array of report types that do not require an entity
+// Mirroring the controller's approach for consistency
+const platformReportTypes: ReportType[] = [
+  'ACCOUNT_ISSUE' as ReportType,
+  'BUG_REPORT' as ReportType,
+  'GENERAL_FEEDBACK' as ReportType,
+  'UI_UX_ISSUE' as ReportType,
+  ReportType.OTHER, 
+];
+
 interface CreateReportData {
   type: ReportType;
   description: string;
@@ -18,36 +28,38 @@ interface ResolveReportData {
 
 export class ReportService {
   static async createReport(userId: string, data: CreateReportData) {
-    // Allow OTHER type reports to not have an entity
-    if (!data.trackId && !data.playlistId && !data.albumId && data.type !== ReportType.OTHER) {
-      throw new Error('A report must be associated with a track, playlist, or album, unless it is of type OTHER.');
+    // Allow platform-specific type reports to not have an entity
+    if (!platformReportTypes.includes(data.type) && !data.trackId && !data.playlistId && !data.albumId) {
+      throw new Error('This type of report must be associated with a track, playlist, or album.');
     }
 
-    // Check if entity exists, only if an ID is provided
-    if (data.trackId) {
-      const track = await prisma.track.findUnique({
-        where: { id: data.trackId }
-      });
-      if (!track) {
-        throw new Error('Track not found');
+    // Check if entity exists, only if an ID is provided and it's not a platform report type
+    if (!platformReportTypes.includes(data.type)) {
+      if (data.trackId) {
+        const track = await prisma.track.findUnique({
+          where: { id: data.trackId }
+        });
+        if (!track) {
+          throw new Error('Track not found');
+        }
       }
-    }
 
-    if (data.playlistId) {
-      const playlist = await prisma.playlist.findUnique({
-        where: { id: data.playlistId }
-      });
-      if (!playlist) {
-        throw new Error('Playlist not found');
+      if (data.playlistId) {
+        const playlist = await prisma.playlist.findUnique({
+          where: { id: data.playlistId }
+        });
+        if (!playlist) {
+          throw new Error('Playlist not found');
+        }
       }
-    }
 
-    if (data.albumId) {
-      const album = await prisma.album.findUnique({
-        where: { id: data.albumId }
-      });
-      if (!album) {
-        throw new Error('Album not found');
+      if (data.albumId) {
+        const album = await prisma.album.findUnique({
+          where: { id: data.albumId }
+        });
+        if (!album) {
+          throw new Error('Album not found');
+        }
       }
     }
 
@@ -89,7 +101,7 @@ export class ReportService {
       });
       entityName = playlist?.name || 'playlist';
       entityType = 'playlist';
-    } else if (data.type === ReportType.OTHER) {
+    } else if (platformReportTypes.includes(data.type)) {
       // For general feedback/platform issues
       entityName = 'Platform Issue/General Feedback';
       entityType = 'platform';
@@ -274,7 +286,7 @@ export class ReportService {
         } else if (report.playlistId && report.playlist) {
           entityName = report.playlist.name || 'playlist';
           entityType = 'playlist';
-        } else if (report.type === ReportType.OTHER) {
+        } else if (platformReportTypes.includes(report.type)) {
           // For general feedback/platform issues that were resolved/rejected
           entityName = 'Platform Issue/General Feedback';
           entityType = 'platform';

@@ -15,12 +15,28 @@ import {
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Music, Album, AlertCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+
+// Define the platform report types for the dropdown
+const platformReportTypeOptions = [
+  { value: 'ACCOUNT_ISSUE', label: 'Account Issue' },
+  { value: 'BUG_REPORT', label: 'Bug Report' },
+  { value: 'GENERAL_FEEDBACK', label: 'General Feedback' },
+  { value: 'UI_UX_ISSUE', label: 'UI/UX Issue' },
+  { value: 'OTHER', label: 'Other' },
+] as const; // Use 'as const' for stricter typing of values
 
 export default function UserReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -31,6 +47,7 @@ export default function UserReportsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isGeneralReportOpen, setIsGeneralReportOpen] = useState(false);
   const [generalReportDescription, setGeneralReportDescription] = useState('');
+  const [selectedPlatformReportType, setSelectedPlatformReportType] = useState<typeof platformReportTypeOptions[number]['value']>(platformReportTypeOptions[0].value);
   const [submittingGeneralReport, setSubmittingGeneralReport] = useState(false);
   const { theme } = useTheme();
   const router = useRouter();
@@ -168,6 +185,30 @@ export default function UserReportsPage() {
             AI Issue
           </Badge>
         );
+      case 'ACCOUNT_ISSUE':
+        return (
+          <Badge variant="outline" className="bg-sky-500/10 text-sky-500 border-sky-500/20">
+            Account
+          </Badge>
+        );
+      case 'BUG_REPORT':
+        return (
+          <Badge variant="outline" className="bg-pink-500/10 text-pink-500 border-pink-500/20">
+            Bug
+          </Badge>
+        );
+      case 'GENERAL_FEEDBACK':
+        return (
+          <Badge variant="outline" className="bg-teal-500/10 text-teal-500 border-teal-500/20">
+            Feedback
+          </Badge>
+        );
+      case 'UI_UX_ISSUE':
+        return (
+          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
+            UI/UX
+          </Badge>
+        );
       case 'OTHER':
         return (
           <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
@@ -175,45 +216,79 @@ export default function UserReportsPage() {
           </Badge>
         );
       default:
-        return <Badge variant="outline">{type}</Badge>;
+        // Fallback for any unhandled types, displays the raw type value
+        // It's good practice to ensure all enum members are handled above
+        return <Badge variant="outline">{String(type)}</Badge>; 
     }
   };
 
   const getEntityTypeAndName = (report: Report) => {
+    const primaryTextClass = `font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`;
+    const secondaryTextClass = `text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`;
+
     if (report.track) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>{report.track.title}</span>
-          <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>Track by {report.track.artist.artistName}</span>
+          <span className={primaryTextClass}>{report.track.title}</span>
+          <span className={secondaryTextClass}>Track by {report.track.artist.artistName}</span>
         </div>
       );
     } else if (report.album) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>{report.album.title}</span>
-          <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>Album by {report.album.artist.artistName}</span>
+          <span className={primaryTextClass}>{report.album.title}</span>
+          <span className={secondaryTextClass}>Album by {report.album.artist.artistName}</span>
         </div>
       );
     } else if (report.playlist) {
       return (
         <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>{report.playlist.name}</span>
-          <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
+          <span className={primaryTextClass}>{report.playlist.name}</span>
+          <span className={secondaryTextClass}>Playlist by {report.playlist.user.name || report.playlist.user.username}</span>
         </div>
       );
-    } else if (report.type === 'OTHER') {
-      return (
-        <div className="flex flex-col">
-          <span className={`font-medium ${theme === 'dark' ? 'text-neutral-100' : ''}`}>Other (Platform Feedback)</span>
-          <span className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-neutral-400'}`}>General feedback</span>
-        </div>
-      );
+    } else {
+      // Handle reports not tied to a specific entity (Track, Album, Playlist)
+      const platformReportOption = platformReportTypeOptions.find(option => option.value === report.type);
+
+      if (platformReportOption) {
+        let subText = 'Platform issue'; // Default subtext
+        if (platformReportOption.value === 'GENERAL_FEEDBACK') {
+          subText = 'General feedback';
+        }
+
+        return (
+          <div className="flex flex-col">
+            <span className={primaryTextClass}>{platformReportOption.label}</span>
+            <span className={secondaryTextClass}>{subText}</span>
+          </div>
+        );
+      } else {
+        // Fallback for any other types that might not have an entity or are not in platformReportTypeOptions
+        const formattedType = String(report.type)
+          .toLowerCase()
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, char => char.toUpperCase());
+        
+        // Determine subtext for fallback cases as well
+        let subText = 'Platform issue'; // Default subtext for fallback
+        if (String(report.type) === 'GENERAL_FEEDBACK') { // Check original enum value string
+          subText = 'General feedback';
+        }
+
+        return (
+          <div className="flex flex-col">
+            <span className={primaryTextClass}>{formattedType}</span>
+            <span className={secondaryTextClass}>{subText}</span>
+          </div>
+        );
+      }
     }
-    return <span className={`${theme === 'dark' ? 'text-neutral-100' : ''}`}>Uncategorized</span>;
   };
 
   const handleOpenGeneralReportDialog = () => {
     setGeneralReportDescription('');
+    setSelectedPlatformReportType(platformReportTypeOptions[0].value);
     setIsGeneralReportOpen(true);
   };
 
@@ -233,7 +308,7 @@ export default function UserReportsPage() {
       }
       await api.reports.create(
         {
-          type: 'OTHER' as ReportType,
+          type: selectedPlatformReportType as ReportType,
           description: generalReportDescription,
         },
         token
@@ -516,13 +591,37 @@ export default function UserReportsPage() {
         <DialogContent className={`sm:max-w-[525px] ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700 text-neutral-100' : ''}`}>
           <form onSubmit={handleSubmitGeneralReport}>
             <DialogHeader>
-              <DialogTitle className={theme === 'dark' ? 'text-neutral-100' : undefined}>Report a Platform Issue</DialogTitle>
+              <DialogTitle className={theme === 'dark' ? 'text-neutral-100' : undefined}>Report an Issue or Provide Feedback</DialogTitle>
               <DialogDescription className={theme === 'dark' ? 'text-neutral-400' : 'text-neutral-500'}>
-                Please describe the issue you are experiencing with the platform or your account.
-                This could be about incorrect information, bugs, or general feedback.
+                Please select the type of issue and describe it below. 
+                This could be about incorrect account information, bugs, UI/UX suggestions, or general feedback.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid w-full gap-1.5">
+                <Label htmlFor="platform-report-type" className={theme === 'dark' ? 'text-neutral-300' : undefined}>
+                  Report Type
+                </Label>
+                <Select 
+                  value={selectedPlatformReportType} 
+                  onValueChange={(value) => setSelectedPlatformReportType(value as typeof platformReportTypeOptions[number]['value'])}
+                >
+                  <SelectTrigger id="platform-report-type" className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 text-neutral-100 placeholder:text-neutral-400' : undefined}>
+                    <SelectValue placeholder="Select a report type" />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-neutral-700 border-neutral-600 text-neutral-100' : 'bg-white'}>
+                    {platformReportTypeOptions.map((option) => (
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className={theme === 'dark' ? 'hover:bg-neutral-600 focus:bg-neutral-600' : undefined}
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid w-full gap-1.5">
                 <Label htmlFor="general-report-description" className={theme === 'dark' ? 'text-neutral-300' : undefined}>
                   Description
