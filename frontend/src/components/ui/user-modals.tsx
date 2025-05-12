@@ -80,7 +80,8 @@ export function GenerateAIPlaylistModal({
         const response = await api.playlists.suggestAndAddTracksByPrompt(playlistId, prompt, token);
 
         if (response.success) {
-            toast.success(response.message || `Tracks suggested and added successfully!`);
+            toast.success(response.message || "Tracks added successfully!");
+            window.dispatchEvent(new CustomEvent("playlist-updated"));
             onPlaylistCreated();
             onClose();
         } else {

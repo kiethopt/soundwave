@@ -4,20 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/utils/api";
-import { Album, Track, Playlist, History, PlaylistPrivacy } from "@/types";
+import { Album, Track, Playlist, PlaylistPrivacy } from "@/types";
 import { useTrack } from "@/contexts/TrackContext";
 import {
   ChevronRight,
-  Heart,
   MoreHorizontal,
-  Share2,
-  ListMusic,
 } from "lucide-react";
-import { Play, Pause, AddSimple } from "@/components/ui/Icons";
+import { Play, Pause } from "@/components/ui/Icons";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { useBackground } from "@/contexts/BackgroundContext";
+import { useSession } from "@/contexts/SessionContext";
 
 export default function Home() {
   const router = useRouter();
@@ -43,18 +41,10 @@ export default function Home() {
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
   const [hoveredAlbum, setHoveredAlbum] = useState<string | null>(null);
   const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
-  const { dialogOpen, setDialogOpen, handleProtectedAction, isAuthenticated } =
+  const { dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
+  const { user, isAuthenticated, loading: sessionLoading } = useSession();
   const { setBackgroundStyle } = useBackground();
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
-    new Set()
-  );
-  const filteredPlaylistNames = new Set([
-    "Soundwave Hits: Trending Right Now",
-    "Discover Weekly",
-    "Release Radar",
-  ]);
 
   const token = localStorage.getItem("userToken") || "";
 
@@ -413,8 +403,8 @@ export default function Home() {
         )}
       </div>
 
-      {isAuthenticated && personalizedPlaylists.length > 0 && (
-        <Section title="Your Personalized Playlists">
+      {isAuthenticated && user && personalizedPlaylists.length > 0 && (
+        <Section title={`Suggest for ${user.name || user.username || 'You'}`}>
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
             {personalizedPlaylists.map((playlist) => (
               <div
