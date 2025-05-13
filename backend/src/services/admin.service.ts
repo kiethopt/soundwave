@@ -3161,7 +3161,6 @@ export const getUserAiPlaylists = async (
     userId: true,
     lastGeneratedAt: true,
     tracks: {
-      // take: 3, // REMOVED: Allow all tracks to be fetched
       orderBy: { trackOrder: "asc" as const },
       select: {
         track: {
@@ -3169,7 +3168,10 @@ export const getUserAiPlaylists = async (
             id: true,
             title: true,
             coverUrl: true,
+            duration: true,
             artist: { select: { artistName: true } },
+            album: { select: { title: true } },
+            genres: { select: { genre: { select: { name: true } } } },
           },
         },
       },
