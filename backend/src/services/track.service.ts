@@ -8,7 +8,7 @@ import {
   Track,
 } from "@prisma/client";
 import { Request } from "express";
-import { uploadFile, analyzeAudioWithReccoBeats } from "./upload.service";
+import { uploadFile, analyzeAudioWithReccoBeats, AudioAnalysisResult as UploadServiceAudioAnalysisResult } from "./upload.service";
 import { paginate } from "../utils/handle-utils";
 import * as emailService from "./email.service";
 import { client, setCache } from "../middleware/cache.middleware";
@@ -530,6 +530,8 @@ interface CreateTrackData {
 }
 
 // --- START: Refactored Audio Analysis Helper ---
+// Remove or comment out the local analyzeAudioFeatures and its interface if no longer needed elsewhere
+/*
 interface AudioAnalysisResult {
   tempo: number | null;
   mood: string | null;
@@ -542,127 +544,9 @@ interface AudioAnalysisResult {
 async function analyzeAudioFeatures(
   audioBuffer: Buffer
 ): Promise<AudioAnalysisResult> {
-  let tempo = null,
-    mood = null,
-    key = null,
-    scale = null,
-    danceability = null,
-    energy = null;
-  try {
-    const pcmF32 = await convertMp3BufferToPcmF32(audioBuffer);
-    if (pcmF32) {
-      console.log(
-        "[Essentia DEBUG] PCM data obtained, proceeding with analysis."
-      );
-      const essentia = new Essentia(EssentiaWASM);
-      const audioVector = essentia.arrayToVector(pcmF32);
-
-      // Tempo
-      try {
-        const tempoResult = essentia.PercivalBpmEstimator(audioVector);
-        console.log(
-          "[Essentia DEBUG] PercivalBpmEstimator result:",
-          tempoResult
-        );
-        tempo =
-          tempoResult && typeof tempoResult.bpm === "number"
-            ? Math.round(tempoResult.bpm)
-            : null;
-        console.log("[Essentia DEBUG] Tempo analysis result:", tempo);
-      } catch (tempoError) {
-        console.error("[Essentia ERROR] Estimating tempo failed:", tempoError);
-        tempo = null;
-      }
-
-      // Danceability
-      try {
-        const danceabilityResult = essentia.Danceability(audioVector);
-        console.log(
-          "[Essentia DEBUG] Danceability result:",
-          danceabilityResult
-        );
-        danceability =
-          danceabilityResult &&
-          typeof danceabilityResult.danceability === "number"
-            ? danceabilityResult.danceability
-            : null;
-        console.log(
-          "[Essentia DEBUG] Danceability analysis result:",
-          danceability
-        );
-      } catch (danceabilityError) {
-        console.error(
-          "[Essentia ERROR] Estimating danceability failed:",
-          danceabilityError
-        );
-        danceability = null;
-      }
-
-      // Energy & Mood
-      try {
-        const energyResult = essentia.Energy(audioVector);
-        console.log("[Essentia DEBUG] Energy result:", energyResult);
-        energy =
-          energyResult && typeof energyResult.energy === "number"
-            ? energyResult.energy
-            : null;
-        mood =
-          energy !== null
-            ? energy > 0.6
-              ? "Energetic"
-              : energy < 0.4
-              ? "Calm"
-              : "Neutral"
-            : null;
-        console.log("[Essentia DEBUG] Energy/Mood analysis result:", {
-          energy,
-          mood,
-        });
-      } catch (energyError) {
-        console.error(
-          "[Essentia ERROR] Calculating energy/mood failed:",
-          energyError
-        );
-        energy = null;
-        mood = null;
-      }
-
-      // Key & Scale
-      try {
-        const keyResult = essentia.KeyExtractor(audioVector);
-        console.log("[Essentia DEBUG] KeyExtractor result:", keyResult);
-        key =
-          keyResult && typeof keyResult.key === "string" ? keyResult.key : null;
-        scale =
-          keyResult && typeof keyResult.scale === "string"
-            ? keyResult.scale
-            : null;
-        console.log("[Essentia DEBUG] Key/Scale analysis result:", {
-          key,
-          scale,
-        });
-      } catch (keyError) {
-        console.error(
-          "[Essentia ERROR] Estimating key/scale failed:",
-          keyError
-        );
-        key = null;
-        scale = null;
-      }
-    } else {
-      console.warn(
-        "[Essentia DEBUG] Audio decoding failed (pcmF32 is null), skipping audio analysis."
-      );
-    }
-  } catch (analysisError) {
-    console.error(
-      "[Essentia ERROR] General error during audio analysis pipeline:",
-      analysisError
-    );
-  }
-
-  return { tempo, mood, key, scale, danceability, energy };
+  // ... implementation of the old analyzeAudioFeatures ...
 }
+*/
 // --- END: Refactored Audio Analysis Helper ---
 
 export class TrackService {
@@ -712,31 +596,40 @@ export class TrackService {
     ]);
 
     let duration = 0;
-    let audioFeatures: AudioAnalysisResult = {
+    let audioFeatures: UploadServiceAudioAnalysisResult = {
       tempo: null,
       mood: null,
       key: null,
       scale: null,
       danceability: null,
       energy: null,
+      instrumentalness: null,
+      acousticness: null,
+      valence: null,
+      loudness: null,
+      speechiness: null,
+      genreIds: [],
     };
 
     try {
-      // Lấy duration
       const metadata = await mm.parseBuffer(
         audioFile.buffer,
         audioFile.mimetype
       );
       duration = Math.round(metadata.format.duration || 0);
+      
+      audioFeatures = await analyzeAudioWithReccoBeats(
+        audioFile.buffer,
+        title,
+        artistName
+      );
 
-      // Gọi hàm helper để phân tích audio
-      audioFeatures = await analyzeAudioFeatures(audioFile.buffer);
     } catch (metadataError) {
       console.error(
-        "[Metadata ERROR] Error parsing basic audio metadata:",
+        "[Metadata ERROR] Error parsing basic audio metadata or calling analyzeAudioWithReccoBeats:",
         metadataError
       );
-      // audioFeatures sẽ giữ giá trị null mặc định
+      // Keep default audioFeatures if analysis fails
     }
 
     const allFeaturedArtistIds = new Set<string>();
@@ -766,32 +659,35 @@ export class TrackService {
     const trackData: Prisma.TrackCreateInput = {
       title,
       duration,
-      releaseDate: new Date(releaseDate),
-      type,
+      releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
+      type: type || AlbumType.SINGLE,
       audioUrl: audioUploadResult.secure_url,
       coverUrl: coverUploadResult?.secure_url,
+      isActive: false,
       artist: { connect: { id: artistProfileId } },
-      label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
-      isActive: true,
-      // Gán kết quả từ helper
       tempo: audioFeatures.tempo,
       mood: audioFeatures.mood,
       key: audioFeatures.key,
       scale: audioFeatures.scale,
       danceability: audioFeatures.danceability,
       energy: audioFeatures.energy,
+      playCount: 0,
+      label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
     };
-    // Adjust isActive based on releaseDate
-    if (new Date(releaseDate) > new Date()) {
-      trackData.isActive = false;
-    }
 
-    if (genreIds && genreIds.length > 0) {
+    if (audioFeatures.genreIds && audioFeatures.genreIds.length > 0) {
       trackData.genres = {
-        create: genreIds.map((genreId) => ({
+        create: audioFeatures.genreIds.map((genreId: string) => ({
           genre: { connect: { id: genreId } },
         })),
       };
+    } else {
+      const defaultGenre = await prisma.genre.findFirst({ where: { name: "Pop" } }) || await prisma.genre.findFirst();
+      if (defaultGenre) {
+        trackData.genres = {
+          create: [{ genre: { connect: { id: defaultGenre.id } } }],
+        };
+      }
     }
 
     const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);
@@ -2176,37 +2072,54 @@ export const reanalyzeTrackAudioFeatures = async (
 
   const audioBuffer = await downloadAudioBuffer(track.audioUrl);
 
-  const reccoAnalysis = await analyzeAudioWithReccoBeats(
+  // Only use analyzeAudioWithReccoBeats from upload.service.ts
+  const audioAnalysis = await analyzeAudioWithReccoBeats(
     audioBuffer,
     track.title,
     track.artist.artistName
   );
-  const essentiaAnalysis = await analyzeAudioFeatures(audioBuffer);
+  // const essentiaAnalysis = await analyzeAudioFeatures(audioBuffer); // Remove call to local essentia-only analysis
 
   return prisma.$transaction(async (tx) => {
+    // Clear existing genres before adding new ones
     await tx.trackGenre.deleteMany({
       where: { trackId: trackId },
     });
 
     const dataToUpdate: Prisma.TrackUpdateInput = {
-      tempo: essentiaAnalysis.tempo ?? reccoAnalysis.tempo,
-      mood: essentiaAnalysis.mood ?? reccoAnalysis.mood,
-      key: essentiaAnalysis.key ?? reccoAnalysis.key,
-      scale: essentiaAnalysis.scale ?? reccoAnalysis.scale,
-      danceability: essentiaAnalysis.danceability ?? reccoAnalysis.danceability,
-      energy: essentiaAnalysis.energy ?? reccoAnalysis.energy,
+      tempo: audioAnalysis.tempo,
+      mood: audioAnalysis.mood,
+      key: audioAnalysis.key,
+      scale: audioAnalysis.scale,
+      danceability: audioAnalysis.danceability,
+      energy: audioAnalysis.energy,
+      // Add other fields from audioAnalysis if they exist on Track model
+      // instrumentalness: audioAnalysis.instrumentalness,
+      // acousticness: audioAnalysis.acousticness,
+      // valence: audioAnalysis.valence,
+      // loudness: audioAnalysis.loudness,
+      // speechiness: audioAnalysis.speechiness,
+      // Potentially update other fields like lastAnalyzedAt if you add such a field
     };
 
-    const newGenreIds = reccoAnalysis.genreIds;
+    const newGenreIds = audioAnalysis.genreIds;
     if (newGenreIds && newGenreIds.length > 0) {
       dataToUpdate.genres = {
         create: newGenreIds.map((genreId: string) => ({
           genre: { connect: { id: genreId } },
         })),
       };
+    } else {
+       // Fallback: if no genres from analysis, assign a default one or leave empty
+      const defaultGenre = await prisma.genre.findFirst({ where: { name: "Pop" } }) || await prisma.genre.findFirst();
+      if (defaultGenre) {
+        dataToUpdate.genres = {
+          create: [{ genre: { connect: { id: defaultGenre.id } } }],
+        };
+      }
     }
 
-    const updatedTrackInTx = await tx.track.update({
+    const updatedTrack = await tx.track.update({
       where: { id: trackId },
       data: dataToUpdate,
       select: {
@@ -2259,12 +2172,12 @@ export const reanalyzeTrackAudioFeatures = async (
       },
     });
 
-    if (!updatedTrackInTx) {
+    if (!updatedTrack) {
       throw new Error(
         "Failed to update or retrieve track after re-analysis in transaction."
       );
     }
-    return updatedTrackInTx; // Return the result directly, type will be inferred
+    return updatedTrack; // Return the result directly, type will be inferred
   });
 };
 // --- END: New Re-analyze Service Function ---
