@@ -113,8 +113,7 @@ export const search = async (user: any, query: string) => {
   await saveSearchHistory(user.id, searchQuery);
 
   // Fetch more results to allow for JS-side accent-insensitive filtering
-  const FETCH_LIMIT = 200;
-  const RETURN_LIMIT = 30;
+  const RETURN_LIMIT = 15;
 
   const [artists, albums, tracks, users] = await Promise.all([
     // Artist
@@ -153,7 +152,6 @@ export const search = async (user: any, query: string) => {
           },
         },
       },
-      take: FETCH_LIMIT,
     }),
 
     // Album
@@ -162,7 +160,6 @@ export const search = async (user: any, query: string) => {
         isActive: true,
       },
       select: searchAlbumSelect,
-      take: FETCH_LIMIT,
     }),
 
     // Track
@@ -172,7 +169,6 @@ export const search = async (user: any, query: string) => {
       },
       select: searchTrackSelect,
       orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-      take: FETCH_LIMIT,
     }),
 
     // User
@@ -183,7 +179,6 @@ export const search = async (user: any, query: string) => {
         isActive: true,
       },
       select: userSelect,
-      take: FETCH_LIMIT,
     }),
   ]);
 
