@@ -59,6 +59,12 @@ export const albumSelect = {
       updatedAt: true,
       artistId: true,
       albumId: true,
+      tempo: true,
+      mood: true,
+      key: true,
+      scale: true,
+      danceability: true,
+      energy: true,
       album: {
         select: {
           id: true,

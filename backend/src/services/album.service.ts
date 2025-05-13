@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import prisma from '../config/db';
-import { uploadFile } from './upload.service';
+import { uploadFile, analyzeAudioWithReccoBeats, AudioAnalysisResult as UploadServiceAudioAnalysisResult } from './upload.service';
 import { Role, AlbumType, Prisma, HistoryType, NotificationType, RecipientType } from '@prisma/client';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
 import * as emailService from './email.service';
@@ -286,6 +286,7 @@ export const addTracksToAlbum = async (req: Request) => {
       isActive: true, 
       releaseDate: true,
       labelId: true, // Select the labelId directly
+      artist: { select: { artistName: true } }, // <<< ADDED: Need artistName for analysis
       tracks: { select: { trackNumber: true } }
     }
   });
@@ -294,6 +295,7 @@ export const addTracksToAlbum = async (req: Request) => {
   if (!canManageAlbum(user, albumWithLabel.artistId)) throw new Error('You can only add tracks to your own albums');
   
   const mainArtistId = albumWithLabel.artistId; // Store the main artist ID
+  const albumArtistName = albumWithLabel.artist?.artistName || 'Unknown Artist'; // <<< ADDED: Get artist name
   const albumLabelId = albumWithLabel.labelId; // Use the fetched labelId
 
   const files = req.files as Express.Multer.File[];
@@ -318,7 +320,7 @@ export const addTracksToAlbum = async (req: Request) => {
     throw new Error(`Mismatch between uploaded files (${files.length}) and titles (${titles.length}).`);
   }
 
-  console.time('[addTracksToAlbum] Total Processing Time'); // Start total timer
+  // console.time('[addTracksToAlbum] Total Processing Time'); // Start total timer
 
   const createdTracks = await Promise.all(
     files.map(async (file, index) => {
@@ -326,7 +328,7 @@ export const addTracksToAlbum = async (req: Request) => {
       const titleForTrack = titles[index];
       const featuredArtistIdsForTrack = JSON.parse(featuredArtistIdsJson[index] || '[]');
       const featuredArtistNamesForTrack = JSON.parse(featuredArtistNamesJson[index] || '[]');
-      const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]');
+      // const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]'); // <<< REMOVED: genres will come from analysis
 
       if (!titleForTrack) { // Simplified check for title presence
         console.error(`Missing title for track at index ${index}`);
@@ -335,7 +337,7 @@ export const addTracksToAlbum = async (req: Request) => {
       }
 
       // Parse duration (already async)
-      console.time(`[addTracksToAlbum] Metadata Parse ${index}`); // Start timer BEFORE parsing
+      // console.time(`[addTracksToAlbum] Metadata Parse ${index}`); // Start timer BEFORE parsing
       let duration = 0; // Default duration
       try {
         const metadata = await mm.parseBuffer(file.buffer); // Removed { duration: true } option
@@ -346,23 +348,46 @@ export const addTracksToAlbum = async (req: Request) => {
       } catch (parseError) {
         console.error(`[addTracksToAlbum] Track ${index} (${file.originalname}): Error parsing metadata:`, parseError);
       }
-      console.timeEnd(`[addTracksToAlbum] Metadata Parse ${index}`);
+      // console.timeEnd(`[addTracksToAlbum] Metadata Parse ${index}`);
 
       // Upload audio file
-      console.time(`[addTracksToAlbum] Cloudinary Upload ${index}`);
+      // console.time(`[addTracksToAlbum] Cloudinary Upload ${index}`);
       const uploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
-      console.timeEnd(`[addTracksToAlbum] Cloudinary Upload ${index}`);
+      // console.timeEnd(`[addTracksToAlbum] Cloudinary Upload ${index}`);
 
-      const existingTrack = await prisma.track.findFirst({
-        where: { title: titleForTrack, artistId: mainArtistId },
+      // >>> ADDED: Perform audio analysis using analyzeAudioWithReccoBeats <<<
+      let audioFeatures: UploadServiceAudioAnalysisResult = {
+        tempo: null, mood: null, key: null, scale: null, danceability: null, energy: null,
+        instrumentalness: null, acousticness: null, valence: null, loudness: null, speechiness: null,
+        genreIds: []
+      };
+      try {
+        audioFeatures = await analyzeAudioWithReccoBeats(
+          file.buffer,
+          titleForTrack,
+          albumArtistName // Use album's main artist name for context
+        );
+      } catch (analysisError) {
+        console.error(`[addTracksToAlbum] Audio analysis failed for track ${index} (${file.originalname}):`, analysisError);
+        // Keep default/null audioFeatures if analysis fails
+      }
+      // >>> END OF AUDIO ANALYSIS <<<
+
+      const existingTrackCheck = await prisma.track.findFirst({
+        where: { title: titleForTrack, artistId: mainArtistId, albumId: albumId }, // More specific check
       });
-      // Consider allowing duplicate titles within an album, or keep this check
-      if (existingTrack) console.warn(`Track with title \"${titleForTrack}\" already exists for this artist.`);
+      if (existingTrackCheck) {
+        console.warn(`Track with title "${titleForTrack}" already exists in this album for this artist. Skipping.`);
+        // Optionally, you could return a specific marker or null to filter out later
+        // For now, it will proceed and potentially create a duplicate if not handled by DB constraints
+        // Or, throw an error if duplicates in the same album are strictly forbidden:
+        // throw new Error(`Track "${titleForTrack}" already exists in this album.`);
+      }
 
       const newTrackNumber = maxTrackNumber + index + 1;
       
       // Resolve featured artists for *this* track
-      console.time(`[addTracksToAlbum] Resolve Artists ${index}`);
+      // console.time(`[addTracksToAlbum] Resolve Artists ${index}`);
       const allFeaturedArtistIds = new Set<string>();
 
       if (featuredArtistIdsForTrack.length > 0) {
@@ -374,30 +399,46 @@ export const addTracksToAlbum = async (req: Request) => {
           try {
             const profile = await getOrCreateArtistProfile(name);
             if (profile.id !== mainArtistId) allFeaturedArtistIds.add(profile.id);
-          } catch (error) { console.error(`Error resolving artist name \"${name}\" for track ${index}:`, error); }
+          } catch (error) { console.error(`Error resolving artist name "${name}" for track ${index}:`, error); }
         }
       }
-      console.timeEnd(`[addTracksToAlbum] Resolve Artists ${index}`);
+      // console.timeEnd(`[addTracksToAlbum] Resolve Artists ${index}`);
 
       const trackData: Prisma.TrackCreateInput = {
         title: titleForTrack,
         duration,
         releaseDate: new Date((albumWithLabel as any)?.releaseDate || Date.now()), 
         trackNumber: newTrackNumber,
-        coverUrl: albumWithLabel.coverUrl,
+        coverUrl: albumWithLabel.coverUrl, // Use album's cover for all tracks in it
         audioUrl: uploadResult.secure_url,
         artist: { connect: { id: mainArtistId } },
         album: { connect: { id: albumId } },
         type: albumWithLabel.type,
         isActive: albumWithLabel.isActive,
+        // >>> ADDED: Populate audio features from analysis <<<
+        tempo: audioFeatures.tempo,
+        mood: audioFeatures.mood,
+        key: audioFeatures.key,
+        scale: audioFeatures.scale,
+        danceability: audioFeatures.danceability,
+        energy: audioFeatures.energy,
+        // Note: instrumentalness, acousticness, etc. from audioFeatures are not on the base Track model by default
+        // If your Track model has these, uncomment and map them here.
+        // instrumentalness: audioFeatures.instrumentalness,
+        // acousticness: audioFeatures.acousticness,
+        // valence: audioFeatures.valence,
+        // loudness: audioFeatures.loudness,
+        // speechiness: audioFeatures.speechiness,
+        // >>> END OF AUDIO FEATURE POPULATION <<<
         featuredArtists:
           allFeaturedArtistIds.size > 0
             ? { create: Array.from(allFeaturedArtistIds).map(artistId => ({ artistProfile: { connect: { id: artistId } } })) }
             : undefined,
+        // >>> MODIFIED: Use genreIds from audioFeatures <<<
         genres:
-          genreIdsForTrack && genreIdsForTrack.length > 0 // Ensure it's an array and has items
-            ? { create: genreIdsForTrack.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
-            : undefined, // Use genres from metadata
+          audioFeatures.genreIds && audioFeatures.genreIds.length > 0
+            ? { create: audioFeatures.genreIds.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
+            : undefined, 
       };
 
       // Automatically connect the track to the album's label if it exists
@@ -405,15 +446,18 @@ export const addTracksToAlbum = async (req: Request) => {
         trackData.label = { connect: { id: albumLabelId } }; // Use connect with ID
       }
 
-      console.time(`[addTracksToAlbum] DB Create Track ${index}`);
+      // console.time(`[addTracksToAlbum] DB Create Track ${index}`);
       const track = await prisma.track.create({
         data: trackData,
         select: trackSelect,
       });
-      console.timeEnd(`[addTracksToAlbum] DB Create Track ${index}`);
+      // console.timeEnd(`[addTracksToAlbum] DB Create Track ${index}`);
       return track;
     })
   );
+
+  // Filter out any nulls if tracks were skipped due to duplication
+  const validCreatedTracks = createdTracks.filter(track => track !== null) as NonNullable<typeof createdTracks[0]>[];
 
   const tracks = await prisma.track.findMany({ where: { albumId }, select: { duration: true, id: true, title: true } }); // Added id and title for logging
   const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
@@ -429,9 +473,9 @@ export const addTracksToAlbum = async (req: Request) => {
   const io = getIO();
   io.emit('album:updated', { album: updatedAlbum });
 
-  console.timeEnd('[addTracksToAlbum] Total Processing Time'); // End total timer
+  // console.timeEnd('[addTracksToAlbum] Total Processing Time'); // End total timer
 
-  return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
+  return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: validCreatedTracks };
 };
 
 export const updateAlbum = async (req: Request) => {
