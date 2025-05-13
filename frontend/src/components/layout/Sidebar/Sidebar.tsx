@@ -328,21 +328,30 @@ export default function Sidebar({
     }
 
     try {
-      const response = await api.generate.createPlaylistFromPrompt({ prompt: aiPromptValue }, token);
-      
-      if (response && response.playlist) { 
-        toast.success(response.message || 'AI Playlist generated successfully!');
-        fetchPlaylists(); 
+      const response = await api.generate.createPlaylistFromPrompt(
+        { prompt: aiPromptValue },
+        token
+      );
+
+      if (response && response.playlist) {
+        toast.success(
+          response.message || "AI Playlist generated successfully!"
+        );
+        fetchPlaylists();
         setShowAiPromptInput(false);
         setAiPromptValue("");
         router.push(`/playlists/${response.playlist.id}`);
       } else {
-        const errorMessage = response?.message || 'Failed to generate AI playlist. The AI might not have found suitable tracks.';
+        const errorMessage =
+          response?.message ||
+          "Failed to generate AI playlist. The AI might not have found suitable tracks.";
         toast.error(errorMessage);
       }
     } catch (error: any) {
-      console.error('Error generating AI playlist inline:', error);
-      toast.error(error.message || 'An error occurred while generating the playlist.');
+      console.error("Error generating AI playlist inline:", error);
+      toast.error(
+        error.message || "An error occurred while generating the playlist."
+      );
     } finally {
       setIsGeneratingWithAI(false);
     }
@@ -590,7 +599,11 @@ export default function Sidebar({
 
                       {/* Inline AI Playlist Input */}
                       {showAiPromptInput && !isCollapsed && (
-                        <div className={`p-3 rounded-lg my-2 ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-800'}`}>
+                        <div
+                          className={`p-3 rounded-lg my-2 ${
+                            theme === "light" ? "bg-gray-100" : "bg-neutral-800"
+                          }`}
+                        >
                           <textarea
                             placeholder='e.g., "Chill V-Pop for a rainy day"'
                             value={aiPromptValue}
@@ -598,9 +611,9 @@ export default function Sidebar({
                             disabled={isGeneratingWithAI}
                             rows={3}
                             className={`w-full p-2 border rounded-md text-sm resize-none mb-2 ${
-                              theme === 'dark'
-                                ? 'bg-neutral-700 border-neutral-600 placeholder-neutral-400 text-white focus:ring-primary focus:border-primary'
-                                : 'bg-gray-50 border-gray-300 placeholder-gray-500 text-black focus:ring-primary-dark focus:border-primary-dark'
+                              theme === "dark"
+                                ? "bg-neutral-700 border-neutral-600 placeholder-neutral-400 text-white focus:ring-primary focus:border-primary"
+                                : "bg-gray-50 border-gray-300 placeholder-gray-500 text-black focus:ring-primary-dark focus:border-primary-dark"
                             }`}
                           />
                           <div className="flex justify-end gap-2">
@@ -608,43 +621,75 @@ export default function Sidebar({
                               onClick={() => setShowAiPromptInput(false)}
                               disabled={isGeneratingWithAI}
                               className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-                                theme === 'dark' ? 'text-neutral-300 hover:bg-neutral-700' : 'text-gray-700 hover:bg-gray-200'
+                                theme === "dark"
+                                  ? "text-neutral-300 hover:bg-neutral-700"
+                                  : "text-gray-700 hover:bg-gray-200"
                               }`}
                             >
                               Cancel
                             </button>
-                            
+
                             {/* Conditional Button Rendering */}
                             {isGeneratingWithAI ? (
                               <button
                                 disabled={true}
                                 className={`relative inline-flex h-auto items-center justify-center overflow-hidden rounded-md p-[1px] text-xs font-semibold focus:outline-none ${
-                                  theme === 'dark' ? 'focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 focus:ring-offset-neutral-900' : 'focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-white'
+                                  theme === "dark"
+                                    ? "focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 focus:ring-offset-neutral-900"
+                                    : "focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-white"
                                 }`}
                               >
-                                <span className={`absolute inset-[-1000%] animate-[spin_2s_linear_infinite] ${ 
-                                    theme === 'dark' 
-                                      ? 'bg-[conic-gradient(from_90deg_at_50%_50%,#a855f7_0%,#ec4899_50%,#a855f7_100%)]' 
-                                      : 'bg-[conic-gradient(from_90deg_at_50%_50%,#c084fc_0%,#f472b6_50%,#c084fc_100%)]'
-                                }`} />
-                                <span className={`relative z-10 inline-flex h-full w-full cursor-not-allowed items-center justify-center rounded-[calc(0.375rem-1px)] px-[calc(0.75rem-1px)] py-[calc(0.375rem-1px)] transition-colors ${
-                                  theme === 'dark' ? 'bg-neutral-800 text-neutral-100' : 'bg-gray-200 text-gray-700'
-                                }`}>
-                                  <svg className="animate-spin h-4 w-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <span
+                                  className={`absolute inset-[-1000%] animate-[spin_2s_linear_infinite] ${
+                                    theme === "dark"
+                                      ? "bg-[conic-gradient(from_90deg_at_50%_50%,#a855f7_0%,#ec4899_50%,#a855f7_100%)]"
+                                      : "bg-[conic-gradient(from_90deg_at_50%_50%,#c084fc_0%,#f472b6_50%,#c084fc_100%)]"
+                                  }`}
+                                />
+                                <span
+                                  className={`relative z-10 inline-flex h-full w-full cursor-not-allowed items-center justify-center rounded-[calc(0.375rem-1px)] px-[calc(0.75rem-1px)] py-[calc(0.375rem-1px)] transition-colors ${
+                                    theme === "dark"
+                                      ? "bg-neutral-800 text-neutral-100"
+                                      : "bg-gray-200 text-gray-700"
+                                  }`}
+                                >
+                                  <svg
+                                    className="animate-spin h-4 w-4 mr-1.5"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
                                   </svg>
-                                  <span className="font-semibold">Generating...</span>
+                                  <span className="font-semibold">
+                                    Generating...
+                                  </span>
                                 </span>
                               </button>
                             ) : (
                               <button
                                 onClick={handleGenerateAIPlaylistInline}
                                 disabled={!aiPromptValue.trim()}
-                                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${ 
+                                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
                                   !aiPromptValue.trim()
-                                    ? (theme === 'dark' ? 'bg-neutral-600 text-neutral-400 cursor-not-allowed' : 'bg-gray-300 text-gray-500 cursor-not-allowed')
-                                    : (theme === 'dark' ? 'bg-yellow-500 text-black hover:bg-yellow-400 focus-visible:ring-yellow-400 focus-visible:ring-offset-neutral-900' : 'bg-primary-dark hover:bg-primary-dark/80 text-white focus-visible:ring-primary-dark focus-visible:ring-offset-white')
+                                    ? theme === "dark"
+                                      ? "bg-neutral-600 text-neutral-400 cursor-not-allowed"
+                                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    : theme === "dark"
+                                    ? "bg-yellow-500 text-black hover:bg-yellow-400 focus-visible:ring-yellow-400 focus-visible:ring-offset-neutral-900"
+                                    : "bg-primary-dark hover:bg-primary-dark/80 text-white focus-visible:ring-primary-dark focus-visible:ring-offset-white"
                                 }`}
                               >
                                 <Bot className="w-4 h-4 mr-1.5" />

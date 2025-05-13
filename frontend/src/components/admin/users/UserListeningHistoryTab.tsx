@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { formatDistanceToNow, format } from "date-fns";
-import Image from "next/image"; 
+import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrackDetailsModal } from "./TrackDetailsModal";
@@ -38,7 +38,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils"; 
+import { cn } from "@/lib/utils";
 
 interface HistoryWithDetails extends Omit<History, "track" | "user"> {
   track: {
@@ -274,22 +274,30 @@ export const UserListeningHistoryTab = ({
         const token = localStorage.getItem("userToken");
         if (!token) throw new Error("No authentication token found");
 
-        const params = new URLSearchParams();
-        params.append("page", page.toString());
-        params.append("limit", limit.toString());
+        const queryParams: { [key: string]: string | number } = {
+          page: page.toString(),
+          limit: limit.toString(),
+        };
+
         if (sort.key) {
-          params.append("sortBy", sort.key);
-          params.append("sortOrder", sort.direction);
+          queryParams["sortBy"] = sort.key;
+          queryParams["sortOrder"] = sort.direction;
+        }
+        if (activeSearchTerm) {
+          queryParams["search"] = activeSearchTerm;
         }
 
         const response: ApiResponse = await api.admin.getUserListeningHistory(
           userId,
           token,
-          params.toString()
+          queryParams
         );
 
         // Add this log to debug pagination
-        console.log("[UserListeningHistoryTab] Pagination data:", response.pagination);
+        console.log(
+          "[UserListeningHistoryTab] Pagination data:",
+          response.pagination
+        );
 
         setHistoryItems(response.data || []);
         const newTotalItems = response.pagination?.totalItems ?? 0;
@@ -326,7 +334,7 @@ export const UserListeningHistoryTab = ({
         setLoading(false);
       }
     },
-    [userId, limit, onTotalItemsChange]
+    [userId, limit, onTotalItemsChange, activeSearchTerm]
   );
 
   const refreshData = useCallback(() => {
@@ -456,7 +464,9 @@ export const UserListeningHistoryTab = ({
                     Re-analyze ({tracksToReanalyzeIds.length})
                   </Button>
                 </DialogTrigger>
-                <DialogContent className={cn("sm:max-w-md", theme === "dark" ? "dark" : "")}>
+                <DialogContent
+                  className={cn("sm:max-w-md", theme === "dark" ? "dark" : "")}
+                >
                   <DialogHeader>
                     <DialogTitle>Confirm Bulk Re-analysis</DialogTitle>
                     <DialogDescription>
@@ -522,16 +532,29 @@ export const UserListeningHistoryTab = ({
           <Table className="w-full">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[60px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">{null}</TableHead>
-                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Track</TableHead>
-                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Artist</TableHead>
-                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Album</TableHead>
-                <TableHead className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer" onClick={() => handleSort("createdAt")}>
+                <TableHead className="w-[60px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                  {null}
+                </TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Track
+                </TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Artist
+                </TableHead>
+                <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                  Album
+                </TableHead>
+                <TableHead
+                  className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort("createdAt")}
+                >
                   <div className="flex items-center justify-center">
                     Played At {renderSortIcon("createdAt")}
                   </div>
                 </TableHead>
-                <TableHead className="w-[80px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Details</TableHead>
+                <TableHead className="w-[80px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                  Details
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -543,7 +566,10 @@ export const UserListeningHistoryTab = ({
                 </TableRow>
               )}
               {historyItems.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                <TableRow
+                  key={item.id}
+                  className="hover:bg-muted/50 transition-colors"
+                >
                   <TableCell className="px-6 py-4">
                     {item.track?.coverUrl ? (
                       <div className="flex justify-center">
@@ -597,7 +623,10 @@ export const UserListeningHistoryTab = ({
                     )}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-center">
-                    <span title={format(new Date(item.createdAt), "Pp")} className="text-sm">
+                    <span
+                      title={format(new Date(item.createdAt), "Pp")}
+                      className="text-sm"
+                    >
                       {formatDistanceToNow(new Date(item.createdAt), {
                         addSuffix: true,
                       })}

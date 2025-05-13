@@ -604,7 +604,7 @@ export default function AiUserManagementPage() {
                   {user.email}
                 </TableCell>
                 <TableCell className="w-[100px] px-6 py-4">
-                  <span 
+                  <span
                     className={`inline-block text-xs font-semibold ${
                       user.role === "ADMIN"
                         ? "text-primary"
@@ -615,13 +615,13 @@ export default function AiUserManagementPage() {
                   </span>
                 </TableCell>
                 <TableCell className="w-[100px] px-6 py-4">
-                  <span 
+                  <span
                     className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       user.isActive
                         ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
-                    style={{marginLeft: "-6px"}}
+                    style={{ marginLeft: "-6px" }}
                   >
                     {user.isActive ? "Active" : "Inactive"}
                   </span>
@@ -655,7 +655,8 @@ export default function AiUserManagementPage() {
                         handleAction("edit", user);
                       }}
                     >
-                      {actionLoading === user.id && editingUser?.id === user.id ? (
+                      {actionLoading === user.id &&
+                      editingUser?.id === user.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Edit className="h-4 w-4" />
@@ -672,7 +673,8 @@ export default function AiUserManagementPage() {
                       }}
                       disabled={actionLoading === user.id}
                     >
-                      {actionLoading === user.id && deletingUser?.id === user.id ? (
+                      {actionLoading === user.id &&
+                      deletingUser?.id === user.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Trash2 className="h-4 w-4" />

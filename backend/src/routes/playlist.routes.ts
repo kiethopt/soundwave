@@ -12,7 +12,7 @@ import {
   removeTrackFromPlaylist,
   addTrackToPlaylist,
   getSystemPlaylists,
-  generateAIPlaylist,
+  // generateAIPlaylist,
   deletePlaylist,
   // System playlist controllers
   updateAllSystemPlaylists,
@@ -24,7 +24,7 @@ import {
   getHomePageData,
   getUserSystemPlaylists,
   getPlaylistSuggestions,
-  suggestMoreTracksForPlaylist,
+  // suggestMoreTracksForPlaylist,
   reorderPlaylistTracks,
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
@@ -53,11 +53,11 @@ router.get("/suggest", getPlaylistSuggestions);
 router.get("/system/user", getUserSystemPlaylists);
 
 // AI playlist routes
-router.post("/ai-generate", generateAIPlaylist);
-router.post("/ai-generate/artist/:artistName", (req, res, next) => {
-  req.body.basedOnArtist = req.params.artistName;
-  generateAIPlaylist(req, res, next);
-});
+// router.post("/ai-generate", generateAIPlaylist);
+// router.post("/ai-generate/artist/:artistName", (req, res, next) => {
+//   req.body.basedOnArtist = req.params.artistName;
+//   generateAIPlaylist(req, res, next);
+// });
 
 // Specific playlist ID routes - must be after all other specific routes
 router.get("/:id", optionalAuthenticate, getPlaylistById);
@@ -65,7 +65,7 @@ router.patch("/:id", upload.single("cover"), updatePlaylist);
 router.delete("/:id", deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
 router.post("/:id/tracks", addTrackToPlaylist);
-router.get("/:id/suggest-more", suggestMoreTracksForPlaylist);
+// router.get("/:id/suggest-more", suggestMoreTracksForPlaylist);
 
 // Route to update track order in a playlist
 router.patch("/:playlistId/reorder", authenticate, reorderPlaylistTracks);

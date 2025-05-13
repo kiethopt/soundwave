@@ -16,17 +16,11 @@ router.get("/", playlist_controller_1.getPlaylists);
 router.post("/", playlist_controller_1.createPlaylist);
 router.get("/suggest", playlist_controller_1.getPlaylistSuggestions);
 router.get("/system/user", playlist_controller_1.getUserSystemPlaylists);
-router.post("/ai-generate", playlist_controller_1.generateAIPlaylist);
-router.post("/ai-generate/artist/:artistName", (req, res, next) => {
-    req.body.basedOnArtist = req.params.artistName;
-    (0, playlist_controller_1.generateAIPlaylist)(req, res, next);
-});
 router.get("/:id", auth_middleware_1.optionalAuthenticate, playlist_controller_1.getPlaylistById);
 router.patch("/:id", upload_middleware_1.default.single("cover"), playlist_controller_1.updatePlaylist);
 router.delete("/:id", playlist_controller_1.deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", playlist_controller_1.removeTrackFromPlaylist);
 router.post("/:id/tracks", playlist_controller_1.addTrackToPlaylist);
-router.get("/:id/suggest-more", playlist_controller_1.suggestMoreTracksForPlaylist);
 router.patch("/:playlistId/reorder", auth_middleware_1.authenticate, playlist_controller_1.reorderPlaylistTracks);
 router.use("/admin", (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]));
 router.post("/admin/system/base", upload_middleware_1.default.single("cover"), playlist_controller_1.createBaseSystemPlaylist);

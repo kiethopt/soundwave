@@ -8,7 +8,7 @@ import {
   Track,
 } from "@prisma/client";
 import { Request } from "express";
-import { uploadFile } from "./upload.service";
+import { uploadFile, analyzeAudioWithReccoBeats } from "./upload.service";
 import { paginate } from "../utils/handle-utils";
 import * as emailService from "./email.service";
 import { client, setCache } from "../middleware/cache.middleware";
@@ -2001,101 +2001,104 @@ export const playTrack = async (req: Request, trackId: string) => {
   const user = req.user;
   if (!user) throw new Error("Unauthorized");
 
-  const track = await prisma.track.findFirst({
+  const trackData = await prisma.track.findFirst({
     where: {
       id: trackId,
       isActive: true,
       OR: [{ album: null }, { album: { isActive: true } }],
     },
-    select: trackSelect,
+    select: trackSelect, // Ensure trackSelect includes artistId and genres
   });
 
-  if (!track) throw new Error("Track not found");
+  if (!trackData) {
+    throw new Error("Track not found");
+  }
 
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  // At this point, trackData is guaranteed to be non-null.
+  const track = trackData;
 
-  const existingListen = await prisma.history.findFirst({
+  // Automatically re-analyze genres if missing
+  if (!track.genres || track.genres.length === 0) {
+    console.log(
+      `[TrackService] Track ${track.id!} is missing genres. Triggering re-analysis.`
+    );
+    try {
+      await reanalyzeTrackAudioFeatures(track.id!);
+      console.log(
+        `[TrackService] Successfully re-analyzed genres for track ${track.id!}.`
+      );
+    } catch (reanalyzeError) {
+      console.error(
+        `[TrackService] Error re-analyzing genres for track ${track.id!}:`,
+        reanalyzeError
+      );
+    }
+  }
+
+  if (!track.artistId) {
+    console.error(
+      `[TrackService] Critical: Track ${track.id!} is missing artistId after initial fetch.`
+    );
+    throw new Error("Track is missing artistId");
+  }
+
+  // Logic to update monthlyListeners for the artist
+  // track.artistId is now guaranteed by the check above.
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+  const existingListenForArtistThisMonth = await prisma.history.findFirst({
     where: {
       userId: user.id,
       track: { artistId: track.artistId },
-      createdAt: { gte: lastMonth },
+      createdAt: { gte: oneMonthAgo },
+      type: "PLAY",
     },
+    select: { id: true },
   });
 
-  if (!existingListen) {
+  if (!existingListenForArtistThisMonth) {
     await prisma.artistProfile.update({
       where: { id: track.artistId },
       data: { monthlyListeners: { increment: 1 } },
     });
+    console.log(
+      `[TrackService] Incremented monthlyListeners for artist ${track.artistId} by user ${user.id}`
+    );
   }
 
-  // Manual upsert logic for History
-  const existingHistoryRecord = await prisma.history.findFirst({
-    where: {
-      userId: user.id,
-      trackId: track.id,
-      type: "PLAY", // Assuming 'PLAY' is the correct HistoryType enum value or string
-    },
-    select: { id: true }, // Select only the ID for efficiency
-  });
-
-  if (existingHistoryRecord) {
-    // Update existing record
-    const now = new Date();
-    const formattedTimestamp = now.toLocaleString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour12: false,
-    });
-    console.log(
-      `[TrackService] Updating existing History record ID: ${existingHistoryRecord.id} for user ${user.id}, track ${track.id} at ${formattedTimestamp}`
-    );
-    await prisma.history.update({
-      where: { id: existingHistoryRecord.id },
-      data: {
-        playCount: { increment: 1 },
-        updatedAt: new Date(),
-      },
-    });
-  } else {
-    // Create new record
-    const now = new Date();
-    const formattedTimestamp = now.toLocaleString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour12: false,
-    });
-    console.log(
-      `[TrackService] Creating NEW History record for user ${user.id}, track ${track.id} at ${formattedTimestamp}`
-    );
-    await prisma.history.create({
-      data: {
-        type: "PLAY",
-        trackId: track.id,
-        userId: user.id,
-        duration: track.duration,
-        completed: true, // Assuming completion on initial play record
-        playCount: 1,
-      },
-    });
-  }
-
-  // Increment track's playCount (moved outside the history logic)
+  // Increment track's overall playCount
   await prisma.track.update({
     where: { id: track.id },
     data: { playCount: { increment: 1 } },
   });
 
-  return { message: "Play count updated", track };
+  // Always create a new history record for each play event
+  const now = new Date();
+  const formattedTimestamp = now.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour12: false,
+  });
+  console.log(
+    `[TrackService] Creating NEW History record for user ${user.id}, track ${track.id} at ${formattedTimestamp}`
+  );
+  await prisma.history.create({
+    data: {
+      type: "PLAY",
+      trackId: track.id,
+      userId: user.id,
+      duration: track.duration ?? null,
+      completed: true,
+      playCount: 1,
+    },
+  });
+
+  return { message: "Play count updated and history recorded", track };
 };
 
 // Check if track is liked
@@ -2143,12 +2146,15 @@ async function downloadAudioBuffer(url: string): Promise<Buffer> {
 
 export const reanalyzeTrackAudioFeatures = async (
   trackId: string
-): Promise<Track> => {
+) /* : Promise<Track> */ => {
+  // Let TypeScript infer the return type or use Prisma.TrackGetPayload
   const track = await prisma.track.findUnique({
     where: { id: trackId },
     include: {
       artist: {
-        include: {
+        select: {
+          id: true,
+          artistName: true,
           user: {
             select: {
               id: true,
@@ -2164,18 +2170,101 @@ export const reanalyzeTrackAudioFeatures = async (
   if (!track) {
     throw new Error("Track not found");
   }
+  if (!track.artist) {
+    throw new Error("Track artist information is missing");
+  }
 
   const audioBuffer = await downloadAudioBuffer(track.audioUrl);
-  const analysis = await analyzeAudioFeatures(audioBuffer);
 
-  const updatedTrack = await prisma.track.update({
-    where: { id: trackId },
-    data: {
-      ...analysis,
-      albumId: track.album?.id || null,
-    },
+  const reccoAnalysis = await analyzeAudioWithReccoBeats(
+    audioBuffer,
+    track.title,
+    track.artist.artistName
+  );
+  const essentiaAnalysis = await analyzeAudioFeatures(audioBuffer);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.trackGenre.deleteMany({
+      where: { trackId: trackId },
+    });
+
+    const dataToUpdate: Prisma.TrackUpdateInput = {
+      tempo: essentiaAnalysis.tempo ?? reccoAnalysis.tempo,
+      mood: essentiaAnalysis.mood ?? reccoAnalysis.mood,
+      key: essentiaAnalysis.key ?? reccoAnalysis.key,
+      scale: essentiaAnalysis.scale ?? reccoAnalysis.scale,
+      danceability: essentiaAnalysis.danceability ?? reccoAnalysis.danceability,
+      energy: essentiaAnalysis.energy ?? reccoAnalysis.energy,
+    };
+
+    const newGenreIds = reccoAnalysis.genreIds;
+    if (newGenreIds && newGenreIds.length > 0) {
+      dataToUpdate.genres = {
+        create: newGenreIds.map((genreId: string) => ({
+          genre: { connect: { id: genreId } },
+        })),
+      };
+    }
+
+    const updatedTrackInTx = await tx.track.update({
+      where: { id: trackId },
+      data: dataToUpdate,
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        releaseDate: true,
+        audioUrl: true,
+        coverUrl: true,
+        type: true,
+        isActive: true,
+        playCount: true,
+        createdAt: true,
+        updatedAt: true,
+        trackNumber: true,
+        tempo: true,
+        mood: true,
+        key: true,
+        scale: true,
+        danceability: true,
+        energy: true,
+        artist: {
+          select: {
+            id: true,
+            artistName: true,
+          },
+        },
+        album: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        featuredArtists: {
+          select: {
+            artistProfile: { select: { id: true, artistName: true } },
+          },
+        },
+        label: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!updatedTrackInTx) {
+      throw new Error(
+        "Failed to update or retrieve track after re-analysis in transaction."
+      );
+    }
+    return updatedTrackInTx; // Return the result directly, type will be inferred
   });
-
-  return updatedTrack;
 };
 // --- END: New Re-analyze Service Function ---

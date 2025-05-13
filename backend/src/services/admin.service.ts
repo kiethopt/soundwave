@@ -27,7 +27,12 @@ import {
   trackSelect,
   labelSelect, // Added for approveLabelRegistration
 } from "../utils/prisma-selects";
-import { paginate, toBooleanValue, runValidations, validateField } from "../utils/handle-utils"; // Added runValidations, validateField
+import {
+  paginate,
+  toBooleanValue,
+  runValidations,
+  validateField,
+} from "../utils/handle-utils"; // Added runValidations, validateField
 import * as fs from "fs";
 import * as path from "path";
 import { SystemComponentStatus } from "../types/system.types";
@@ -44,6 +49,8 @@ import { Essentia, EssentiaWASM } from "essentia.js";
 import { MPEGDecoder, MPEGDecodedAudio } from "mpg123-decoder";
 import * as aiService from "./ai.service";
 import { HttpError } from "../utils/errors";
+import { AIGeneratedPlaylistInput, HistoryTrackDetail } from "./ai.service";
+import * as trackService from "./track.service"; // Import trackService
 
 // Define a list of valid models here
 const VALID_GEMINI_MODELS = [
@@ -197,15 +204,15 @@ export const getArtistRequests = async (req: Request) => {
 export const getArtistRequestDetail = async (id: string) => {
   let requestData: any = await prisma.artistProfile.findUnique({
     where: { id },
-    select: artistRequestDetailsSelect, 
+    select: artistRequestDetailsSelect,
   });
 
   // Attempt 2: If not found by ArtistProfile ID, try finding by ArtistProfile UserID
   if (!requestData) {
     requestData = await prisma.artistProfile.findFirst({
       where: {
-        userId: id, 
-        verificationRequestedAt: { not: null }, 
+        userId: id,
+        verificationRequestedAt: { not: null },
       },
       select: artistRequestDetailsSelect,
     });
@@ -221,12 +228,13 @@ export const getArtistRequestDetail = async (id: string) => {
         bio: true,
         status: true,
         requestedLabelName: true,
-        rejectionReason: true,     // Make sure this is in your Prisma schema for ArtistRequest
-        socialMediaLinks: true,    // Assuming this is a Json field in ArtistRequest
-        avatarUrl: true,            // Added avatarUrl
-        requestedGenres: true,      // Added requestedGenres
+        rejectionReason: true, // Make sure this is in your Prisma schema for ArtistRequest
+        socialMediaLinks: true, // Assuming this is a Json field in ArtistRequest
+        avatarUrl: true, // Added avatarUrl
+        requestedGenres: true, // Added requestedGenres
         // createdAt: true,              // Or submittedAt, if you have it
-        user: {                     // Nested user data
+        user: {
+          // Nested user data
           select: {
             id: true,
             name: true,
@@ -243,17 +251,16 @@ export const getArtistRequestDetail = async (id: string) => {
       // designed for ArtistProfile structure. Or, the frontend needs to adapt.
       // For now, let's assume the frontend can handle the ArtistRequest structure directly.
       // Add a flag to distinguish if needed, or ensure frontend handles both structures.
-      return { ...artistRoleRequest, _sourceTable: 'ArtistRequest' };
+      return { ...artistRoleRequest, _sourceTable: "ArtistRequest" };
     }
   }
-
 
   if (!requestData) {
     throw new Error("Request not found");
   }
 
   // If data came from ArtistProfile, add a source flag
-  return { ...requestData, _sourceTable: 'ArtistProfile' };
+  return { ...requestData, _sourceTable: "ArtistProfile" };
 };
 
 interface UpdateUserData {
@@ -907,7 +914,10 @@ export const deleteGenreById = async (id: string) => {
   return prisma.genre.delete({ where: { id } });
 };
 
-export const approveArtistRequest = async (adminUserId: string, artistRequestId: string) => {
+export const approveArtistRequest = async (
+  adminUserId: string,
+  artistRequestId: string
+) => {
   const artistRequest = await prisma.artistRequest.findUnique({
     where: { id: artistRequestId },
     select: {
@@ -917,7 +927,7 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
       bio: true,
       avatarUrl: true,
       socialMediaLinks: true, // Assuming this is Prisma.JsonValue
-      requestedGenres: true,  // Assuming this is string[]
+      requestedGenres: true, // Assuming this is string[]
       requestedLabelName: true,
       status: true,
       user: { select: { id: true, email: true, name: true, username: true } },
@@ -935,7 +945,9 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
   }
 
   if (!artistRequest.userId) {
-    throw new Error("User ID missing from artist request, cannot create artist profile.");
+    throw new Error(
+      "User ID missing from artist request, cannot create artist profile."
+    );
   }
 
   const updatedData = await prisma.$transaction(async (tx) => {
@@ -947,7 +959,10 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
       select: { userId: true }, // Only need userId to check if it's a different user
     });
 
-    if (conflictingProfileByName && conflictingProfileByName.userId !== artistRequest.userId) {
+    if (
+      conflictingProfileByName &&
+      conflictingProfileByName.userId !== artistRequest.userId
+    ) {
       // Artist name is taken by a DIFFERENT user
       throw new HttpError(
         409, // HTTP 409 Conflict
@@ -961,7 +976,8 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
     // or to create a new one if it doesn't exist at all.
     const userArtistProfile = await tx.artistProfile.upsert({
       where: { userId: artistRequest.userId }, // Use userId to find existing profile for this user
-      update: { // If ArtistProfile for this user exists, update it
+      update: {
+        // If ArtistProfile for this user exists, update it
         artistName: artistRequest.artistName,
         bio: artistRequest.bio,
         avatar: artistRequest.avatarUrl, // Use avatarUrl from the request
@@ -974,7 +990,8 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
         verificationRequestedAt: null, // Clear old request flag if it was used
         // requestedLabelName: null, // Clear if it was on ArtistProfile, now handled via ArtistRequest
       },
-      create: { // If no ArtistProfile for this user, create a new one
+      create: {
+        // If no ArtistProfile for this user, create a new one
         userId: artistRequest.userId,
         artistName: artistRequest.artistName,
         bio: artistRequest.bio,
@@ -987,7 +1004,14 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
         isActive: true,
         monthlyListeners: 0,
       },
-      select: { id: true, userId: true, artistName: true, labelId: true, user: { select: userSelect}, label:true }, 
+      select: {
+        id: true,
+        userId: true,
+        artistName: true,
+        labelId: true,
+        user: { select: userSelect },
+        label: true,
+      },
     });
 
     // 2. Handle Label Creation and Assignment (if requestedLabelName exists)
@@ -998,7 +1022,10 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
       const labelRecord = await tx.label.upsert({
         where: { name: artistRequest.requestedLabelName },
         update: {}, // If label exists, do nothing to it, just use its ID
-        create: { name: artistRequest.requestedLabelName, description: "Created via artist request" }, // Add a default description
+        create: {
+          name: artistRequest.requestedLabelName,
+          description: "Created via artist request",
+        }, // Add a default description
         select: { id: true },
       });
       finalLabelId = labelRecord.id;
@@ -1010,19 +1037,23 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
         data: { labelId: finalLabelId },
       });
     }
-    
+
     // 3. Create LabelRegistrationRequest if a label was processed by this artist request approval
-    if (createdLabelViaRequest && finalLabelId && artistRequest.requestedLabelName) {
+    if (
+      createdLabelViaRequest &&
+      finalLabelId &&
+      artistRequest.requestedLabelName
+    ) {
       await tx.labelRegistrationRequest.create({
         data: {
           requestedLabelName: artistRequest.requestedLabelName,
           requestingArtistId: userArtistProfile.id, // This is ArtistProfile.id
-          status: RequestStatus.APPROVED, 
+          status: RequestStatus.APPROVED,
           submittedAt: new Date(), // Consider using the ArtistRequest submission time if available and desired
           reviewedAt: new Date(),
           reviewedByAdminId: adminUserId,
           createdLabelId: finalLabelId,
-        }
+        },
       });
     }
 
@@ -1035,37 +1066,47 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
         // reviewedAt: new Date(), // Optionally set reviewedAt for the ArtistRequest itself
         // reviewedByAdminId: adminUserId, // Optionally set this too
       },
-      select: { id: true, status: true, userId: true, artistName: true } // Select necessary fields
+      select: { id: true, status: true, userId: true, artistName: true }, // Select necessary fields
     });
 
     // Refetch the artist profile to include the potentially updated label
     const finalPopulatedProfile = await tx.artistProfile.findUnique({
-        where: { id: userArtistProfile.id },
-        include: { user: {select: userSelect}, label: true }
+      where: { id: userArtistProfile.id },
+      include: { user: { select: userSelect }, label: true },
     });
 
     if (!finalPopulatedProfile) {
-        throw new Error("Failed to retrieve final populated artist profile after transaction.");
+      throw new Error(
+        "Failed to retrieve final populated artist profile after transaction."
+      );
     }
 
-    return { artistRequest: finalArtistRequest, artistProfile: finalPopulatedProfile };
+    return {
+      artistRequest: finalArtistRequest,
+      artistProfile: finalPopulatedProfile,
+    };
   });
 
   // --- Start Notification Logic ---
   const userForNotification = artistRequest.user;
   if (userForNotification) {
-    prisma.notification.create({
-      data: {
-        type: "ARTIST_REQUEST_APPROVE",
-        message: `Congratulations! Your request to become artist '${artistRequest.artistName}' has been approved. Your artist profile is now active.`, 
-        recipientType: "USER",
-        userId: userForNotification.id, // Correct: Use userForNotification.id for the recipient User
-        artistId: updatedData.artistProfile.id, // Correct: Use the ID of the created/updated ArtistProfile
-        isRead: false,
-      },
-    }).catch((err) =>
-      console.error("[Service Notify Error] Failed to create approval notification:", err)
-    );
+    prisma.notification
+      .create({
+        data: {
+          type: "ARTIST_REQUEST_APPROVE",
+          message: `Congratulations! Your request to become artist '${artistRequest.artistName}' has been approved. Your artist profile is now active.`,
+          recipientType: "USER",
+          userId: userForNotification.id, // Correct: Use userForNotification.id for the recipient User
+          artistId: updatedData.artistProfile.id, // Correct: Use the ID of the created/updated ArtistProfile
+          isRead: false,
+        },
+      })
+      .catch((err) =>
+        console.error(
+          "[Service Notify Error] Failed to create approval notification:",
+          err
+        )
+      );
 
     if (userForNotification.email) {
       try {
@@ -1073,11 +1114,19 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
           userForNotification.email,
           userForNotification.name || userForNotification.username || "User"
         );
-        emailService.sendEmail(emailOptions).catch((err) =>
-          console.error("[Service Email Error] Failed to send approval email:", err)
-        );
+        emailService
+          .sendEmail(emailOptions)
+          .catch((err) =>
+            console.error(
+              "[Service Email Error] Failed to send approval email:",
+              err
+            )
+          );
       } catch (syncError) {
-        console.error("[Email Setup Error] Failed to create approval email options:", syncError);
+        console.error(
+          "[Email Setup Error] Failed to create approval email options:",
+          syncError
+        );
       }
     } else {
       console.warn(
@@ -1085,7 +1134,9 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
       );
     }
   } else {
-    console.error("[Approve Request Service] User data missing on ArtistRequest for notification/email.");
+    console.error(
+      "[Approve Request Service] User data missing on ArtistRequest for notification/email."
+    );
   }
   // --- End Notification Logic ---
 
@@ -1095,7 +1146,10 @@ export const approveArtistRequest = async (adminUserId: string, artistRequestId:
   };
 };
 
-export const rejectArtistRequest = async (artistRequestId: string, rejectionReason?: string) => {
+export const rejectArtistRequest = async (
+  artistRequestId: string,
+  rejectionReason?: string
+) => {
   const artistRequest = await prisma.artistRequest.findUnique({
     where: {
       id: artistRequestId,
@@ -1105,7 +1159,7 @@ export const rejectArtistRequest = async (artistRequestId: string, rejectionReas
       status: true,
       userId: true,
       artistName: true, // For notification message
-      user: { select: { id: true, email: true, name: true, username: true } } // For email and notification context
+      user: { select: { id: true, email: true, name: true, username: true } }, // For email and notification context
     },
   });
 
@@ -1126,40 +1180,56 @@ export const rejectArtistRequest = async (artistRequestId: string, rejectionReas
       rejectionReason: rejectionReason || "No reason provided",
       // reviewedAt: new Date(), // Optionally set reviewedAt, ensure reviewedByAdminId is also handled if needed
     },
-    select: { 
-      id: true, 
-      userId: true, 
-      status: true, 
-      user: { select: { id:true, email:true, name:true, username:true } }, 
-      artistName:true, 
-      rejectionReason: true
-    }
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      user: { select: { id: true, email: true, name: true, username: true } },
+      artistName: true,
+      rejectionReason: true,
+    },
   });
 
   // --- Start Notification Logic (moved from controller) ---
   if (updatedRequest.user) {
-    let notificationMessage =
-      `Your request to become artist '${updatedRequest.artistName}' has been rejected.`;
-    if (updatedRequest.rejectionReason && updatedRequest.rejectionReason !== "No reason provided") {
+    let notificationMessage = `Your request to become artist '${updatedRequest.artistName}' has been rejected.`;
+    if (
+      updatedRequest.rejectionReason &&
+      updatedRequest.rejectionReason !== "No reason provided"
+    ) {
       notificationMessage += ` Reason: ${updatedRequest.rejectionReason}`;
     }
 
     // Create notification for the user whose request was rejected
-    prisma.notification.create({
-      data: { // This 'data' key is correct for prisma.notification.create
-        type: "ARTIST_REQUEST_REJECT",
-        message: notificationMessage,
-        recipientType: "USER", 
-        userId: updatedRequest.user.id,
-        isRead: false,
-      },
-      select: { // This select should be at the top level of the create arguments, not nested under data
-        id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
-        userId: true, // Keep if needed by socket logic, though recipientType + userId is the primary target
-        // artistId: true, // Not directly relevant for a user-facing rejection of their own request here
-        // senderId: true, // adminUserId would need to be passed if we want to log who rejected
-      }
-    }).catch(err => console.error("[Service Notify Error] Failed to create rejection notification:", err));
+    prisma.notification
+      .create({
+        data: {
+          // This 'data' key is correct for prisma.notification.create
+          type: "ARTIST_REQUEST_REJECT",
+          message: notificationMessage,
+          recipientType: "USER",
+          userId: updatedRequest.user.id,
+          isRead: false,
+        },
+        select: {
+          // This select should be at the top level of the create arguments, not nested under data
+          id: true,
+          type: true,
+          message: true,
+          recipientType: true,
+          isRead: true,
+          createdAt: true,
+          userId: true, // Keep if needed by socket logic, though recipientType + userId is the primary target
+          // artistId: true, // Not directly relevant for a user-facing rejection of their own request here
+          // senderId: true, // adminUserId would need to be passed if we want to log who rejected
+        },
+      })
+      .catch((err) =>
+        console.error(
+          "[Service Notify Error] Failed to create rejection notification:",
+          err
+        )
+      );
 
     // Send email
     if (updatedRequest.user.email) {
@@ -1169,8 +1239,17 @@ export const rejectArtistRequest = async (artistRequestId: string, rejectionReas
           updatedRequest.user.name || updatedRequest.user.username || "User",
           updatedRequest.rejectionReason || undefined // Ensure undefined if null for the email function
         );
-        emailService.sendEmail(emailOptions).catch(err => console.error("[Service Email Error] Failed to send rejection email:", err));
-        console.log(`Artist rejection email sent to ${updatedRequest.user.email}`);
+        emailService
+          .sendEmail(emailOptions)
+          .catch((err) =>
+            console.error(
+              "[Service Email Error] Failed to send rejection email:",
+              err
+            )
+          );
+        console.log(
+          `Artist rejection email sent to ${updatedRequest.user.email}`
+        );
       } catch (emailError) {
         console.error("Failed to setup artist rejection email:", emailError);
       }
@@ -1425,7 +1504,11 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
   const acrSecret = process.env.ACRCLOUD_ACCESS_SECRET;
 
   if (acrHost && acrKey && acrSecret) {
-    statuses.push({ name: "ACRCloud (Copyright Check)", status: "Available", message: "SDK configured with credentials." });
+    statuses.push({
+      name: "ACRCloud (Copyright Check)",
+      status: "Available",
+      message: "SDK configured with credentials.",
+    });
   } else {
     statuses.push({
       name: "ACRCloud (Copyright Check)",
@@ -1578,11 +1661,13 @@ export const getArtistClaimRequests = async (req: Request) => {
           },
           {
             claimingUser: {
-              email: { contains: trimmedSearch, mode: "insensitive" } },
+              email: { contains: trimmedSearch, mode: "insensitive" },
+            },
           },
           {
             claimingUser: {
-              username: { contains: trimmedSearch, mode: "insensitive" } },
+              username: { contains: trimmedSearch, mode: "insensitive" },
+            },
           },
           {
             artistProfile: {
@@ -1686,9 +1771,7 @@ export const approveArtistClaim = async (
   }
 
   // Double-check if the target profile is still available before approving
-  if (
-    claimRequest.artistProfile.userId
-  ) {
+  if (claimRequest.artistProfile.userId) {
     // Optionally auto-reject here instead of throwing
     await prisma.artistClaimRequest.update({
       where: { id: claimId },
@@ -1990,7 +2073,9 @@ async function convertMp3BufferToPcmF32(
 
     // Simple linear resampling to 44100 Hz for RhythmExtractor2013
     // This is a basic implementation - more sophisticated resampling would be better for production
-    console.log(`Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`);
+    console.log(
+      `Resampling audio from ${originalSampleRate} Hz to 44100 Hz for RhythmExtractor2013`
+    );
     const targetSampleRate = 44100;
     const resampleRatio = targetSampleRate / originalSampleRate;
     const resampledLength = Math.floor(monoChannel.length * resampleRatio);
@@ -2000,16 +2085,21 @@ async function convertMp3BufferToPcmF32(
       // Calculate the position in the original buffer
       const originalPos = i / resampleRatio;
       const originalPosFloor = Math.floor(originalPos);
-      const originalPosCeil = Math.min(originalPosFloor + 1, monoChannel.length - 1);
+      const originalPosCeil = Math.min(
+        originalPosFloor + 1,
+        monoChannel.length - 1
+      );
       const fraction = originalPos - originalPosFloor;
 
       // Linear interpolation between the two closest samples
-      resampledBuffer[i] = 
-        monoChannel[originalPosFloor] * (1 - fraction) + 
+      resampledBuffer[i] =
+        monoChannel[originalPosFloor] * (1 - fraction) +
         monoChannel[originalPosCeil] * fraction;
     }
 
-    console.log(`Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`);
+    console.log(
+      `Resampled audio to ${resampledBuffer.length} samples at 44100 Hz`
+    );
     return resampledBuffer;
     // Explicit return to satisfy linter - should never reach here due to earlier returns
   } catch (error) {
@@ -2130,13 +2220,15 @@ interface BulkUploadResult {
   error?: string;
   albumName: string | null;
   albumId?: string;
-  albumType?: 'SINGLE' | 'EP' | 'ALBUM' | undefined;
+  albumType?: "SINGLE" | "EP" | "ALBUM" | undefined;
 }
 
 export const processBulkUpload = async (files: Express.Multer.File[]) => {
   const results: BulkUploadResult[] = [];
   // Track album mapping for batch processing
-  const albumTracks: { [albumName: string]: { tracks: any[], artistId: string, coverUrl?: string } } = {};
+  const albumTracks: {
+    [albumName: string]: { tracks: any[]; artistId: string; coverUrl?: string };
+  } = {};
 
   for (const file of files) {
     let coverUrl: string | null = null;
@@ -2158,7 +2250,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         duration = Math.round(metadata.format.duration || 0);
         if (metadata.common?.artist) derivedArtistName = metadata.common.artist;
         if (metadata.common?.title) title = metadata.common.title;
-        
+
         // Extract album name from metadata if available
         if (metadata.common?.album) {
           albumName = metadata.common.album;
@@ -2168,37 +2260,47 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         if (metadata.common?.picture && metadata.common.picture.length > 0) {
           const picture = metadata.common.picture[0];
           try {
-            console.log(`Found embedded cover art for "${title}". Uploading...`);
+            console.log(
+              `Found embedded cover art for "${title}". Uploading...`
+            );
             const coverUploadResult = await uploadFile(
               Buffer.from(picture.data), // Chuyển Uint8Array thành Buffer
-              'covers',     // Thư mục lưu ảnh bìa trên Cloudinary
-              'image'       // Loại tài nguyên là ảnh
+              "covers", // Thư mục lưu ảnh bìa trên Cloudinary
+              "image" // Loại tài nguyên là ảnh
             );
             coverUrl = coverUploadResult.secure_url;
-            console.log(`Uploaded embedded cover art for "${title}" to: ${coverUrl}`);
+            console.log(
+              `Uploaded embedded cover art for "${title}" to: ${coverUrl}`
+            );
           } catch (coverUploadError) {
-            console.error(`Error uploading embedded cover art for "${title}":`, coverUploadError);
+            console.error(
+              `Error uploading embedded cover art for "${title}":`,
+              coverUploadError
+            );
             coverUrl = null; // Đặt lại là null nếu upload lỗi để fallback
           }
         } else {
-          console.log(`No embedded cover art found for "${title}". Will generate fallback.`);
+          console.log(
+            `No embedded cover art found for "${title}". Will generate fallback.`
+          );
         }
-
       } catch (metadataError) {
         console.error("Error parsing basic audio metadata:", metadataError);
       }
 
-      
-
       // 3. Analyze Audio with ReccoBeats API
       const audioAnalysis = await analyzeAudioWithReccoBeats(
         file.buffer,
-        title, 
+        title,
         derivedArtistName
       );
-      console.log(`Audio analysis result for "${title}":`, JSON.stringify(audioAnalysis, null, 2));
+      console.log(
+        `Audio analysis result for "${title}":`,
+        JSON.stringify(audioAnalysis, null, 2)
+      );
 
-      let { tempo, mood, key, scale, danceability, energy, genreIds } = audioAnalysis;
+      let { tempo, mood, key, scale, danceability, energy, genreIds } =
+        audioAnalysis;
       let confidence: number | null = null;
       try {
         const pcmF32 = await convertMp3BufferToPcmF32(file.buffer);
@@ -2218,13 +2320,23 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
             tempo = Math.round(rawTempo);
             console.log("Tempo calculated from Essentia:", tempo, "BPM");
           } catch (tempoError) {
-            console.error("Error estimating tempo with RhythmExtractor2013:", tempoError);
+            console.error(
+              "Error estimating tempo with RhythmExtractor2013:",
+              tempoError
+            );
             try {
               const tempoResult = essentia.PercivalBpmEstimator(audioVector);
               tempo = Math.round(tempoResult.bpm);
-              console.log("Tempo calculated from PercivalBpmEstimator fallback:", tempo, "BPM");
+              console.log(
+                "Tempo calculated from PercivalBpmEstimator fallback:",
+                tempo,
+                "BPM"
+              );
             } catch (fallbackError) {
-              console.error("Error estimating tempo with PercivalBpmEstimator fallback:", fallbackError);
+              console.error(
+                "Error estimating tempo with PercivalBpmEstimator fallback:",
+                fallbackError
+              );
               tempo = null;
             }
           }
@@ -2236,26 +2348,37 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
             scale = keyResult.scale;
             console.log("Key estimation from Essentia:", key, scale);
           } catch (keyError) {
-            console.error("Error estimating key/scale with Essentia:", keyError);
+            console.error(
+              "Error estimating key/scale with Essentia:",
+              keyError
+            );
           }
         }
       } catch (analysisError) {
         console.error("Error during audio analysis pipeline:", analysisError);
       }
-            
+
       // 4. Get or Create VERIFIED Artist Profile
-      const artistProfile = await getOrCreateVerifiedArtistProfile(derivedArtistName);
+      const artistProfile = await getOrCreateVerifiedArtistProfile(
+        derivedArtistName
+      );
       const artistId = artistProfile.id;
 
       // 5. Check for existing track (moved check after getting artistId)
       const existingTrack = await prisma.track.findUnique({
         where: { title_artistId: { title: title, artistId: artistId } },
-        select: { id: true, title: true, artist: { select: { artistName: true } } },
+        select: {
+          id: true,
+          title: true,
+          artist: { select: { artistName: true } },
+        },
       });
 
       // Xử lý trùng lặp
       if (existingTrack) {
-        console.log(`Duplicate track found: "${existingTrack.title}" by ${existingTrack.artist?.artistName} (ID: ${existingTrack.id}). Skipping creation for file: ${file.originalname}`);
+        console.log(
+          `Duplicate track found: "${existingTrack.title}" by ${existingTrack.artist?.artistName} (ID: ${existingTrack.id}). Skipping creation for file: ${file.originalname}`
+        );
         results.push({
           fileName: file.originalname,
           title: title,
@@ -2264,8 +2387,8 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           success: false,
           trackId: existingTrack.id,
           artistId: artistId,
-          duration: 0, 
-          audioUrl: '',
+          duration: 0,
+          audioUrl: "",
           coverUrl: undefined,
           tempo: null,
           mood: null,
@@ -2277,7 +2400,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           genres: [],
           albumName: albumName,
           albumId: undefined,
-          albumType: albumName ? 'ALBUM' : 'SINGLE'
+          albumType: albumName ? "ALBUM" : "SINGLE",
         });
         continue;
       }
@@ -2286,11 +2409,15 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       let finalGenreIds = [...genreIds];
       if (finalGenreIds.length === 0) {
         try {
-          const popGenre = await prisma.genre.findFirst({ where: { name: { equals: "Pop", mode: "insensitive" } } });
+          const popGenre = await prisma.genre.findFirst({
+            where: { name: { equals: "Pop", mode: "insensitive" } },
+          });
           if (popGenre) {
             finalGenreIds = [popGenre.id];
           } else {
-            const anyGenre = await prisma.genre.findFirst({ orderBy: { createdAt: "asc" } });
+            const anyGenre = await prisma.genre.findFirst({
+              orderBy: { createdAt: "asc" },
+            });
             if (anyGenre) finalGenreIds = [anyGenre.id];
           }
         } catch (fallbackGenreError) {
@@ -2299,40 +2426,60 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       }
 
       // Determine album vs single
-      let albumTypeName: 'SINGLE' | 'EP' | 'ALBUM' = 'SINGLE';
+      let albumTypeName: "SINGLE" | "EP" | "ALBUM" = "SINGLE";
       let shouldAddToAlbum = false;
-      
+
       // If there's an album name and it's different from the track title, add to an album
       if (albumName && albumName !== title) {
         shouldAddToAlbum = true;
-        albumTypeName = 'ALBUM';
+        albumTypeName = "ALBUM";
       } else {
         // If no album name or album name equals track title, it's a single
-        albumTypeName = 'SINGLE';
+        albumTypeName = "SINGLE";
         albumName = null;
       }
 
       // 7. Generate cover artwork ONLY for singles or for the first track in an album
-      if (!coverUrl) { 
+      if (!coverUrl) {
         if (!shouldAddToAlbum) {
           // This is a single track, generate cover
           try {
-            coverUrl = await generateCoverArtwork(title, derivedArtistName, mood);
+            coverUrl = await generateCoverArtwork(
+              title,
+              derivedArtistName,
+              mood
+            );
             console.log(`Generated cover artwork for single "${title}"`);
           } catch (coverError) {
-            console.error("Error generating cover artwork for single:", coverError);
+            console.error(
+              "Error generating cover artwork for single:",
+              coverError
+            );
           }
-        } else if (albumName && (!albumTracks[albumName] || albumTracks[albumName].tracks.length === 0)) {
+        } else if (
+          albumName &&
+          (!albumTracks[albumName] ||
+            albumTracks[albumName].tracks.length === 0)
+        ) {
           // This is the first track of an album, generate album cover
           try {
-            coverUrl = await generateCoverArtwork(albumName, derivedArtistName, mood);
+            coverUrl = await generateCoverArtwork(
+              albumName,
+              derivedArtistName,
+              mood
+            );
             console.log(`Generated cover artwork for album "${albumName}"`);
           } catch (coverError) {
-            console.error(`Error generating cover artwork for album "${albumName}":`, coverError);
+            console.error(
+              `Error generating cover artwork for album "${albumName}":`,
+              coverError
+            );
           }
         } else {
           // This is not the first track of an album, don't generate cover
-          console.log(`Skipping cover generation for "${title}" as it will use album cover`);
+          console.log(
+            `Skipping cover generation for "${title}" as it will use album cover`
+          );
         }
       }
 
@@ -2344,9 +2491,12 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         releaseDate,
         audioUrl,
         coverUrl: coverUrl || undefined, // Convert null to undefined
-        type: albumTypeName === 'ALBUM' ? AlbumType.ALBUM : 
-              albumTypeName === 'SINGLE' ? AlbumType.SINGLE :
-              AlbumType.EP,
+        type:
+          albumTypeName === "ALBUM"
+            ? AlbumType.ALBUM
+            : albumTypeName === "SINGLE"
+            ? AlbumType.SINGLE
+            : AlbumType.EP,
         isActive: true,
         tempo,
         mood,
@@ -2359,7 +2509,11 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
       };
 
       if (finalGenreIds.length > 0) {
-        trackData.genres = { create: finalGenreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })) };
+        trackData.genres = {
+          create: finalGenreIds.map((genreId) => ({
+            genre: { connect: { id: genreId } },
+          })),
+        };
       }
 
       // If track is part of an album, add to album tracks mapping
@@ -2368,16 +2522,18 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           albumTracks[albumName] = {
             tracks: [],
             artistId,
-            coverUrl: undefined
+            coverUrl: undefined,
           };
         }
-        
+
         // If this track has an embedded cover, prioritize it for the album
         if (coverUrl && !albumTracks[albumName].coverUrl) {
-          console.log(`Using embedded cover from "${title}" for album "${albumName}"`);
+          console.log(
+            `Using embedded cover from "${title}" for album "${albumName}"`
+          );
           albumTracks[albumName].coverUrl = coverUrl;
         }
-        
+
         // Add track data to album mapping
         albumTracks[albumName].tracks.push({
           trackData,
@@ -2393,9 +2549,12 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           key,
           scale,
           genreIds: finalGenreIds,
-          genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : []
+          genres:
+            finalGenreIds.length > 0
+              ? await getGenreNamesFromIds(finalGenreIds)
+              : [],
         });
-        
+
         // Add to results for frontend display
         results.push({
           fileName: file.originalname,
@@ -2412,11 +2571,14 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           danceability,
           energy,
           genreIds: finalGenreIds,
-          genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : [],
+          genres:
+            finalGenreIds.length > 0
+              ? await getGenreNamesFromIds(finalGenreIds)
+              : [],
           success: true,
           albumName,
           albumId: undefined,
-          albumType: albumTypeName
+          albumType: albumTypeName,
         });
       } else {
         // Single track, not part of an album - create directly
@@ -2445,7 +2607,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
           success: true,
           albumName: null,
           albumId: undefined,
-          albumType: 'SINGLE'
+          albumType: "SINGLE",
         });
       }
     } catch (error) {
@@ -2458,11 +2620,11 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         success: false,
         albumName: albumName,
         albumId: undefined,
-        albumType: albumName ? 'ALBUM' : 'SINGLE',
-        artistId: '',
-        trackId: '',
+        albumType: albumName ? "ALBUM" : "SINGLE",
+        artistId: "",
+        trackId: "",
         duration: 0,
-        audioUrl: '',
+        audioUrl: "",
         coverUrl: undefined,
         tempo: null,
         mood: null,
@@ -2471,7 +2633,7 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
         danceability: null,
         energy: null,
         genreIds: [],
-        genres: []
+        genres: [],
       });
     }
   }
@@ -2481,49 +2643,61 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
     try {
       const { tracks, artistId, coverUrl } = albumData;
       if (tracks.length === 0) continue;
-      
+
       // Calculate total duration of newly added tracks
-      const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
-      
+      const totalDuration = tracks.reduce(
+        (sum, track) => sum + (track.duration || 0),
+        0
+      );
+
       // Check if album already exists for this artist
       const existingAlbum = await prisma.album.findFirst({
         where: {
           title: albumName,
-          artistId: artistId
+          artistId: artistId,
         },
         include: {
           tracks: {
             select: {
-              duration: true
-            }
-          }
-        }
+              duration: true,
+            },
+          },
+        },
       });
-      
+
       let album;
       // Initialize with defaults
-      let albumTypeName: 'EP' | 'ALBUM' | 'SINGLE' = 'EP';
+      let albumTypeName: "EP" | "ALBUM" | "SINGLE" = "EP";
       let albumType: AlbumType = AlbumType.EP;
-      
+
       if (existingAlbum) {
-        console.log(`Album "${albumName}" already exists for this artist. Adding tracks to existing album.`);
-        
+        console.log(
+          `Album "${albumName}" already exists for this artist. Adding tracks to existing album.`
+        );
+
         // Use existing album type instead of recalculating
         albumType = existingAlbum.type;
         // Derive string representation from enum
-        albumTypeName = existingAlbum.type === AlbumType.ALBUM ? 'ALBUM' : 
-                       existingAlbum.type === AlbumType.SINGLE ? 'SINGLE' : 'EP';
-        
+        albumTypeName =
+          existingAlbum.type === AlbumType.ALBUM
+            ? "ALBUM"
+            : existingAlbum.type === AlbumType.SINGLE
+            ? "SINGLE"
+            : "EP";
+
         // Calculate new total duration including existing tracks
-        const existingDuration = existingAlbum.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+        const existingDuration = existingAlbum.tracks.reduce(
+          (sum, track) => sum + (track.duration || 0),
+          0
+        );
         const newTotalDuration = existingDuration + totalDuration;
         const newTotalTracks = existingAlbum.totalTracks + tracks.length;
-        
+
         // Only change from EP to ALBUM if total duration exceeds 10 minutes
         if (newTotalDuration >= 600 && existingAlbum.type === AlbumType.EP) {
           albumType = AlbumType.ALBUM;
-          albumTypeName = 'ALBUM';
-          
+          albumTypeName = "ALBUM";
+
           // Update album type and data
           await prisma.album.update({
             where: { id: existingAlbum.id },
@@ -2532,17 +2706,21 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               duration: newTotalDuration,
               totalTracks: newTotalTracks,
               // Only update album cover if album has a better cover image and existing album has no cover
-              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
-            }
+              ...(albumData.coverUrl && !existingAlbum.coverUrl
+                ? { coverUrl: albumData.coverUrl }
+                : {}),
+            },
           });
-          
+
           // Update type of all tracks in the album to match the new album type
           await prisma.track.updateMany({
             where: { albumId: existingAlbum.id },
-            data: { type: AlbumType.ALBUM }
+            data: { type: AlbumType.ALBUM },
           });
-          
-          console.log(`Album "${albumName}" type changed from EP to ALBUM as duration now exceeds 10 minutes. Updated type for all ${existingAlbum.totalTracks} existing tracks.`);
+
+          console.log(
+            `Album "${albumName}" type changed from EP to ALBUM as duration now exceeds 10 minutes. Updated type for all ${existingAlbum.totalTracks} existing tracks.`
+          );
         } else {
           // Just update duration and track count
           await prisma.album.update({
@@ -2551,20 +2729,22 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
               duration: newTotalDuration,
               totalTracks: newTotalTracks,
               // Only update album cover if album has a better cover image and existing album has no cover
-              ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
-            }
+              ...(albumData.coverUrl && !existingAlbum.coverUrl
+                ? { coverUrl: albumData.coverUrl }
+                : {}),
+            },
           });
         }
-        
+
         album = await prisma.album.findUnique({
-          where: { id: existingAlbum.id }
+          where: { id: existingAlbum.id },
         });
       } else {
         // For new albums, determine type based on duration
         // EP if total duration is less than 10 minutes (600 seconds)
-        albumTypeName = totalDuration < 600 ? 'EP' : 'ALBUM';
-        albumType = albumTypeName === 'EP' ? AlbumType.EP : AlbumType.ALBUM;
-        
+        albumTypeName = totalDuration < 600 ? "EP" : "ALBUM";
+        albumType = albumTypeName === "EP" ? AlbumType.EP : AlbumType.ALBUM;
+
         // Create new album
         album = await prisma.album.create({
           data: {
@@ -2575,27 +2755,31 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
             totalTracks: tracks.length,
             type: albumType,
             isActive: true,
-            artist: { connect: { id: artistId } }
-          }
+            artist: { connect: { id: artistId } },
+          },
         });
-        console.log(`Created new album "${albumName}" with ${tracks.length} tracks. Type: ${albumTypeName}`);
+        console.log(
+          `Created new album "${albumName}" with ${tracks.length} tracks. Type: ${albumTypeName}`
+        );
       }
-      
+
       // Create all tracks and connect to album
       for (let i = 0; i < tracks.length; i++) {
         const trackInfo = tracks[i];
-        
+
         // Get the next track number (existing tracks count + 1 + index)
-        const trackNumber = existingAlbum 
-          ? existingAlbum.totalTracks + 1 + i 
+        const trackNumber = existingAlbum
+          ? existingAlbum.totalTracks + 1 + i
           : i + 1; // 1-based track numbering
-        
+
         // Check if album is defined before using it
         if (!album) {
-          console.error(`Album object is null when trying to create track "${trackInfo.title}"`);
+          console.error(
+            `Album object is null when trying to create track "${trackInfo.title}"`
+          );
           continue; // Skip this track
         }
-        
+
         // Create track with album connection and track number
         await prisma.track.create({
           data: {
@@ -2604,25 +2788,33 @@ export const processBulkUpload = async (files: Express.Multer.File[]) => {
             coverUrl: album.coverUrl || trackInfo.trackData.coverUrl,
             album: { connect: { id: album.id } },
             trackNumber: trackNumber,
-            type: albumType // Use the possibly updated album type
-          }
+            type: albumType, // Use the possibly updated album type
+          },
         });
-        
+
         // Update results with album ID and type
         const resultIndex = results.findIndex(
-          r => r.fileName === trackInfo.fileName && r.title === trackInfo.title
+          (r) =>
+            r.fileName === trackInfo.fileName && r.title === trackInfo.title
         );
-        
+
         if (resultIndex !== -1 && album) {
           results[resultIndex].albumId = album.id;
           // Ensure albumTypeName is correctly typed for the results array
-          results[resultIndex].albumType = albumTypeName as 'SINGLE' | 'EP' | 'ALBUM';
+          results[resultIndex].albumType = albumTypeName as
+            | "SINGLE"
+            | "EP"
+            | "ALBUM";
           // Update the cover URL in results to match what was actually saved
-          results[resultIndex].coverUrl = album.coverUrl || results[resultIndex].coverUrl;
+          results[resultIndex].coverUrl =
+            album.coverUrl || results[resultIndex].coverUrl;
         }
       }
     } catch (albumError) {
-      console.error(`Error creating/updating album "${albumName}":`, albumError);
+      console.error(
+        `Error creating/updating album "${albumName}":`,
+        albumError
+      );
     }
   }
 
@@ -2635,13 +2827,13 @@ async function getGenreNamesFromIds(genreIds: string[]): Promise<string[]> {
   try {
     const genres = await prisma.genre.findMany({
       where: {
-        id: { in: genreIds }
+        id: { in: genreIds },
       },
       select: {
-        name: true
-      }
+        name: true,
+      },
     });
-    return genres.map(g => g.name);
+    return genres.map((g) => g.name);
   } catch (error) {
     console.error("Error getting genre names:", error);
     return [];
@@ -2650,119 +2842,183 @@ async function getGenreNamesFromIds(genreIds: string[]): Promise<string[]> {
 
 export const generateAndAssignAiPlaylistToUser = async (
   adminExecutingId: string,
-  targetUserId: string
+  targetUserId: string,
+  customParams?: {
+    customPromptKeywords?: string;
+    requestedTrackCount?: number;
+  }
 ): Promise<PrismaPlaylist> => {
-  // Use PrismaPlaylist
-  // 1. Verify Admin Privileges
-  const adminUser = await prisma.user.findUnique({
+  const admin = await prisma.user.findUnique({
     where: { id: adminExecutingId },
   });
-
-  if (!adminUser) {
-    throw new HttpError(404, "Admin user not found");
-  }
-  if (adminUser.role !== Role.ADMIN) {
-    throw new HttpError(403, "Forbidden: Insufficient privileges");
-  }
-
-  // 2. Verify Target User Exists
   const targetUser = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true, username: true, name: true }, // Select only necessary fields
   });
 
+  if (!admin || admin.role !== Role.ADMIN) {
+    throw new HttpError(403, "Forbidden: Only admins can perform this action.");
+  }
   if (!targetUser) {
-    throw new HttpError(404, "Target user not found");
+    throw new HttpError(404, "Target user not found.");
   }
 
-  const targetUserDisplayName =
-    targetUser.username || targetUser.name || targetUserId;
+  console.log(
+    `[AdminService] Admin ${
+      admin.id
+    } initiating AI playlist generation for user ${
+      targetUser.id
+    }. Custom params: ${JSON.stringify(customParams)}`
+  );
 
-  // 3. Get User's Listening History (just to check if it's empty)
-  const listeningHistory = await prisma.history.findMany({
+  const history = await prisma.history.findMany({
     where: {
-      userId: targetUserId,
-      type: "PLAY", // Assuming 'PLAY' is the type for played tracks
-      trackId: { not: null }, // Ensure there's an associated track
+      userId: targetUser.id,
+      type: "PLAY",
+      track: {
+        isActive: true, // Only consider active tracks
+        artist: { isActive: true }, // Only consider tracks from active artists
+        duration: { gte: 60 }, // Minimum duration (e.g., 60 seconds)
+      },
     },
-    take: 10, // Only need a few to check for existence and variety
-    select: { trackId: true },
+    orderBy: { createdAt: "desc" },
+    take: 100, // Consider last 100 played tracks
+    include: {
+      track: {
+        select: {
+          id: true,
+          title: true,
+          artist: { select: { artistName: true } },
+          genres: { select: { genre: { select: { name: true, id: true } } } },
+          tempo: true,
+          mood: true,
+          key: true,
+          scale: true,
+          danceability: true,
+          energy: true,
+        },
+      },
+    },
   });
 
-  const uniqueTracksInHistory = new Set(listeningHistory.map((h) => h.trackId))
-    .size;
-  const hasSufficientHistory = uniqueTracksInHistory > 3; // Arbitrary threshold for "sufficient" history
+  const playedTracksWithDetails: HistoryTrackDetail[] = history
+    .map((h): HistoryTrackDetail | null => {
+      if (!h.track) {
+        return null;
+      }
+      return {
+        id: h.track.id,
+        title: h.track.title,
+        artistName: h.track.artist?.artistName || "Unknown Artist",
+        genres: h.track.genres.map((g) => g.genre.name),
+        tempo: h.track.tempo,
+        mood: h.track.mood,
+        key: h.track.key,
+        scale: h.track.scale,
+        danceability: h.track.danceability,
+        energy: h.track.energy,
+      };
+    })
+    .filter((t): t is HistoryTrackDetail => t !== null);
 
-  let playlistOptions: aiService.PlaylistGenerationOptions = {};
-  let trackIdsToUse: string[] | undefined = undefined;
+  const distinctPlayedTracks = Array.from(
+    new Map(playedTracksWithDetails.map((t) => [t.id, t])).values()
+  ).slice(0, 30); // Use up to 30 distinct tracks for the prompt
 
-  if (!hasSufficientHistory) {
-    // 4. No (or insufficient) listening history: Generate playlist from top played tracks
+  console.log(
+    `[AdminService] Found ${distinctPlayedTracks.length} distinct playable tracks in user history for prompt generation.`
+  );
+
+  // Auto re-analyze missing features if necessary
+  const tracksMissingFeatures = distinctPlayedTracks.filter(
+    (track) =>
+      !track.tempo ||
+      !track.mood ||
+      !track.key ||
+      !track.scale ||
+      !track.danceability ||
+      !track.energy ||
+      !track.genres ||
+      track.genres.length === 0
+  );
+
+  if (tracksMissingFeatures.length > 0) {
     console.log(
-      `[AdminService] User ${targetUserId} has no/insufficient history. Generating from top tracks.`
+      `[AdminService] Found ${tracksMissingFeatures.length} tracks with missing audio features. Attempting re-analysis...`
     );
-    trackIdsToUse = await aiService.getTopPlayedTrackIds(10); // Fix: Only pass count
-    if (!trackIdsToUse || trackIdsToUse.length === 0) {
-      // Fallback: if no top tracks either (e.g. new system), maybe throw error or return empty playlist indication
-      // For now, createAIGeneratedPlaylist will throw an error if trackIds are empty.
-      console.warn(
-        "[AdminService] No top tracks found to generate default playlist."
-      );
+    for (const trackToReanalyze of tracksMissingFeatures) {
+      try {
+        console.log(
+          `[AdminService] Re-analyzing track: ${trackToReanalyze.title} (ID: ${trackToReanalyze.id})`
+        );
+        const reanalyzed = await trackService.reanalyzeTrackAudioFeatures(
+          trackToReanalyze.id
+        );
+        // Update the track in distinctPlayedTracks with new features
+        const index = distinctPlayedTracks.findIndex(
+          (t) => t.id === reanalyzed.id
+        );
+        if (index !== -1 && reanalyzed) {
+          distinctPlayedTracks[index] = {
+            ...distinctPlayedTracks[index], // Keep original ID, title, artist, etc.
+            genres: reanalyzed.genres?.map((g) => g.genre.name) || [],
+            tempo: reanalyzed.tempo,
+            mood: reanalyzed.mood,
+            key: reanalyzed.key,
+            scale: reanalyzed.scale,
+            danceability: reanalyzed.danceability,
+            energy: reanalyzed.energy,
+          };
+        }
+      } catch (error) {
+        console.error(
+          `[AdminService] Failed to re-analyze track ${trackToReanalyze.id}:`,
+          error
+        );
+        // Continue even if some re-analysis fails, AI can work with partial data
+      }
     }
-    playlistOptions = {
-      name: `Popular Mix for ${targetUserDisplayName}`,
-      description:
-        "Discover popular tracks! An AI-curated playlist based on trending songs.",
-      // trackCount will be implicitly set by the length of trackIdsToUse in createAIGeneratedPlaylist
-    };
-  } else {
-    // 5. Has listening history: Generate personalized playlist using AI
-    console.log(
-      `[AdminService] User ${targetUserId} has history. Generating personalized AI mix.`
-    );
-    playlistOptions = {
-      name: `Your AI Mix, ${targetUserDisplayName}`,
-      description: `A personalized playlist crafted by AI, just for you, ${targetUserDisplayName}! Based on your listening taste.`,
-      trackCount: 10, // Request 10 tracks from Gemini
-    };
   }
 
-  try {
-    console.log(
-      `[AdminService] Attempting to generate AI playlist for user ${targetUserId}`
-    );
+  const MINIMUM_TRACKS_FOR_PERSONALIZED_PLAYLIST = 5;
+  let generationMode: AIGeneratedPlaylistInput["generationMode"] =
+    "userHistory";
 
-    // Call the AI service to create the playlist
-    // Pass an empty options object, or specific options EXCEPT name/description
-    const newPlaylist = await aiService.createAIGeneratedPlaylist(
-      targetUserId,
-      {
-        /* Pass other options if needed, e.g., coverUrl, but not name/desc */
-      },
-      trackIdsToUse
-    );
-
+  if (distinctPlayedTracks.length < MINIMUM_TRACKS_FOR_PERSONALIZED_PLAYLIST) {
     console.log(
-      `[AdminService] Successfully generated AI playlist ${newPlaylist.id} for user ${targetUserId}`
+      `[AdminService] Insufficient distinct tracks (${distinctPlayedTracks.length}) for personalized playlist. Switching to topGlobalTracks mode.`
     );
-    return newPlaylist;
-  } catch (error) {
-    console.error(
-      `[AdminService] Error generating AI playlist for user ${targetUserId}:`,
-      error
-    );
-    // Re-throw or handle more gracefully
-    if (error instanceof Error) {
-      throw new HttpError(
-        500,
-        `Failed to generate AI playlist: ${error.message}`
-      );
-    }
-    throw new HttpError(
-      500,
-      "An unexpected error occurred while generating the AI playlist."
-    );
+    generationMode = "topGlobalTracks";
   }
+
+  const aiPlaylistInput: AIGeneratedPlaylistInput = {
+    targetUserId: targetUser.id,
+    generationMode,
+    historyTracks: distinctPlayedTracks, // Send all, AI service will use if in userHistory mode
+    // Use custom track count if provided, otherwise default (e.g., 20, can be set in ai.service or here)
+    requestedTrackCount: customParams?.requestedTrackCount || 20,
+    type: PlaylistType.SYSTEM, // Ensure correct type from DB schema
+    customPromptKeywords: customParams?.customPromptKeywords,
+    requestedPrivacy: PlaylistPrivacy.PRIVATE, // Ensure new playlists default to PRIVATE
+  };
+
+  // Log the input being sent to AI service
+  console.log(
+    "[AdminService] Input for aiService.createAIGeneratedPlaylist:",
+    JSON.stringify(aiPlaylistInput, null, 2)
+  );
+
+  const newPlaylist = await aiService.createAIGeneratedPlaylist(
+    aiPlaylistInput
+  );
+
+  if (!newPlaylist) {
+    throw new Error("Failed to generate AI playlist");
+  }
+
+  console.log(
+    `[AdminService] Successfully generated AI playlist ${newPlaylist.id} for user ${targetUser.id}`
+  );
+  return newPlaylist;
 };
 
 export const setAiPlaylistVisibilityForUser = async (
@@ -2860,6 +3116,7 @@ export const getUserAiPlaylists = async (
   // 3. Query AI Playlists with pagination
   const where: Prisma.PlaylistWhereInput = {
     userId: targetUserId,
+    type: PlaylistType.SYSTEM,  
     isAIGenerated: true,
   };
 
@@ -2904,7 +3161,7 @@ export const getUserAiPlaylists = async (
     userId: true,
     lastGeneratedAt: true,
     tracks: {
-      take: 3,
+      // take: 3, // REMOVED: Allow all tracks to be fetched
       orderBy: { trackOrder: "asc" as const },
       select: {
         track: {
@@ -3035,13 +3292,23 @@ export const getUserListeningHistoryDetails = async (
           duration: true,
           artist: { select: { artistName: true, id: true } },
           album: { select: { title: true, id: true } },
-          // Add audio feature fields to the select statement
           tempo: true,
           mood: true,
           key: true,
           scale: true,
           danceability: true,
           energy: true,
+          // MODIFIED: Include genres details
+          genres: {
+            select: {
+              genre: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -3103,65 +3370,82 @@ export const getAllLabelRegistrations = async (req: Request) => {
 
   const whereClause: Prisma.LabelRegistrationRequestWhereInput = {};
 
-  if (search && typeof search === 'string') {
+  if (search && typeof search === "string") {
     whereClause.OR = [
-      { requestedLabelName: { contains: search, mode: 'insensitive' } },
-      { requestingArtist: { artistName: { contains: search, mode: 'insensitive' } } },
+      { requestedLabelName: { contains: search, mode: "insensitive" } },
+      {
+        requestingArtist: {
+          artistName: { contains: search, mode: "insensitive" },
+        },
+      },
     ];
   }
 
-  if (status && typeof status === 'string' && Object.values(RequestStatus).includes(status as RequestStatus)) {
+  if (
+    status &&
+    typeof status === "string" &&
+    Object.values(RequestStatus).includes(status as RequestStatus)
+  ) {
     whereClause.status = status as RequestStatus;
   } else {
     // Default to PENDING if no status or invalid status is provided by admin panel
     // This might need adjustment based on how admin panel filters are designed
     // For now, let's fetch all non-archived or allow flexible status filtering
     // If status is explicitly empty or "ALL", don't filter by status
-    if (status && status !== 'ALL') {
-        whereClause.status = status as RequestStatus;
-    } else if (!status) { // Default to PENDING if status is not provided at all
-        whereClause.status = RequestStatus.PENDING;
+    if (status && status !== "ALL") {
+      whereClause.status = status as RequestStatus;
+    } else if (!status) {
+      // Default to PENDING if status is not provided at all
+      whereClause.status = RequestStatus.PENDING;
     }
   }
 
-
-  const orderByClause: Prisma.LabelRegistrationRequestOrderByWithRelationInput = {};
-  const validSortKeys = ['submittedAt', 'requestedLabelName', 'status'] as const;
-  type SortKey = typeof validSortKeys[number];
+  const orderByClause: Prisma.LabelRegistrationRequestOrderByWithRelationInput =
+    {};
+  const validSortKeys = [
+    "submittedAt",
+    "requestedLabelName",
+    "status",
+  ] as const;
+  type SortKey = (typeof validSortKeys)[number];
   const key = sortBy as SortKey;
-  const order = sortOrder === 'desc' ? 'desc' : 'asc';
+  const order = sortOrder === "desc" ? "desc" : "asc";
 
-  if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+  if (sortBy && typeof sortBy === "string" && validSortKeys.includes(key)) {
     orderByClause[key] = order;
   } else {
-    orderByClause.submittedAt = 'desc'; // Default sort
+    orderByClause.submittedAt = "desc"; // Default sort
   }
 
-  const result = await paginate<LabelRegistrationRequest>(prisma.labelRegistrationRequest, req, {
-    where: whereClause,
-    include: {
-      requestingArtist: {
-        select: {
-          id: true,
-          artistName: true,
-          avatar: true,
-        },
-      },
-      reviewedByAdmin: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      createdLabel: {
+  const result = await paginate<LabelRegistrationRequest>(
+    prisma.labelRegistrationRequest,
+    req,
+    {
+      where: whereClause,
+      include: {
+        requestingArtist: {
           select: {
-              id: true,
-              name: true,
-          }
-      }
-    },
-    orderBy: orderByClause,
-  });
+            id: true,
+            artistName: true,
+            avatar: true,
+          },
+        },
+        reviewedByAdmin: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        createdLabel: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: orderByClause,
+    }
+  );
 
   return {
     data: result.data,
@@ -3195,13 +3479,13 @@ export const getLabelRegistrationById = async (registrationId: string) => {
           id: true,
           name: true,
           logoUrl: true,
-        }
-      }
+        },
+      },
     },
   });
 
   if (!request) {
-    throw { status: 404, message: 'Label registration request not found.' };
+    throw { status: 404, message: "Label registration request not found." };
   }
   return request;
 };
@@ -3209,18 +3493,24 @@ export const getLabelRegistrationById = async (registrationId: string) => {
 /**
  * Admin approves a label registration request.
  */
-export const approveLabelRegistration = async (adminUserId: string, registrationId: string) => {
+export const approveLabelRegistration = async (
+  adminUserId: string,
+  registrationId: string
+) => {
   const registrationRequest = await prisma.labelRegistrationRequest.findUnique({
     where: { id: registrationId },
     include: { requestingArtist: true }, // Need artist profile to update it
   });
 
   if (!registrationRequest) {
-    throw { status: 404, message: 'Label registration request not found.' };
+    throw { status: 404, message: "Label registration request not found." };
   }
 
   if (registrationRequest.status !== RequestStatus.PENDING) {
-    throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+    throw {
+      status: 400,
+      message: `Request is already ${registrationRequest.status.toLowerCase()}.`,
+    };
   }
 
   // Transaction to ensure all operations succeed or fail together
@@ -3261,14 +3551,17 @@ export const approveLabelRegistration = async (adminUserId: string, registration
     });
 
     // 3. Update the LabelRegistrationRequest
-    const labelRegistrationUpdateData: Prisma.LabelRegistrationRequestUpdateInput = {
-      status: RequestStatus.APPROVED,
-      reviewedAt: new Date(),
-      reviewedByAdmin: { connect: { id: adminUserId } }, // Correct Prisma syntax
-    };
-    
+    const labelRegistrationUpdateData: Prisma.LabelRegistrationRequestUpdateInput =
+      {
+        status: RequestStatus.APPROVED,
+        reviewedAt: new Date(),
+        reviewedByAdmin: { connect: { id: adminUserId } }, // Correct Prisma syntax
+      };
+
     if (newLabelWasActuallyCreated) {
-      labelRegistrationUpdateData.createdLabel = { connect: { id: targetLabelId } }; // Correct Prisma syntax
+      labelRegistrationUpdateData.createdLabel = {
+        connect: { id: targetLabelId },
+      }; // Correct Prisma syntax
     }
 
     const updatedRequest = await tx.labelRegistrationRequest.update({
@@ -3284,7 +3577,7 @@ export const approveLabelRegistration = async (adminUserId: string, registration
       approvalMessage = `Congratulations! Your request concerning the label "${finalLabelName}" has been approved. You are now associated with this existing label.`;
     }
 
-    if (registrationRequest.requestingArtist.userId) { 
+    if (registrationRequest.requestingArtist.userId) {
       const notificationData = {
         data: {
           recipientType: RecipientType.ARTIST, // Changed from ARTIST to USER as per other notifications
@@ -3293,57 +3586,73 @@ export const approveLabelRegistration = async (adminUserId: string, registration
           message: approvalMessage,
           artistId: registrationRequest.requestingArtistId, // Target artist profile
           isRead: false,
-        },              
-        select: { 
-          id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+        },
+        select: {
+          id: true,
+          type: true,
+          message: true,
+          recipientType: true,
+          isRead: true,
+          createdAt: true,
           userId: true, // For socket payload
-        }
+        },
       };
       const notification = await tx.notification.create(notificationData);
 
       const io = getIO();
-      const targetUserSocketId = getUserSockets().get(registrationRequest.requestingArtist.userId);
+      const targetUserSocketId = getUserSockets().get(
+        registrationRequest.requestingArtist.userId
+      );
       if (targetUserSocketId) {
-        io.to(targetUserSocketId).emit('notification', {
+        io.to(targetUserSocketId).emit("notification", {
           // Explicitly list properties for the socket payload from the notification object
           id: notification.id,
           type: notification.type,
           message: notification.message,
           recipientType: notification.recipientType,
           isRead: notification.isRead,
-          createdAt: notification.createdAt.toISOString(), 
+          createdAt: notification.createdAt.toISOString(),
           // Add label-specific info
-          labelName: finalLabelName, 
+          labelName: finalLabelName,
           labelId: targetLabelId,
           // userId: notification.userId, // Already known by the user receiving it, but can include if needed
         });
-        console.log(`[Socket Emit][AdminService] Sent LABEL_REGISTRATION_APPROVED (Label: ${finalLabelName}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`);
+        console.log(
+          `[Socket Emit][AdminService] Sent LABEL_REGISTRATION_APPROVED (Label: ${finalLabelName}) to user ${registrationRequest.requestingArtist.userId} via socket ${targetUserSocketId}`
+        );
       } else {
-        console.log(`[Socket Emit][AdminService] User ${registrationRequest.requestingArtist.userId} (for Label: ${finalLabelName}) not connected for LABEL_REGISTRATION_APPROVED.`);
+        console.log(
+          `[Socket Emit][AdminService] User ${registrationRequest.requestingArtist.userId} (for Label: ${finalLabelName}) not connected for LABEL_REGISTRATION_APPROVED.`
+        );
       }
     }
-    
+
     // Fetch full label details to return, using the correct variable name for the created/found label
     const finalLabelDetails = await tx.label.findUnique({
-        where: { id: targetLabelId },
-        select: labelSelect 
+      where: { id: targetLabelId },
+      select: labelSelect,
     });
-    
+
     return { updatedRequest, label: finalLabelDetails }; // Return label instead of newLabel
   });
 };
 
-
 export const rejectLabelRegistration = async (
-  adminUserId: string, 
-  registrationId: string, 
+  adminUserId: string,
+  registrationId: string,
   rejectionReason: string
 ) => {
   const errors = runValidations([
-    validateField(rejectionReason, 'rejectionReason', { required: true, minLength: 5, maxLength: 500 }),
+    validateField(rejectionReason, "rejectionReason", {
+      required: true,
+      minLength: 5,
+      maxLength: 500,
+    }),
   ]);
   if (errors.length > 0) {
-    console.warn(`[AdminService] Validation failed for rejection reason for request ${registrationId}, but proceeding with rejection.`);
+    console.warn(
+      `[AdminService] Validation failed for rejection reason for request ${registrationId}, but proceeding with rejection.`
+    );
     // Potentially throw new Error(`Validation failed: ${errors.join(', ')}`); if strict validation is required before proceeding
   }
 
@@ -3353,15 +3662,17 @@ export const rejectLabelRegistration = async (
   });
 
   if (!registrationRequest) {
-    throw { status: 404, message: 'Label registration request not found.' };
+    throw { status: 404, message: "Label registration request not found." };
   }
 
   if (registrationRequest.status !== RequestStatus.PENDING) {
-    console.warn(`[AdminService] Attempting to reject a request that is already ${registrationRequest.status.toLowerCase()}. ID: ${registrationId}`);
+    console.warn(
+      `[AdminService] Attempting to reject a request that is already ${registrationRequest.status.toLowerCase()}. ID: ${registrationId}`
+    );
     // Allow proceeding to ensure consistent state if somehow a request was processed without full completion.
     // Or throw: throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
   }
-  
+
   const updatedRequest = await prisma.labelRegistrationRequest.update({
     where: { id: registrationId },
     data: {
@@ -3370,19 +3681,22 @@ export const rejectLabelRegistration = async (
       reviewedAt: new Date(),
       reviewedByAdminId: adminUserId,
     },
-    select: { 
-        id: true,
-        requestedLabelName: true,
-        requestingArtistId: true, // This is the ArtistProfile.id
-        requestingArtist: { select: { userId: true } } // Need the userId for socket targeting
-    }
+    select: {
+      id: true,
+      requestedLabelName: true,
+      requestingArtistId: true, // This is the ArtistProfile.id
+      requestingArtist: { select: { userId: true } }, // Need the userId for socket targeting
+    },
   });
-  console.log(`[AdminService] Updated LabelRegistrationRequest ID: ${updatedRequest.id} to REJECTED`);
+  console.log(
+    `[AdminService] Updated LabelRegistrationRequest ID: ${updatedRequest.id} to REJECTED`
+  );
 
   // Notify the artist
   // Check if the artist has an associated user account for socket targeting
   if (updatedRequest.requestingArtist?.userId) {
-    const artistUserIdForSocketTargeting = updatedRequest.requestingArtist.userId;
+    const artistUserIdForSocketTargeting =
+      updatedRequest.requestingArtist.userId;
     const notificationData = {
       data: {
         recipientType: RecipientType.ARTIST, // Target the ArtistProfile
@@ -3392,38 +3706,55 @@ export const rejectLabelRegistration = async (
         userId: artistUserIdForSocketTargeting, // Keep for socket targeting
         isRead: false,
       },
-      select: { 
-        id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+      select: {
+        id: true,
+        type: true,
+        message: true,
+        recipientType: true,
+        isRead: true,
+        createdAt: true,
         artistId: true, // Ensure artistId is selected for socket payload
-      }
+      },
     };
 
-    prisma.notification.create(notificationData)
-      .then(createdNotification => {
+    prisma.notification
+      .create(notificationData)
+      .then((createdNotification) => {
         const io = getIO();
-        const targetSocketId = getUserSockets().get(artistUserIdForSocketTargeting);
+        const targetSocketId = getUserSockets().get(
+          artistUserIdForSocketTargeting
+        );
         if (targetSocketId) {
-          io.to(targetSocketId).emit('notification', {
-            ...createdNotification, 
+          io.to(targetSocketId).emit("notification", {
+            ...createdNotification,
             createdAt: createdNotification.createdAt.toISOString(),
-            rejectionReason: rejectionReason, 
-            labelName: updatedRequest.requestedLabelName, 
+            rejectionReason: rejectionReason,
+            labelName: updatedRequest.requestedLabelName,
           });
-          console.log(`[Socket Emit] Sent LABEL_REGISTRATION_REJECTED (to ArtistProfile ${createdNotification.artistId}) to user ${artistUserIdForSocketTargeting} via socket ${targetSocketId}`);
+          console.log(
+            `[Socket Emit] Sent LABEL_REGISTRATION_REJECTED (to ArtistProfile ${createdNotification.artistId}) to user ${artistUserIdForSocketTargeting} via socket ${targetSocketId}`
+          );
         } else {
-          console.log(`[Socket Emit] User ${artistUserIdForSocketTargeting} (for ArtistProfile ${createdNotification.artistId}) not connected for LABEL_REGISTRATION_REJECTED.`);
+          console.log(
+            `[Socket Emit] User ${artistUserIdForSocketTargeting} (for ArtistProfile ${createdNotification.artistId}) not connected for LABEL_REGISTRATION_REJECTED.`
+          );
         }
       })
-      .catch(err => {
-        console.error(`[AdminService] Failed to create or emit rejection notification for user ${artistUserIdForSocketTargeting} (Request ID: ${updatedRequest.id}):`, err);
-    });
+      .catch((err) => {
+        console.error(
+          `[AdminService] Failed to create or emit rejection notification for user ${artistUserIdForSocketTargeting} (Request ID: ${updatedRequest.id}):`,
+          err
+        );
+      });
   } else {
-    console.warn(`[AdminService] Cannot send rejection notification for request ${updatedRequest.id} - requesting artist has no associated user ID for socket targeting.`);
+    console.warn(
+      `[AdminService] Cannot send rejection notification for request ${updatedRequest.id} - requesting artist has no associated user ID for socket targeting.`
+    );
   }
 
   return {
-      message: `Label registration request ${updatedRequest.id} rejected successfully.`,
-      rejectedRequestId: updatedRequest.id
+    message: `Label registration request ${updatedRequest.id} rejected successfully.`,
+    rejectedRequestId: updatedRequest.id,
   };
 };
 // --- End Label Registration Request Management (Admin) ---
@@ -3436,24 +3767,30 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
     status: RequestStatus.PENDING, // Default to PENDING
   };
 
-  if (status && typeof status === 'string' && status !== 'ALL' && Object.values(RequestStatus).includes(status as RequestStatus)) {
+  if (
+    status &&
+    typeof status === "string" &&
+    status !== "ALL" &&
+    Object.values(RequestStatus).includes(status as RequestStatus)
+  ) {
     where.status = status as RequestStatus;
-  } else if (status === 'ALL') {
+  } else if (status === "ALL") {
     // If status is 'ALL', remove the default PENDING filter
     delete where.status;
   }
 
-
   const andConditions: Prisma.ArtistRequestWhereInput[] = [];
 
-  if (search && typeof search === 'string' && search.trim()) {
+  if (search && typeof search === "string" && search.trim()) {
     const trimmedSearch = search.trim();
     andConditions.push({
       OR: [
-        { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
-        { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
-        { user: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
-        { requestedLabelName: { contains: trimmedSearch, mode: 'insensitive' } },
+        { artistName: { contains: trimmedSearch, mode: "insensitive" } },
+        { user: { name: { contains: trimmedSearch, mode: "insensitive" } } },
+        { user: { email: { contains: trimmedSearch, mode: "insensitive" } } },
+        {
+          requestedLabelName: { contains: trimmedSearch, mode: "insensitive" },
+        },
       ],
     });
   }
@@ -3466,16 +3803,16 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
 
   if (andConditions.length > 0) {
     if (where.AND) {
-       if(Array.isArray(where.AND)) {
+      if (Array.isArray(where.AND)) {
         where.AND.push(...andConditions);
-       } else {
-         where.AND = [where.AND, ...andConditions];
-       }
+      } else {
+        where.AND = [where.AND, ...andConditions];
+      }
     } else {
       where.AND = andConditions;
     }
   }
-  
+
   // Define a select object for ArtistRequest, similar to artistRequestSelect for ArtistProfile
   const artistRoleRequestSelect = {
     id: true,
@@ -3484,7 +3821,8 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
     status: true,
     requestedLabelName: true,
     // Add any other fields from ArtistRequest model you want to display in the list
-    user: { // Include basic user info
+    user: {
+      // Include basic user info
       select: {
         id: true,
         name: true,
@@ -3493,14 +3831,14 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
       },
     },
     // If ArtistRequest model had a submission date like 'createdAt', select it here
-    // createdAt: true, 
+    // createdAt: true,
   };
 
   const options = {
     where,
     select: artistRoleRequestSelect,
     // orderBy: { createdAt: 'desc' }, // If using a createdAt field
-    orderBy: { id: 'desc' }, // Fallback sorting if no date field
+    orderBy: { id: "desc" }, // Fallback sorting if no date field
   };
 
   // Explicitly type the paginate result if item type is different from Prisma.ArtistRequestGetPayload
@@ -3514,7 +3852,7 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
   return {
     // Ensure the returned data structure matches what the frontend expects
     // The old 'requests' field might be expected.
-    requests: result.data, 
+    requests: result.data,
     pagination: result.pagination,
   };
 };
@@ -3527,7 +3865,7 @@ export const extractTrackAndArtistData = async () => {
     const artists = await prisma.artistProfile.findMany({
       where: {
         isActive: true,
-        isVerified: true
+        isVerified: true,
       },
       select: {
         id: true,
@@ -3539,42 +3877,42 @@ export const extractTrackAndArtistData = async () => {
         userId: true,
         label: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         genres: {
           select: {
             genre: {
               select: {
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         tracks: {
           select: {
-            id: true
-          }
+            id: true,
+          },
         },
         user: {
           select: {
             email: true,
             username: true,
-            name: true
-          }
+            name: true,
+          },
         },
         avatar: true,
         socialMediaLinks: true,
       },
       orderBy: {
-        artistName: 'asc'
-      }
+        artistName: "asc",
+      },
     });
 
     // Get albums with detailed info
     const albums = await prisma.album.findMany({
       where: {
-        isActive: true
+        isActive: true,
       },
       select: {
         id: true,
@@ -3588,42 +3926,42 @@ export const extractTrackAndArtistData = async () => {
         artist: {
           select: {
             id: true,
-            artistName: true
-          }
+            artistName: true,
+          },
         },
         label: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         genres: {
           select: {
             genre: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
       },
       orderBy: [
         {
           artist: {
-            artistName: 'asc'
-          }
+            artistName: "asc",
+          },
         },
         {
-          releaseDate: 'desc'
-        }
-      ]
+          releaseDate: "desc",
+        },
+      ],
     });
 
     // Get tracks with detailed info
     const tracks = await prisma.track.findMany({
       where: {
-        isActive: true
+        isActive: true,
       },
       select: {
         id: true,
@@ -3634,8 +3972,8 @@ export const extractTrackAndArtistData = async () => {
         audioUrl: true,
         label: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         playCount: true,
         tempo: true,
@@ -3646,8 +3984,8 @@ export const extractTrackAndArtistData = async () => {
         energy: true,
         artist: {
           select: {
-            artistName: true
-          }
+            artistName: true,
+          },
         },
         album: {
           select: {
@@ -3657,109 +3995,116 @@ export const extractTrackAndArtistData = async () => {
             releaseDate: true,
             coverUrl: true,
             totalTracks: true,
-            duration: true
-          }
+            duration: true,
+          },
         },
         genres: {
           select: {
             genre: {
               select: {
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         featuredArtists: {
           select: {
             artistProfile: {
               select: {
-                artistName: true
-              }
-            }
-          }
-        }
+                artistName: true,
+              },
+            },
+          },
+        },
       },
       orderBy: [
         {
           artist: {
-            artistName: 'asc'
-          }
+            artistName: "asc",
+          },
         },
         {
-          releaseDate: 'desc'
-        }
-      ]
+          releaseDate: "desc",
+        },
+      ],
     });
 
     // Transform data for easier Excel processing
-    const artistsForExport = artists.map(artist => ({
+    const artistsForExport = artists.map((artist) => ({
       id: artist.id,
       artistName: artist.artistName,
-      bio: artist.bio || '',
-      userId: artist.userId || '',
+      bio: artist.bio || "",
+      userId: artist.userId || "",
       monthlyListeners: artist.monthlyListeners,
       verified: artist.isVerified,
-      label: artist.label?.name || '',
-      genres: artist.genres.map(g => g.genre.name).join(', '),
+      label: artist.label?.name || "",
+      genres: artist.genres.map((g) => g.genre.name).join(", "),
       trackCount: artist.tracks.length,
-      createdAt: artist.createdAt.toISOString().split('T')[0],
-      userEmail: artist.user?.email || '',
-      userUsername: artist.user?.username || '',
-      userName: artist.user?.name || '',
-      avatar: artist.avatar || '',
-      socialMediaLinks: artist.socialMediaLinks ? JSON.stringify(artist.socialMediaLinks) : '',
+      createdAt: artist.createdAt.toISOString().split("T")[0],
+      userEmail: artist.user?.email || "",
+      userUsername: artist.user?.username || "",
+      userName: artist.user?.name || "",
+      avatar: artist.avatar || "",
+      socialMediaLinks: artist.socialMediaLinks
+        ? JSON.stringify(artist.socialMediaLinks)
+        : "",
     }));
 
     // Format albums for export
-    const albumsForExport = albums.map(album => ({
+    const albumsForExport = albums.map((album) => ({
       id: album.id,
       title: album.title,
       artistName: album.artist.artistName,
       artistId: album.artist.id,
-      releaseDate: album.releaseDate.toISOString().split('T')[0],
+      releaseDate: album.releaseDate.toISOString().split("T")[0],
       albumType: album.type,
       totalTracks: album.totalTracks,
       duration: album.duration,
-      labelName: album.label?.name || '',
-      coverUrl: album.coverUrl || '',
-      genres: album.genres.map(g => g.genre.name).join(', '),
-      createdAt: album.createdAt.toISOString().split('T')[0]
+      labelName: album.label?.name || "",
+      coverUrl: album.coverUrl || "",
+      genres: album.genres.map((g) => g.genre.name).join(", "),
+      createdAt: album.createdAt.toISOString().split("T")[0],
     }));
 
-    const tracksForExport = tracks.map(track => ({
+    const tracksForExport = tracks.map((track) => ({
       id: track.id,
       title: track.title,
       artist: track.artist.artistName,
-      album: track.album?.title || '(Single)',
-      albumId: track.album?.id || '',
-      albumType: track.album?.type || 'SINGLE',
-      albumReleaseDate: track.album?.releaseDate ? track.album.releaseDate.toISOString().split('T')[0] : '',
+      album: track.album?.title || "(Single)",
+      albumId: track.album?.id || "",
+      albumType: track.album?.type || "SINGLE",
+      albumReleaseDate: track.album?.releaseDate
+        ? track.album.releaseDate.toISOString().split("T")[0]
+        : "",
       albumTotalTracks: track.album?.totalTracks || 1,
       albumDuration: track.album?.duration || track.duration,
-      coverUrl: track.coverUrl || track.album?.coverUrl || '',
+      coverUrl: track.coverUrl || track.album?.coverUrl || "",
       audioUrl: track.audioUrl,
-      labelName: track.label?.name || '',
-      featuredArtistNames: track.featuredArtists?.map(fa => fa.artistProfile.artistName).join(', ') || '',
+      labelName: track.label?.name || "",
+      featuredArtistNames:
+        track.featuredArtists
+          ?.map((fa) => fa.artistProfile.artistName)
+          .join(", ") || "",
       duration: track.duration,
-      releaseDate: track.releaseDate.toISOString().split('T')[0],
+      releaseDate: track.releaseDate.toISOString().split("T")[0],
       playCount: track.playCount,
       tempo: track.tempo || null,
-      mood: track.mood || '',
-      key: track.key || '',
-      scale: track.scale || '',
+      mood: track.mood || "",
+      key: track.key || "",
+      scale: track.scale || "",
       danceability: track.danceability || null,
       energy: track.energy || null,
-      genres: track.genres.map(g => g.genre.name).join(', ')
+      genres: track.genres.map((g) => g.genre.name).join(", "),
     }));
 
     return {
       artists: artistsForExport,
       albums: albumsForExport,
       tracks: tracksForExport,
-      exportDate: new Date().toISOString()
+      exportDate: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('Error extracting track and artist data:', error);
+    console.error("Error extracting track and artist data:", error);
     throw error;
   }
 };
@@ -3768,8 +4113,8 @@ export const extractTrackAndArtistData = async () => {
 // --- New function to fix inconsistent track types in albums ---
 export const fixAlbumTrackTypeConsistency = async () => {
   try {
-    console.log('[Admin Service] Starting album track type consistency fix...');
-    
+    console.log("[Admin Service] Starting album track type consistency fix...");
+
     // Find all albums
     const albums = await prisma.album.findMany({
       select: {
@@ -3779,49 +4124,253 @@ export const fixAlbumTrackTypeConsistency = async () => {
         tracks: {
           select: {
             id: true,
-            type: true
-          }
-        }
-      }
+            type: true,
+          },
+        },
+      },
     });
-    
-    console.log(`[Admin Service] Found ${albums.length} albums to check for track type consistency`);
-    
+
+    console.log(
+      `[Admin Service] Found ${albums.length} albums to check for track type consistency`
+    );
+
     let fixedAlbums = 0;
     let fixedTracks = 0;
-    
+
     // Process each album
     for (const album of albums) {
-      const inconsistentTracks = album.tracks.filter(track => track.type !== album.type);
-      
+      const inconsistentTracks = album.tracks.filter(
+        (track) => track.type !== album.type
+      );
+
       if (inconsistentTracks.length > 0) {
         // Fix inconsistent tracks
         await prisma.track.updateMany({
-          where: { 
+          where: {
             albumId: album.id,
-            type: { not: album.type }
+            type: { not: album.type },
           },
-          data: { type: album.type }
+          data: { type: album.type },
         });
-        
+
         fixedAlbums++;
         fixedTracks += inconsistentTracks.length;
-        console.log(`[Admin Service] Fixed ${inconsistentTracks.length} tracks in album "${album.title}" (ID: ${album.id})`);
+        console.log(
+          `[Admin Service] Fixed ${inconsistentTracks.length} tracks in album "${album.title}" (ID: ${album.id})`
+        );
       }
     }
-    
+
     return {
       success: true,
       message: `Fixed track types in ${fixedAlbums} albums, updating ${fixedTracks} tracks to match their album types.`,
       fixedAlbums,
-      fixedTracks
+      fixedTracks,
     };
   } catch (error) {
-    console.error('[Admin Service] Error fixing album track type consistency:', error);
+    console.error(
+      "[Admin Service] Error fixing album track type consistency:",
+      error
+    );
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      error: true
+      message:
+        error instanceof Error ? error.message : "Unknown error occurred",
+      error: true,
     };
   }
 };
+
+export const removeTrackFromSystemPlaylist = async (
+  adminExecutingId: string,
+  playlistId: string,
+  trackToRemoveId: string
+): Promise<PrismaPlaylist> => {
+  // 1. Verify Admin Privileges
+  const adminUser = await prisma.user.findUnique({
+    where: { id: adminExecutingId },
+  });
+
+  if (!adminUser) {
+    throw new HttpError(404, "Admin user not found");
+  }
+  if (adminUser.role !== Role.ADMIN) {
+    throw new HttpError(403, "Forbidden: Insufficient privileges");
+  }
+
+  // 2. Find the playlist to ensure it exists and is an AI-generated playlist
+  const playlistDetails = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    select: {
+      id: true,
+      isAIGenerated: true,
+      // Select 'tracks' relation to find the PlaylistTrack entry ID
+      tracks: {
+        where: { trackId: trackToRemoveId },
+        select: {
+          id: true, // This is the ID of the PlaylistTrack (join table) entry
+        },
+      },
+    },
+  });
+
+  if (!playlistDetails) {
+    throw new HttpError(404, "Playlist not found");
+  }
+
+  if (!playlistDetails.isAIGenerated) {
+    throw new HttpError(
+      403,
+      "Forbidden: Can only remove tracks from AI-generated system playlists using this method."
+    );
+  }
+
+  const playlistTrackEntry =
+    playlistDetails.tracks.length > 0 ? playlistDetails.tracks[0] : null;
+
+  if (!playlistTrackEntry) {
+    throw new HttpError(
+      404,
+      `Track ${trackToRemoveId} not found in playlist ${playlistId}`
+    );
+  }
+
+  // 3. Delete the PlaylistTrack entry and update playlist aggregates in a transaction
+  const updatedPlaylist = await prisma.$transaction(async (tx) => {
+    // Delete the association (PlaylistTrack record)
+    await tx.playlistTrack.delete({
+      where: {
+        id: playlistTrackEntry.id, // Use the ID of the PlaylistTrack entry
+      },
+    });
+
+    // Recalculate totalTracks and totalDuration
+    const remainingPlaylistTracksData = await tx.playlistTrack.findMany({
+      where: { playlistId: playlistId },
+      include: { track: { select: { duration: true } } },
+    });
+
+    const newTotalDuration = remainingPlaylistTracksData.reduce(
+      (sum, pt) => sum + (pt.track?.duration || 0),
+      0
+    );
+    const newTotalTracks = remainingPlaylistTracksData.length;
+
+    // Update the playlist metadata
+    const finalUpdatedPlaylist = await tx.playlist.update({
+      where: { id: playlistId },
+      data: {
+        totalTracks: newTotalTracks,
+        totalDuration: newTotalDuration,
+        updatedAt: new Date(),
+      },
+      // Select clause consistent with getUserAiPlaylists for frontend updates
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        coverUrl: true,
+        privacy: true,
+        type: true,
+        isAIGenerated: true,
+        totalTracks: true,
+        totalDuration: true,
+        createdAt: true,
+        updatedAt: true,
+        userId: true,
+        lastGeneratedAt: true,
+        tracks: {
+          take: 3, // Or adjust as needed for preview modal updates
+          orderBy: { trackOrder: "asc" as const },
+          select: {
+            track: {
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                artist: { select: { artistName: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return finalUpdatedPlaylist;
+  });
+
+  // Optional: Re-order PlaylistTracks if `trackOrder` is used and needs to be dense.
+  // This step is omitted for now for simplicity. If PlaylistTrack has a 'trackOrder' field,
+  // you might want to update the order of subsequent tracks. Example:
+  // const remainingTracksInOrder = await prisma.playlistTrack.findMany({
+  //   where: { playlistId },
+  //   orderBy: { trackOrder: 'asc' },
+  //   select: { id: true }
+  // });
+  // await prisma.$transaction(
+  //   remainingTracksInOrder.map((pt, index) =>
+  //     prisma.playlistTrack.update({
+  //       where: { id: pt.id },
+  //       data: { trackOrder: index + 1 } // Re-number starting from 1
+  //     })
+  //   )
+  // );
+
+  console.log(
+    `[AdminService] Track ${trackToRemoveId} removed from playlist ${playlistId} by admin ${adminExecutingId}`
+  );
+  return updatedPlaylist;
+};
+
+export const deleteSystemPlaylist = async (
+  playlistId: string,
+  adminUserId: string
+): Promise<void> => {
+  // 1. Verify admin user
+  const adminUser = await prisma.user.findUnique({
+    where: { id: adminUserId },
+  });
+
+  if (!adminUser || adminUser.role !== Role.ADMIN) {
+    throw new HttpError(
+      403,
+      "Forbidden: Admin access required to delete system playlists."
+    );
+  }
+
+  // 2. Find the playlist
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    include: { tracks: true }, // Include tracks to check or for manual deletion if cascade is not set
+  });
+
+  if (!playlist) {
+    throw new HttpError(404, `Playlist with ID ${playlistId} not found.`);
+  }
+
+  // 3. Check if it's a deletable type (e.g., SYSTEM or AI_GENERATED by an admin)
+  // You might want to adjust this logic based on your specific requirements for which playlists admins can delete.
+  if (
+    playlist.type !== PlaylistType.SYSTEM &&
+    !playlist.isAIGenerated // Corrected check: not SYSTEM type AND not AI-generated
+  ) {
+    // Alternatively, you could check if playlist.userId === adminUserId if AI playlists are tied to the admin who generated them.
+    throw new HttpError(
+      403,
+      `Forbidden: Playlist with ID ${playlistId} is not a deletable system playlist and is not AI-generated.`
+    );
+  }
+
+  // If not using onDelete: Cascade for PlaylistTrack, you'd delete tracks here:
+  // await prisma.playlistTrack.deleteMany({ where: { playlistId: playlistId } });
+
+  // 4. Delete the playlist
+  await prisma.playlist.delete({
+    where: { id: playlistId },
+  });
+
+  console.log(
+    `[Admin Service] System Playlist ${playlistId} deleted by admin ${adminUserId}`
+  );
+};
+
+// --- Utility Functions (if any) or End of File ---

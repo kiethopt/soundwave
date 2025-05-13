@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fixAlbumTrackTypeConsistency = exports.extractTrackAndArtistData = exports.getPendingArtistRoleRequests = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.deleteSystemPlaylist = exports.removeTrackFromSystemPlaylist = exports.fixAlbumTrackTypeConsistency = exports.extractTrackAndArtistData = exports.getPendingArtistRoleRequests = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -57,6 +57,7 @@ const essentia_js_1 = require("essentia.js");
 const mpg123_decoder_1 = require("mpg123-decoder");
 const aiService = __importStar(require("./ai.service"));
 const errors_1 = require("../utils/errors");
+const trackService = __importStar(require("./track.service"));
 const VALID_GEMINI_MODELS = [
     "gemini-2.5-flash-preview-04-17",
     "gemini-2.5-pro-preview-03-25",
@@ -220,13 +221,13 @@ const getArtistRequestDetail = async (id) => {
             },
         });
         if (artistRoleRequest) {
-            return { ...artistRoleRequest, _sourceTable: 'ArtistRequest' };
+            return { ...artistRoleRequest, _sourceTable: "ArtistRequest" };
         }
     }
     if (!requestData) {
         throw new Error("Request not found");
     }
-    return { ...requestData, _sourceTable: 'ArtistProfile' };
+    return { ...requestData, _sourceTable: "ArtistProfile" };
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUserInfo = async (id, data, requestingUser) => {
@@ -692,7 +693,8 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
             },
             select: { userId: true },
         });
-        if (conflictingProfileByName && conflictingProfileByName.userId !== artistRequest.userId) {
+        if (conflictingProfileByName &&
+            conflictingProfileByName.userId !== artistRequest.userId) {
             throw new errors_1.HttpError(409, `The artist name "${artistRequest.artistName}" is already in use by another artist. This request cannot be approved with the current name.`);
         }
         const userArtistProfile = await tx.artistProfile.upsert({
@@ -720,7 +722,14 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
                 isActive: true,
                 monthlyListeners: 0,
             },
-            select: { id: true, userId: true, artistName: true, labelId: true, user: { select: prisma_selects_1.userSelect }, label: true },
+            select: {
+                id: true,
+                userId: true,
+                artistName: true,
+                labelId: true,
+                user: { select: prisma_selects_1.userSelect },
+                label: true,
+            },
         });
         let finalLabelId = userArtistProfile.labelId;
         let createdLabelViaRequest = false;
@@ -728,7 +737,10 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
             const labelRecord = await tx.label.upsert({
                 where: { name: artistRequest.requestedLabelName },
                 update: {},
-                create: { name: artistRequest.requestedLabelName, description: "Created via artist request" },
+                create: {
+                    name: artistRequest.requestedLabelName,
+                    description: "Created via artist request",
+                },
                 select: { id: true },
             });
             finalLabelId = labelRecord.id;
@@ -738,7 +750,9 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
                 data: { labelId: finalLabelId },
             });
         }
-        if (createdLabelViaRequest && finalLabelId && artistRequest.requestedLabelName) {
+        if (createdLabelViaRequest &&
+            finalLabelId &&
+            artistRequest.requestedLabelName) {
             await tx.labelRegistrationRequest.create({
                 data: {
                     requestedLabelName: artistRequest.requestedLabelName,
@@ -748,7 +762,7 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
                     reviewedAt: new Date(),
                     reviewedByAdminId: adminUserId,
                     createdLabelId: finalLabelId,
-                }
+                },
             });
         }
         const finalArtistRequest = await tx.artistRequest.update({
@@ -756,20 +770,24 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
             data: {
                 status: client_1.RequestStatus.APPROVED,
             },
-            select: { id: true, status: true, userId: true, artistName: true }
+            select: { id: true, status: true, userId: true, artistName: true },
         });
         const finalPopulatedProfile = await tx.artistProfile.findUnique({
             where: { id: userArtistProfile.id },
-            include: { user: { select: prisma_selects_1.userSelect }, label: true }
+            include: { user: { select: prisma_selects_1.userSelect }, label: true },
         });
         if (!finalPopulatedProfile) {
             throw new Error("Failed to retrieve final populated artist profile after transaction.");
         }
-        return { artistRequest: finalArtistRequest, artistProfile: finalPopulatedProfile };
+        return {
+            artistRequest: finalArtistRequest,
+            artistProfile: finalPopulatedProfile,
+        };
     });
     const userForNotification = artistRequest.user;
     if (userForNotification) {
-        db_1.default.notification.create({
+        db_1.default.notification
+            .create({
             data: {
                 type: "ARTIST_REQUEST_APPROVE",
                 message: `Congratulations! Your request to become artist '${artistRequest.artistName}' has been approved. Your artist profile is now active.`,
@@ -778,11 +796,14 @@ const approveArtistRequest = async (adminUserId, artistRequestId) => {
                 artistId: updatedData.artistProfile.id,
                 isRead: false,
             },
-        }).catch((err) => console.error("[Service Notify Error] Failed to create approval notification:", err));
+        })
+            .catch((err) => console.error("[Service Notify Error] Failed to create approval notification:", err));
         if (userForNotification.email) {
             try {
                 const emailOptions = emailService.createArtistRequestApprovedEmail(userForNotification.email, userForNotification.name || userForNotification.username || "User");
-                emailService.sendEmail(emailOptions).catch((err) => console.error("[Service Email Error] Failed to send approval email:", err));
+                emailService
+                    .sendEmail(emailOptions)
+                    .catch((err) => console.error("[Service Email Error] Failed to send approval email:", err));
             }
             catch (syncError) {
                 console.error("[Email Setup Error] Failed to create approval email options:", syncError);
@@ -811,7 +832,7 @@ const rejectArtistRequest = async (artistRequestId, rejectionReason) => {
             status: true,
             userId: true,
             artistName: true,
-            user: { select: { id: true, email: true, name: true, username: true } }
+            user: { select: { id: true, email: true, name: true, username: true } },
         },
     });
     if (!artistRequest) {
@@ -832,15 +853,17 @@ const rejectArtistRequest = async (artistRequestId, rejectionReason) => {
             status: true,
             user: { select: { id: true, email: true, name: true, username: true } },
             artistName: true,
-            rejectionReason: true
-        }
+            rejectionReason: true,
+        },
     });
     if (updatedRequest.user) {
         let notificationMessage = `Your request to become artist '${updatedRequest.artistName}' has been rejected.`;
-        if (updatedRequest.rejectionReason && updatedRequest.rejectionReason !== "No reason provided") {
+        if (updatedRequest.rejectionReason &&
+            updatedRequest.rejectionReason !== "No reason provided") {
             notificationMessage += ` Reason: ${updatedRequest.rejectionReason}`;
         }
-        db_1.default.notification.create({
+        db_1.default.notification
+            .create({
             data: {
                 type: "ARTIST_REQUEST_REJECT",
                 message: notificationMessage,
@@ -849,14 +872,22 @@ const rejectArtistRequest = async (artistRequestId, rejectionReason) => {
                 isRead: false,
             },
             select: {
-                id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                id: true,
+                type: true,
+                message: true,
+                recipientType: true,
+                isRead: true,
+                createdAt: true,
                 userId: true,
-            }
-        }).catch(err => console.error("[Service Notify Error] Failed to create rejection notification:", err));
+            },
+        })
+            .catch((err) => console.error("[Service Notify Error] Failed to create rejection notification:", err));
         if (updatedRequest.user.email) {
             try {
                 const emailOptions = emailService.createArtistRequestRejectedEmail(updatedRequest.user.email, updatedRequest.user.name || updatedRequest.user.username || "User", updatedRequest.rejectionReason || undefined);
-                emailService.sendEmail(emailOptions).catch(err => console.error("[Service Email Error] Failed to send rejection email:", err));
+                emailService
+                    .sendEmail(emailOptions)
+                    .catch((err) => console.error("[Service Email Error] Failed to send rejection email:", err));
                 console.log(`Artist rejection email sent to ${updatedRequest.user.email}`);
             }
             catch (emailError) {
@@ -1084,7 +1115,11 @@ const getSystemStatus = async () => {
     const acrKey = process.env.ACRCLOUD_ACCESS_KEY;
     const acrSecret = process.env.ACRCLOUD_ACCESS_SECRET;
     if (acrHost && acrKey && acrSecret) {
-        statuses.push({ name: "ACRCloud (Copyright Check)", status: "Available", message: "SDK configured with credentials." });
+        statuses.push({
+            name: "ACRCloud (Copyright Check)",
+            status: "Available",
+            message: "SDK configured with credentials.",
+        });
     }
     else {
         statuses.push({
@@ -1218,12 +1253,12 @@ const getArtistClaimRequests = async (req) => {
                     },
                     {
                         claimingUser: {
-                            email: { contains: trimmedSearch, mode: "insensitive" }
+                            email: { contains: trimmedSearch, mode: "insensitive" },
                         },
                     },
                     {
                         claimingUser: {
-                            username: { contains: trimmedSearch, mode: "insensitive" }
+                            username: { contains: trimmedSearch, mode: "insensitive" },
                         },
                     },
                     {
@@ -1648,7 +1683,7 @@ const processBulkUpload = async (files) => {
                     const picture = metadata.common.picture[0];
                     try {
                         console.log(`Found embedded cover art for "${title}". Uploading...`);
-                        const coverUploadResult = await (0, upload_service_1.uploadFile)(Buffer.from(picture.data), 'covers', 'image');
+                        const coverUploadResult = await (0, upload_service_1.uploadFile)(Buffer.from(picture.data), "covers", "image");
                         coverUrl = coverUploadResult.secure_url;
                         console.log(`Uploaded embedded cover art for "${title}" to: ${coverUrl}`);
                     }
@@ -1711,7 +1746,11 @@ const processBulkUpload = async (files) => {
             const artistId = artistProfile.id;
             const existingTrack = await db_1.default.track.findUnique({
                 where: { title_artistId: { title: title, artistId: artistId } },
-                select: { id: true, title: true, artist: { select: { artistName: true } } },
+                select: {
+                    id: true,
+                    title: true,
+                    artist: { select: { artistName: true } },
+                },
             });
             if (existingTrack) {
                 console.log(`Duplicate track found: "${existingTrack.title}" by ${existingTrack.artist?.artistName} (ID: ${existingTrack.id}). Skipping creation for file: ${file.originalname}`);
@@ -1724,7 +1763,7 @@ const processBulkUpload = async (files) => {
                     trackId: existingTrack.id,
                     artistId: artistId,
                     duration: 0,
-                    audioUrl: '',
+                    audioUrl: "",
                     coverUrl: undefined,
                     tempo: null,
                     mood: null,
@@ -1736,19 +1775,23 @@ const processBulkUpload = async (files) => {
                     genres: [],
                     albumName: albumName,
                     albumId: undefined,
-                    albumType: albumName ? 'ALBUM' : 'SINGLE'
+                    albumType: albumName ? "ALBUM" : "SINGLE",
                 });
                 continue;
             }
             let finalGenreIds = [...genreIds];
             if (finalGenreIds.length === 0) {
                 try {
-                    const popGenre = await db_1.default.genre.findFirst({ where: { name: { equals: "Pop", mode: "insensitive" } } });
+                    const popGenre = await db_1.default.genre.findFirst({
+                        where: { name: { equals: "Pop", mode: "insensitive" } },
+                    });
                     if (popGenre) {
                         finalGenreIds = [popGenre.id];
                     }
                     else {
-                        const anyGenre = await db_1.default.genre.findFirst({ orderBy: { createdAt: "asc" } });
+                        const anyGenre = await db_1.default.genre.findFirst({
+                            orderBy: { createdAt: "asc" },
+                        });
                         if (anyGenre)
                             finalGenreIds = [anyGenre.id];
                     }
@@ -1757,14 +1800,14 @@ const processBulkUpload = async (files) => {
                     console.error("Error finding fallback genre:", fallbackGenreError);
                 }
             }
-            let albumTypeName = 'SINGLE';
+            let albumTypeName = "SINGLE";
             let shouldAddToAlbum = false;
             if (albumName && albumName !== title) {
                 shouldAddToAlbum = true;
-                albumTypeName = 'ALBUM';
+                albumTypeName = "ALBUM";
             }
             else {
-                albumTypeName = 'SINGLE';
+                albumTypeName = "SINGLE";
                 albumName = null;
             }
             if (!coverUrl) {
@@ -1777,7 +1820,9 @@ const processBulkUpload = async (files) => {
                         console.error("Error generating cover artwork for single:", coverError);
                     }
                 }
-                else if (albumName && (!albumTracks[albumName] || albumTracks[albumName].tracks.length === 0)) {
+                else if (albumName &&
+                    (!albumTracks[albumName] ||
+                        albumTracks[albumName].tracks.length === 0)) {
                     try {
                         coverUrl = await generateCoverArtwork(albumName, derivedArtistName, mood);
                         console.log(`Generated cover artwork for album "${albumName}"`);
@@ -1797,9 +1842,11 @@ const processBulkUpload = async (files) => {
                 releaseDate,
                 audioUrl,
                 coverUrl: coverUrl || undefined,
-                type: albumTypeName === 'ALBUM' ? client_1.AlbumType.ALBUM :
-                    albumTypeName === 'SINGLE' ? client_1.AlbumType.SINGLE :
-                        client_1.AlbumType.EP,
+                type: albumTypeName === "ALBUM"
+                    ? client_1.AlbumType.ALBUM
+                    : albumTypeName === "SINGLE"
+                        ? client_1.AlbumType.SINGLE
+                        : client_1.AlbumType.EP,
                 isActive: true,
                 tempo,
                 mood,
@@ -1810,14 +1857,18 @@ const processBulkUpload = async (files) => {
                 artist: { connect: { id: artistId } },
             };
             if (finalGenreIds.length > 0) {
-                trackData.genres = { create: finalGenreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })) };
+                trackData.genres = {
+                    create: finalGenreIds.map((genreId) => ({
+                        genre: { connect: { id: genreId } },
+                    })),
+                };
             }
             if (shouldAddToAlbum && albumName) {
                 if (!albumTracks[albumName]) {
                     albumTracks[albumName] = {
                         tracks: [],
                         artistId,
-                        coverUrl: undefined
+                        coverUrl: undefined,
                     };
                 }
                 if (coverUrl && !albumTracks[albumName].coverUrl) {
@@ -1838,7 +1889,9 @@ const processBulkUpload = async (files) => {
                     key,
                     scale,
                     genreIds: finalGenreIds,
-                    genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : []
+                    genres: finalGenreIds.length > 0
+                        ? await getGenreNamesFromIds(finalGenreIds)
+                        : [],
                 });
                 results.push({
                     fileName: file.originalname,
@@ -1855,11 +1908,13 @@ const processBulkUpload = async (files) => {
                     danceability,
                     energy,
                     genreIds: finalGenreIds,
-                    genres: finalGenreIds.length > 0 ? await getGenreNamesFromIds(finalGenreIds) : [],
+                    genres: finalGenreIds.length > 0
+                        ? await getGenreNamesFromIds(finalGenreIds)
+                        : [],
                     success: true,
                     albumName,
                     albumId: undefined,
-                    albumType: albumTypeName
+                    albumType: albumTypeName,
                 });
             }
             else {
@@ -1887,7 +1942,7 @@ const processBulkUpload = async (files) => {
                     success: true,
                     albumName: null,
                     albumId: undefined,
-                    albumType: 'SINGLE'
+                    albumType: "SINGLE",
                 });
             }
         }
@@ -1901,11 +1956,11 @@ const processBulkUpload = async (files) => {
                 success: false,
                 albumName: albumName,
                 albumId: undefined,
-                albumType: albumName ? 'ALBUM' : 'SINGLE',
-                artistId: '',
-                trackId: '',
+                albumType: albumName ? "ALBUM" : "SINGLE",
+                artistId: "",
+                trackId: "",
                 duration: 0,
-                audioUrl: '',
+                audioUrl: "",
                 coverUrl: undefined,
                 tempo: null,
                 mood: null,
@@ -1914,7 +1969,7 @@ const processBulkUpload = async (files) => {
                 danceability: null,
                 energy: null,
                 genreIds: [],
-                genres: []
+                genres: [],
             });
         }
     }
@@ -1927,42 +1982,48 @@ const processBulkUpload = async (files) => {
             const existingAlbum = await db_1.default.album.findFirst({
                 where: {
                     title: albumName,
-                    artistId: artistId
+                    artistId: artistId,
                 },
                 include: {
                     tracks: {
                         select: {
-                            duration: true
-                        }
-                    }
-                }
+                            duration: true,
+                        },
+                    },
+                },
             });
             let album;
-            let albumTypeName = 'EP';
+            let albumTypeName = "EP";
             let albumType = client_1.AlbumType.EP;
             if (existingAlbum) {
                 console.log(`Album "${albumName}" already exists for this artist. Adding tracks to existing album.`);
                 albumType = existingAlbum.type;
-                albumTypeName = existingAlbum.type === client_1.AlbumType.ALBUM ? 'ALBUM' :
-                    existingAlbum.type === client_1.AlbumType.SINGLE ? 'SINGLE' : 'EP';
+                albumTypeName =
+                    existingAlbum.type === client_1.AlbumType.ALBUM
+                        ? "ALBUM"
+                        : existingAlbum.type === client_1.AlbumType.SINGLE
+                            ? "SINGLE"
+                            : "EP";
                 const existingDuration = existingAlbum.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
                 const newTotalDuration = existingDuration + totalDuration;
                 const newTotalTracks = existingAlbum.totalTracks + tracks.length;
                 if (newTotalDuration >= 600 && existingAlbum.type === client_1.AlbumType.EP) {
                     albumType = client_1.AlbumType.ALBUM;
-                    albumTypeName = 'ALBUM';
+                    albumTypeName = "ALBUM";
                     await db_1.default.album.update({
                         where: { id: existingAlbum.id },
                         data: {
                             type: client_1.AlbumType.ALBUM,
                             duration: newTotalDuration,
                             totalTracks: newTotalTracks,
-                            ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
-                        }
+                            ...(albumData.coverUrl && !existingAlbum.coverUrl
+                                ? { coverUrl: albumData.coverUrl }
+                                : {}),
+                        },
                     });
                     await db_1.default.track.updateMany({
                         where: { albumId: existingAlbum.id },
-                        data: { type: client_1.AlbumType.ALBUM }
+                        data: { type: client_1.AlbumType.ALBUM },
                     });
                     console.log(`Album "${albumName}" type changed from EP to ALBUM as duration now exceeds 10 minutes. Updated type for all ${existingAlbum.totalTracks} existing tracks.`);
                 }
@@ -1972,17 +2033,19 @@ const processBulkUpload = async (files) => {
                         data: {
                             duration: newTotalDuration,
                             totalTracks: newTotalTracks,
-                            ...(albumData.coverUrl && !existingAlbum.coverUrl ? { coverUrl: albumData.coverUrl } : {})
-                        }
+                            ...(albumData.coverUrl && !existingAlbum.coverUrl
+                                ? { coverUrl: albumData.coverUrl }
+                                : {}),
+                        },
                     });
                 }
                 album = await db_1.default.album.findUnique({
-                    where: { id: existingAlbum.id }
+                    where: { id: existingAlbum.id },
                 });
             }
             else {
-                albumTypeName = totalDuration < 600 ? 'EP' : 'ALBUM';
-                albumType = albumTypeName === 'EP' ? client_1.AlbumType.EP : client_1.AlbumType.ALBUM;
+                albumTypeName = totalDuration < 600 ? "EP" : "ALBUM";
+                albumType = albumTypeName === "EP" ? client_1.AlbumType.EP : client_1.AlbumType.ALBUM;
                 album = await db_1.default.album.create({
                     data: {
                         title: albumName,
@@ -1992,8 +2055,8 @@ const processBulkUpload = async (files) => {
                         totalTracks: tracks.length,
                         type: albumType,
                         isActive: true,
-                        artist: { connect: { id: artistId } }
-                    }
+                        artist: { connect: { id: artistId } },
+                    },
                 });
                 console.log(`Created new album "${albumName}" with ${tracks.length} tracks. Type: ${albumTypeName}`);
             }
@@ -2012,14 +2075,15 @@ const processBulkUpload = async (files) => {
                         coverUrl: album.coverUrl || trackInfo.trackData.coverUrl,
                         album: { connect: { id: album.id } },
                         trackNumber: trackNumber,
-                        type: albumType
-                    }
+                        type: albumType,
+                    },
                 });
-                const resultIndex = results.findIndex(r => r.fileName === trackInfo.fileName && r.title === trackInfo.title);
+                const resultIndex = results.findIndex((r) => r.fileName === trackInfo.fileName && r.title === trackInfo.title);
                 if (resultIndex !== -1 && album) {
                     results[resultIndex].albumId = album.id;
                     results[resultIndex].albumType = albumTypeName;
-                    results[resultIndex].coverUrl = album.coverUrl || results[resultIndex].coverUrl;
+                    results[resultIndex].coverUrl =
+                        album.coverUrl || results[resultIndex].coverUrl;
                 }
             }
         }
@@ -2034,83 +2098,138 @@ async function getGenreNamesFromIds(genreIds) {
     try {
         const genres = await db_1.default.genre.findMany({
             where: {
-                id: { in: genreIds }
+                id: { in: genreIds },
             },
             select: {
-                name: true
-            }
+                name: true,
+            },
         });
-        return genres.map(g => g.name);
+        return genres.map((g) => g.name);
     }
     catch (error) {
         console.error("Error getting genre names:", error);
         return [];
     }
 }
-const generateAndAssignAiPlaylistToUser = async (adminExecutingId, targetUserId) => {
-    const adminUser = await db_1.default.user.findUnique({
+const generateAndAssignAiPlaylistToUser = async (adminExecutingId, targetUserId, customParams) => {
+    const admin = await db_1.default.user.findUnique({
         where: { id: adminExecutingId },
     });
-    if (!adminUser) {
-        throw new errors_1.HttpError(404, "Admin user not found");
-    }
-    if (adminUser.role !== client_1.Role.ADMIN) {
-        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
-    }
     const targetUser = await db_1.default.user.findUnique({
         where: { id: targetUserId },
-        select: { id: true, username: true, name: true },
     });
+    if (!admin || admin.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Only admins can perform this action.");
+    }
     if (!targetUser) {
-        throw new errors_1.HttpError(404, "Target user not found");
+        throw new errors_1.HttpError(404, "Target user not found.");
     }
-    const targetUserDisplayName = targetUser.username || targetUser.name || targetUserId;
-    const listeningHistory = await db_1.default.history.findMany({
+    console.log(`[AdminService] Admin ${admin.id} initiating AI playlist generation for user ${targetUser.id}. Custom params: ${JSON.stringify(customParams)}`);
+    const history = await db_1.default.history.findMany({
         where: {
-            userId: targetUserId,
+            userId: targetUser.id,
             type: "PLAY",
-            trackId: { not: null },
+            track: {
+                isActive: true,
+                artist: { isActive: true },
+                duration: { gte: 60 },
+            },
         },
-        take: 10,
-        select: { trackId: true },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+            track: {
+                select: {
+                    id: true,
+                    title: true,
+                    artist: { select: { artistName: true } },
+                    genres: { select: { genre: { select: { name: true, id: true } } } },
+                    tempo: true,
+                    mood: true,
+                    key: true,
+                    scale: true,
+                    danceability: true,
+                    energy: true,
+                },
+            },
+        },
     });
-    const uniqueTracksInHistory = new Set(listeningHistory.map((h) => h.trackId))
-        .size;
-    const hasSufficientHistory = uniqueTracksInHistory > 3;
-    let playlistOptions = {};
-    let trackIdsToUse = undefined;
-    if (!hasSufficientHistory) {
-        console.log(`[AdminService] User ${targetUserId} has no/insufficient history. Generating from top tracks.`);
-        trackIdsToUse = await aiService.getTopPlayedTrackIds(10);
-        if (!trackIdsToUse || trackIdsToUse.length === 0) {
-            console.warn("[AdminService] No top tracks found to generate default playlist.");
+    const playedTracksWithDetails = history
+        .map((h) => {
+        if (!h.track) {
+            return null;
         }
-        playlistOptions = {
-            name: `Popular Mix for ${targetUserDisplayName}`,
-            description: "Discover popular tracks! An AI-curated playlist based on trending songs.",
+        return {
+            id: h.track.id,
+            title: h.track.title,
+            artistName: h.track.artist?.artistName || "Unknown Artist",
+            genres: h.track.genres.map((g) => g.genre.name),
+            tempo: h.track.tempo,
+            mood: h.track.mood,
+            key: h.track.key,
+            scale: h.track.scale,
+            danceability: h.track.danceability,
+            energy: h.track.energy,
         };
-    }
-    else {
-        console.log(`[AdminService] User ${targetUserId} has history. Generating personalized AI mix.`);
-        playlistOptions = {
-            name: `Your AI Mix, ${targetUserDisplayName}`,
-            description: `A personalized playlist crafted by AI, just for you, ${targetUserDisplayName}! Based on your listening taste.`,
-            trackCount: 10,
-        };
-    }
-    try {
-        console.log(`[AdminService] Attempting to generate AI playlist for user ${targetUserId}`);
-        const newPlaylist = await aiService.createAIGeneratedPlaylist(targetUserId, {}, trackIdsToUse);
-        console.log(`[AdminService] Successfully generated AI playlist ${newPlaylist.id} for user ${targetUserId}`);
-        return newPlaylist;
-    }
-    catch (error) {
-        console.error(`[AdminService] Error generating AI playlist for user ${targetUserId}:`, error);
-        if (error instanceof Error) {
-            throw new errors_1.HttpError(500, `Failed to generate AI playlist: ${error.message}`);
+    })
+        .filter((t) => t !== null);
+    const distinctPlayedTracks = Array.from(new Map(playedTracksWithDetails.map((t) => [t.id, t])).values()).slice(0, 30);
+    console.log(`[AdminService] Found ${distinctPlayedTracks.length} distinct playable tracks in user history for prompt generation.`);
+    const tracksMissingFeatures = distinctPlayedTracks.filter((track) => !track.tempo ||
+        !track.mood ||
+        !track.key ||
+        !track.scale ||
+        !track.danceability ||
+        !track.energy ||
+        !track.genres ||
+        track.genres.length === 0);
+    if (tracksMissingFeatures.length > 0) {
+        console.log(`[AdminService] Found ${tracksMissingFeatures.length} tracks with missing audio features. Attempting re-analysis...`);
+        for (const trackToReanalyze of tracksMissingFeatures) {
+            try {
+                console.log(`[AdminService] Re-analyzing track: ${trackToReanalyze.title} (ID: ${trackToReanalyze.id})`);
+                const reanalyzed = await trackService.reanalyzeTrackAudioFeatures(trackToReanalyze.id);
+                const index = distinctPlayedTracks.findIndex((t) => t.id === reanalyzed.id);
+                if (index !== -1 && reanalyzed) {
+                    distinctPlayedTracks[index] = {
+                        ...distinctPlayedTracks[index],
+                        genres: reanalyzed.genres?.map((g) => g.genre.name) || [],
+                        tempo: reanalyzed.tempo,
+                        mood: reanalyzed.mood,
+                        key: reanalyzed.key,
+                        scale: reanalyzed.scale,
+                        danceability: reanalyzed.danceability,
+                        energy: reanalyzed.energy,
+                    };
+                }
+            }
+            catch (error) {
+                console.error(`[AdminService] Failed to re-analyze track ${trackToReanalyze.id}:`, error);
+            }
         }
-        throw new errors_1.HttpError(500, "An unexpected error occurred while generating the AI playlist.");
     }
+    const MINIMUM_TRACKS_FOR_PERSONALIZED_PLAYLIST = 5;
+    let generationMode = "userHistory";
+    if (distinctPlayedTracks.length < MINIMUM_TRACKS_FOR_PERSONALIZED_PLAYLIST) {
+        console.log(`[AdminService] Insufficient distinct tracks (${distinctPlayedTracks.length}) for personalized playlist. Switching to topGlobalTracks mode.`);
+        generationMode = "topGlobalTracks";
+    }
+    const aiPlaylistInput = {
+        targetUserId: targetUser.id,
+        generationMode,
+        historyTracks: distinctPlayedTracks,
+        requestedTrackCount: customParams?.requestedTrackCount || 20,
+        type: client_1.PlaylistType.SYSTEM,
+        customPromptKeywords: customParams?.customPromptKeywords,
+        requestedPrivacy: client_1.PlaylistPrivacy.PRIVATE,
+    };
+    console.log("[AdminService] Input for aiService.createAIGeneratedPlaylist:", JSON.stringify(aiPlaylistInput, null, 2));
+    const newPlaylist = await aiService.createAIGeneratedPlaylist(aiPlaylistInput);
+    if (!newPlaylist) {
+        throw new Error("Failed to generate AI playlist");
+    }
+    console.log(`[AdminService] Successfully generated AI playlist ${newPlaylist.id} for user ${targetUser.id}`);
+    return newPlaylist;
 };
 exports.generateAndAssignAiPlaylistToUser = generateAndAssignAiPlaylistToUser;
 const setAiPlaylistVisibilityForUser = async (adminExecutingId, playlistId, newVisibility) => {
@@ -2166,6 +2285,7 @@ const getUserAiPlaylists = async (adminExecutingId, targetUserId, req) => {
     }
     const where = {
         userId: targetUserId,
+        type: client_1.PlaylistType.SYSTEM,
         isAIGenerated: true,
     };
     const { search, sortBy, sortOrder } = req.query;
@@ -2203,7 +2323,6 @@ const getUserAiPlaylists = async (adminExecutingId, targetUserId, req) => {
         userId: true,
         lastGeneratedAt: true,
         tracks: {
-            take: 3,
             orderBy: { trackOrder: "asc" },
             select: {
                 track: {
@@ -2307,6 +2426,16 @@ const getUserListeningHistoryDetails = async (adminExecutingId, targetUserId, re
                     scale: true,
                     danceability: true,
                     energy: true,
+                    genres: {
+                        select: {
+                            genre: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                },
+                            },
+                        },
+                    },
                 },
             },
         },
@@ -2346,17 +2475,23 @@ exports.getUserListeningHistoryDetails = getUserListeningHistoryDetails;
 const getAllLabelRegistrations = async (req) => {
     const { search, status, sortBy, sortOrder } = req.query;
     const whereClause = {};
-    if (search && typeof search === 'string') {
+    if (search && typeof search === "string") {
         whereClause.OR = [
-            { requestedLabelName: { contains: search, mode: 'insensitive' } },
-            { requestingArtist: { artistName: { contains: search, mode: 'insensitive' } } },
+            { requestedLabelName: { contains: search, mode: "insensitive" } },
+            {
+                requestingArtist: {
+                    artistName: { contains: search, mode: "insensitive" },
+                },
+            },
         ];
     }
-    if (status && typeof status === 'string' && Object.values(client_1.RequestStatus).includes(status)) {
+    if (status &&
+        typeof status === "string" &&
+        Object.values(client_1.RequestStatus).includes(status)) {
         whereClause.status = status;
     }
     else {
-        if (status && status !== 'ALL') {
+        if (status && status !== "ALL") {
             whereClause.status = status;
         }
         else if (!status) {
@@ -2364,14 +2499,18 @@ const getAllLabelRegistrations = async (req) => {
         }
     }
     const orderByClause = {};
-    const validSortKeys = ['submittedAt', 'requestedLabelName', 'status'];
+    const validSortKeys = [
+        "submittedAt",
+        "requestedLabelName",
+        "status",
+    ];
     const key = sortBy;
-    const order = sortOrder === 'desc' ? 'desc' : 'asc';
-    if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+    const order = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy && typeof sortBy === "string" && validSortKeys.includes(key)) {
         orderByClause[key] = order;
     }
     else {
-        orderByClause.submittedAt = 'desc';
+        orderByClause.submittedAt = "desc";
     }
     const result = await (0, handle_utils_1.paginate)(db_1.default.labelRegistrationRequest, req, {
         where: whereClause,
@@ -2393,8 +2532,8 @@ const getAllLabelRegistrations = async (req) => {
                 select: {
                     id: true,
                     name: true,
-                }
-            }
+                },
+            },
         },
         orderBy: orderByClause,
     });
@@ -2427,12 +2566,12 @@ const getLabelRegistrationById = async (registrationId) => {
                     id: true,
                     name: true,
                     logoUrl: true,
-                }
-            }
+                },
+            },
         },
     });
     if (!request) {
-        throw { status: 404, message: 'Label registration request not found.' };
+        throw { status: 404, message: "Label registration request not found." };
     }
     return request;
 };
@@ -2443,10 +2582,13 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
         include: { requestingArtist: true },
     });
     if (!registrationRequest) {
-        throw { status: 404, message: 'Label registration request not found.' };
+        throw { status: 404, message: "Label registration request not found." };
     }
     if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
-        throw { status: 400, message: `Request is already ${registrationRequest.status.toLowerCase()}.` };
+        throw {
+            status: 400,
+            message: `Request is already ${registrationRequest.status.toLowerCase()}.`,
+        };
     }
     return db_1.default.$transaction(async (tx) => {
         let targetLabelId;
@@ -2483,7 +2625,9 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
             reviewedByAdmin: { connect: { id: adminUserId } },
         };
         if (newLabelWasActuallyCreated) {
-            labelRegistrationUpdateData.createdLabel = { connect: { id: targetLabelId } };
+            labelRegistrationUpdateData.createdLabel = {
+                connect: { id: targetLabelId },
+            };
         }
         const updatedRequest = await tx.labelRegistrationRequest.update({
             where: { id: registrationId },
@@ -2507,15 +2651,20 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
                     isRead: false,
                 },
                 select: {
-                    id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                    id: true,
+                    type: true,
+                    message: true,
+                    recipientType: true,
+                    isRead: true,
+                    createdAt: true,
                     userId: true,
-                }
+                },
             };
             const notification = await tx.notification.create(notificationData);
             const io = (0, socket_1.getIO)();
             const targetUserSocketId = (0, socket_2.getUserSockets)().get(registrationRequest.requestingArtist.userId);
             if (targetUserSocketId) {
-                io.to(targetUserSocketId).emit('notification', {
+                io.to(targetUserSocketId).emit("notification", {
                     id: notification.id,
                     type: notification.type,
                     message: notification.message,
@@ -2533,7 +2682,7 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
         }
         const finalLabelDetails = await tx.label.findUnique({
             where: { id: targetLabelId },
-            select: prisma_selects_1.labelSelect
+            select: prisma_selects_1.labelSelect,
         });
         return { updatedRequest, label: finalLabelDetails };
     });
@@ -2541,7 +2690,11 @@ const approveLabelRegistration = async (adminUserId, registrationId) => {
 exports.approveLabelRegistration = approveLabelRegistration;
 const rejectLabelRegistration = async (adminUserId, registrationId, rejectionReason) => {
     const errors = (0, handle_utils_1.runValidations)([
-        (0, handle_utils_1.validateField)(rejectionReason, 'rejectionReason', { required: true, minLength: 5, maxLength: 500 }),
+        (0, handle_utils_1.validateField)(rejectionReason, "rejectionReason", {
+            required: true,
+            minLength: 5,
+            maxLength: 500,
+        }),
     ]);
     if (errors.length > 0) {
         console.warn(`[AdminService] Validation failed for rejection reason for request ${registrationId}, but proceeding with rejection.`);
@@ -2550,7 +2703,7 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
         where: { id: registrationId },
     });
     if (!registrationRequest) {
-        throw { status: 404, message: 'Label registration request not found.' };
+        throw { status: 404, message: "Label registration request not found." };
     }
     if (registrationRequest.status !== client_1.RequestStatus.PENDING) {
         console.warn(`[AdminService] Attempting to reject a request that is already ${registrationRequest.status.toLowerCase()}. ID: ${registrationId}`);
@@ -2567,8 +2720,8 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
             id: true,
             requestedLabelName: true,
             requestingArtistId: true,
-            requestingArtist: { select: { userId: true } }
-        }
+            requestingArtist: { select: { userId: true } },
+        },
     });
     console.log(`[AdminService] Updated LabelRegistrationRequest ID: ${updatedRequest.id} to REJECTED`);
     if (updatedRequest.requestingArtist?.userId) {
@@ -2583,16 +2736,22 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
                 isRead: false,
             },
             select: {
-                id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true,
+                id: true,
+                type: true,
+                message: true,
+                recipientType: true,
+                isRead: true,
+                createdAt: true,
                 artistId: true,
-            }
+            },
         };
-        db_1.default.notification.create(notificationData)
-            .then(createdNotification => {
+        db_1.default.notification
+            .create(notificationData)
+            .then((createdNotification) => {
             const io = (0, socket_1.getIO)();
             const targetSocketId = (0, socket_2.getUserSockets)().get(artistUserIdForSocketTargeting);
             if (targetSocketId) {
-                io.to(targetSocketId).emit('notification', {
+                io.to(targetSocketId).emit("notification", {
                     ...createdNotification,
                     createdAt: createdNotification.createdAt.toISOString(),
                     rejectionReason: rejectionReason,
@@ -2604,7 +2763,7 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
                 console.log(`[Socket Emit] User ${artistUserIdForSocketTargeting} (for ArtistProfile ${createdNotification.artistId}) not connected for LABEL_REGISTRATION_REJECTED.`);
             }
         })
-            .catch(err => {
+            .catch((err) => {
             console.error(`[AdminService] Failed to create or emit rejection notification for user ${artistUserIdForSocketTargeting} (Request ID: ${updatedRequest.id}):`, err);
         });
     }
@@ -2613,7 +2772,7 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
     }
     return {
         message: `Label registration request ${updatedRequest.id} rejected successfully.`,
-        rejectedRequestId: updatedRequest.id
+        rejectedRequestId: updatedRequest.id,
     };
 };
 exports.rejectLabelRegistration = rejectLabelRegistration;
@@ -2622,21 +2781,26 @@ const getPendingArtistRoleRequests = async (req) => {
     const where = {
         status: client_1.RequestStatus.PENDING,
     };
-    if (status && typeof status === 'string' && status !== 'ALL' && Object.values(client_1.RequestStatus).includes(status)) {
+    if (status &&
+        typeof status === "string" &&
+        status !== "ALL" &&
+        Object.values(client_1.RequestStatus).includes(status)) {
         where.status = status;
     }
-    else if (status === 'ALL') {
+    else if (status === "ALL") {
         delete where.status;
     }
     const andConditions = [];
-    if (search && typeof search === 'string' && search.trim()) {
+    if (search && typeof search === "string" && search.trim()) {
         const trimmedSearch = search.trim();
         andConditions.push({
             OR: [
-                { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
-                { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
-                { user: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
-                { requestedLabelName: { contains: trimmedSearch, mode: 'insensitive' } },
+                { artistName: { contains: trimmedSearch, mode: "insensitive" } },
+                { user: { name: { contains: trimmedSearch, mode: "insensitive" } } },
+                { user: { email: { contains: trimmedSearch, mode: "insensitive" } } },
+                {
+                    requestedLabelName: { contains: trimmedSearch, mode: "insensitive" },
+                },
             ],
         });
     }
@@ -2672,7 +2836,7 @@ const getPendingArtistRoleRequests = async (req) => {
     const options = {
         where,
         select: artistRoleRequestSelect,
-        orderBy: { id: 'desc' },
+        orderBy: { id: "desc" },
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.artistRequest, req, options);
     return {
@@ -2686,7 +2850,7 @@ const extractTrackAndArtistData = async () => {
         const artists = await db_1.default.artistProfile.findMany({
             where: {
                 isActive: true,
-                isVerified: true
+                isVerified: true,
             },
             select: {
                 id: true,
@@ -2698,40 +2862,40 @@ const extractTrackAndArtistData = async () => {
                 userId: true,
                 label: {
                     select: {
-                        name: true
-                    }
+                        name: true,
+                    },
                 },
                 genres: {
                     select: {
                         genre: {
                             select: {
-                                name: true
-                            }
-                        }
-                    }
+                                name: true,
+                            },
+                        },
+                    },
                 },
                 tracks: {
                     select: {
-                        id: true
-                    }
+                        id: true,
+                    },
                 },
                 user: {
                     select: {
                         email: true,
                         username: true,
-                        name: true
-                    }
+                        name: true,
+                    },
                 },
                 avatar: true,
                 socialMediaLinks: true,
             },
             orderBy: {
-                artistName: 'asc'
-            }
+                artistName: "asc",
+            },
         });
         const albums = await db_1.default.album.findMany({
             where: {
-                isActive: true
+                isActive: true,
             },
             select: {
                 id: true,
@@ -2745,40 +2909,40 @@ const extractTrackAndArtistData = async () => {
                 artist: {
                     select: {
                         id: true,
-                        artistName: true
-                    }
+                        artistName: true,
+                    },
                 },
                 label: {
                     select: {
                         id: true,
-                        name: true
-                    }
+                        name: true,
+                    },
                 },
                 genres: {
                     select: {
                         genre: {
                             select: {
                                 id: true,
-                                name: true
-                            }
-                        }
-                    }
+                                name: true,
+                            },
+                        },
+                    },
                 },
             },
             orderBy: [
                 {
                     artist: {
-                        artistName: 'asc'
-                    }
+                        artistName: "asc",
+                    },
                 },
                 {
-                    releaseDate: 'desc'
-                }
-            ]
+                    releaseDate: "desc",
+                },
+            ],
         });
         const tracks = await db_1.default.track.findMany({
             where: {
-                isActive: true
+                isActive: true,
             },
             select: {
                 id: true,
@@ -2789,8 +2953,8 @@ const extractTrackAndArtistData = async () => {
                 audioUrl: true,
                 label: {
                     select: {
-                        name: true
-                    }
+                        name: true,
+                    },
                 },
                 playCount: true,
                 tempo: true,
@@ -2801,8 +2965,8 @@ const extractTrackAndArtistData = async () => {
                 energy: true,
                 artist: {
                     select: {
-                        artistName: true
-                    }
+                        artistName: true,
+                    },
                 },
                 album: {
                     select: {
@@ -2812,111 +2976,117 @@ const extractTrackAndArtistData = async () => {
                         releaseDate: true,
                         coverUrl: true,
                         totalTracks: true,
-                        duration: true
-                    }
+                        duration: true,
+                    },
                 },
                 genres: {
                     select: {
                         genre: {
                             select: {
-                                name: true
-                            }
-                        }
-                    }
+                                name: true,
+                            },
+                        },
+                    },
                 },
                 featuredArtists: {
                     select: {
                         artistProfile: {
                             select: {
-                                artistName: true
-                            }
-                        }
-                    }
-                }
+                                artistName: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: [
                 {
                     artist: {
-                        artistName: 'asc'
-                    }
+                        artistName: "asc",
+                    },
                 },
                 {
-                    releaseDate: 'desc'
-                }
-            ]
+                    releaseDate: "desc",
+                },
+            ],
         });
-        const artistsForExport = artists.map(artist => ({
+        const artistsForExport = artists.map((artist) => ({
             id: artist.id,
             artistName: artist.artistName,
-            bio: artist.bio || '',
-            userId: artist.userId || '',
+            bio: artist.bio || "",
+            userId: artist.userId || "",
             monthlyListeners: artist.monthlyListeners,
             verified: artist.isVerified,
-            label: artist.label?.name || '',
-            genres: artist.genres.map(g => g.genre.name).join(', '),
+            label: artist.label?.name || "",
+            genres: artist.genres.map((g) => g.genre.name).join(", "),
             trackCount: artist.tracks.length,
-            createdAt: artist.createdAt.toISOString().split('T')[0],
-            userEmail: artist.user?.email || '',
-            userUsername: artist.user?.username || '',
-            userName: artist.user?.name || '',
-            avatar: artist.avatar || '',
-            socialMediaLinks: artist.socialMediaLinks ? JSON.stringify(artist.socialMediaLinks) : '',
+            createdAt: artist.createdAt.toISOString().split("T")[0],
+            userEmail: artist.user?.email || "",
+            userUsername: artist.user?.username || "",
+            userName: artist.user?.name || "",
+            avatar: artist.avatar || "",
+            socialMediaLinks: artist.socialMediaLinks
+                ? JSON.stringify(artist.socialMediaLinks)
+                : "",
         }));
-        const albumsForExport = albums.map(album => ({
+        const albumsForExport = albums.map((album) => ({
             id: album.id,
             title: album.title,
             artistName: album.artist.artistName,
             artistId: album.artist.id,
-            releaseDate: album.releaseDate.toISOString().split('T')[0],
+            releaseDate: album.releaseDate.toISOString().split("T")[0],
             albumType: album.type,
             totalTracks: album.totalTracks,
             duration: album.duration,
-            labelName: album.label?.name || '',
-            coverUrl: album.coverUrl || '',
-            genres: album.genres.map(g => g.genre.name).join(', '),
-            createdAt: album.createdAt.toISOString().split('T')[0]
+            labelName: album.label?.name || "",
+            coverUrl: album.coverUrl || "",
+            genres: album.genres.map((g) => g.genre.name).join(", "),
+            createdAt: album.createdAt.toISOString().split("T")[0],
         }));
-        const tracksForExport = tracks.map(track => ({
+        const tracksForExport = tracks.map((track) => ({
             id: track.id,
             title: track.title,
             artist: track.artist.artistName,
-            album: track.album?.title || '(Single)',
-            albumId: track.album?.id || '',
-            albumType: track.album?.type || 'SINGLE',
-            albumReleaseDate: track.album?.releaseDate ? track.album.releaseDate.toISOString().split('T')[0] : '',
+            album: track.album?.title || "(Single)",
+            albumId: track.album?.id || "",
+            albumType: track.album?.type || "SINGLE",
+            albumReleaseDate: track.album?.releaseDate
+                ? track.album.releaseDate.toISOString().split("T")[0]
+                : "",
             albumTotalTracks: track.album?.totalTracks || 1,
             albumDuration: track.album?.duration || track.duration,
-            coverUrl: track.coverUrl || track.album?.coverUrl || '',
+            coverUrl: track.coverUrl || track.album?.coverUrl || "",
             audioUrl: track.audioUrl,
-            labelName: track.label?.name || '',
-            featuredArtistNames: track.featuredArtists?.map(fa => fa.artistProfile.artistName).join(', ') || '',
+            labelName: track.label?.name || "",
+            featuredArtistNames: track.featuredArtists
+                ?.map((fa) => fa.artistProfile.artistName)
+                .join(", ") || "",
             duration: track.duration,
-            releaseDate: track.releaseDate.toISOString().split('T')[0],
+            releaseDate: track.releaseDate.toISOString().split("T")[0],
             playCount: track.playCount,
             tempo: track.tempo || null,
-            mood: track.mood || '',
-            key: track.key || '',
-            scale: track.scale || '',
+            mood: track.mood || "",
+            key: track.key || "",
+            scale: track.scale || "",
             danceability: track.danceability || null,
             energy: track.energy || null,
-            genres: track.genres.map(g => g.genre.name).join(', ')
+            genres: track.genres.map((g) => g.genre.name).join(", "),
         }));
         return {
             artists: artistsForExport,
             albums: albumsForExport,
             tracks: tracksForExport,
-            exportDate: new Date().toISOString()
+            exportDate: new Date().toISOString(),
         };
     }
     catch (error) {
-        console.error('Error extracting track and artist data:', error);
+        console.error("Error extracting track and artist data:", error);
         throw error;
     }
 };
 exports.extractTrackAndArtistData = extractTrackAndArtistData;
 const fixAlbumTrackTypeConsistency = async () => {
     try {
-        console.log('[Admin Service] Starting album track type consistency fix...');
+        console.log("[Admin Service] Starting album track type consistency fix...");
         const albums = await db_1.default.album.findMany({
             select: {
                 id: true,
@@ -2925,23 +3095,23 @@ const fixAlbumTrackTypeConsistency = async () => {
                 tracks: {
                     select: {
                         id: true,
-                        type: true
-                    }
-                }
-            }
+                        type: true,
+                    },
+                },
+            },
         });
         console.log(`[Admin Service] Found ${albums.length} albums to check for track type consistency`);
         let fixedAlbums = 0;
         let fixedTracks = 0;
         for (const album of albums) {
-            const inconsistentTracks = album.tracks.filter(track => track.type !== album.type);
+            const inconsistentTracks = album.tracks.filter((track) => track.type !== album.type);
             if (inconsistentTracks.length > 0) {
                 await db_1.default.track.updateMany({
                     where: {
                         albumId: album.id,
-                        type: { not: album.type }
+                        type: { not: album.type },
                     },
-                    data: { type: album.type }
+                    data: { type: album.type },
                 });
                 fixedAlbums++;
                 fixedTracks += inconsistentTracks.length;
@@ -2952,17 +3122,129 @@ const fixAlbumTrackTypeConsistency = async () => {
             success: true,
             message: `Fixed track types in ${fixedAlbums} albums, updating ${fixedTracks} tracks to match their album types.`,
             fixedAlbums,
-            fixedTracks
+            fixedTracks,
         };
     }
     catch (error) {
-        console.error('[Admin Service] Error fixing album track type consistency:', error);
+        console.error("[Admin Service] Error fixing album track type consistency:", error);
         return {
             success: false,
-            message: error instanceof Error ? error.message : 'Unknown error occurred',
-            error: true
+            message: error instanceof Error ? error.message : "Unknown error occurred",
+            error: true,
         };
     }
 };
 exports.fixAlbumTrackTypeConsistency = fixAlbumTrackTypeConsistency;
+const removeTrackFromSystemPlaylist = async (adminExecutingId, playlistId, trackToRemoveId) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    const playlistDetails = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        select: {
+            id: true,
+            isAIGenerated: true,
+            tracks: {
+                where: { trackId: trackToRemoveId },
+                select: {
+                    id: true,
+                },
+            },
+        },
+    });
+    if (!playlistDetails) {
+        throw new errors_1.HttpError(404, "Playlist not found");
+    }
+    if (!playlistDetails.isAIGenerated) {
+        throw new errors_1.HttpError(403, "Forbidden: Can only remove tracks from AI-generated system playlists using this method.");
+    }
+    const playlistTrackEntry = playlistDetails.tracks.length > 0 ? playlistDetails.tracks[0] : null;
+    if (!playlistTrackEntry) {
+        throw new errors_1.HttpError(404, `Track ${trackToRemoveId} not found in playlist ${playlistId}`);
+    }
+    const updatedPlaylist = await db_1.default.$transaction(async (tx) => {
+        await tx.playlistTrack.delete({
+            where: {
+                id: playlistTrackEntry.id,
+            },
+        });
+        const remainingPlaylistTracksData = await tx.playlistTrack.findMany({
+            where: { playlistId: playlistId },
+            include: { track: { select: { duration: true } } },
+        });
+        const newTotalDuration = remainingPlaylistTracksData.reduce((sum, pt) => sum + (pt.track?.duration || 0), 0);
+        const newTotalTracks = remainingPlaylistTracksData.length;
+        const finalUpdatedPlaylist = await tx.playlist.update({
+            where: { id: playlistId },
+            data: {
+                totalTracks: newTotalTracks,
+                totalDuration: newTotalDuration,
+                updatedAt: new Date(),
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                coverUrl: true,
+                privacy: true,
+                type: true,
+                isAIGenerated: true,
+                totalTracks: true,
+                totalDuration: true,
+                createdAt: true,
+                updatedAt: true,
+                userId: true,
+                lastGeneratedAt: true,
+                tracks: {
+                    take: 3,
+                    orderBy: { trackOrder: "asc" },
+                    select: {
+                        track: {
+                            select: {
+                                id: true,
+                                title: true,
+                                coverUrl: true,
+                                artist: { select: { artistName: true } },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        return finalUpdatedPlaylist;
+    });
+    console.log(`[AdminService] Track ${trackToRemoveId} removed from playlist ${playlistId} by admin ${adminExecutingId}`);
+    return updatedPlaylist;
+};
+exports.removeTrackFromSystemPlaylist = removeTrackFromSystemPlaylist;
+const deleteSystemPlaylist = async (playlistId, adminUserId) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminUserId },
+    });
+    if (!adminUser || adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Admin access required to delete system playlists.");
+    }
+    const playlist = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        include: { tracks: true },
+    });
+    if (!playlist) {
+        throw new errors_1.HttpError(404, `Playlist with ID ${playlistId} not found.`);
+    }
+    if (playlist.type !== client_1.PlaylistType.SYSTEM &&
+        !playlist.isAIGenerated) {
+        throw new errors_1.HttpError(403, `Forbidden: Playlist with ID ${playlistId} is not a deletable system playlist and is not AI-generated.`);
+    }
+    await db_1.default.playlist.delete({
+        where: { id: playlistId },
+    });
+    console.log(`[Admin Service] System Playlist ${playlistId} deleted by admin ${adminUserId}`);
+};
+exports.deleteSystemPlaylist = deleteSystemPlaylist;
 //# sourceMappingURL=admin.service.js.map

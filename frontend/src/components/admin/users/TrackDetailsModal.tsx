@@ -166,7 +166,7 @@ export const TrackDetailsModal: React.FC<TrackDetailsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Track Audio Features</DialogTitle>
           <DialogDescription>
@@ -184,51 +184,75 @@ export const TrackDetailsModal: React.FC<TrackDetailsModalProps> = ({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-          <dl className="space-y-0">
-            <DetailItem label="Title" value={currentTrack.title} />
-            <DetailItem
-              label="Artist"
-              value={currentTrack.artist?.artistName}
-            />
-            <DetailItem
-              label="Tempo"
-              value={
-                currentTrack.tempo
-                  ? `${Math.round(currentTrack.tempo)} BPM`
-                  : "N/A"
-              }
-            />
-            <DetailItem label="Mood" value={currentTrack.mood || "N/A"} />
-            <DetailItem
-              label="Key"
-              value={
-                currentTrack.key && currentTrack.scale
-                  ? `${currentTrack.key} ${currentTrack.scale}`
-                  : "N/A"
-              }
-            />
-            <DetailItem
-              label="Danceability"
-              value={
-                currentTrack.danceability !== null &&
-                currentTrack.danceability !== undefined
-                  ? (currentTrack.danceability * 100).toFixed(0) + "%"
-                  : "N/A"
-              }
-            />
-            <DetailItem
-              label="Energy"
-              value={
-                currentTrack.energy !== null &&
-                currentTrack.energy !== undefined
-                  ? (currentTrack.energy * 100).toFixed(0) + "%"
-                  : "N/A"
-              }
-            />
-          </dl>
+        <div className="py-4 space-y-4">
+          {/* Base Information Section */}
+          <div>
+            <h3 className="text-md font-semibold mb-2 text-primary">
+              Base Information
+            </h3>
+            <dl className="space-y-0 border rounded-md p-3">
+              <DetailItem label="Title" value={currentTrack.title} />
+              <DetailItem
+                label="Artist"
+                value={currentTrack.artist?.artistName}
+              />
+            </dl>
+          </div>
+
+          {/* Audio Analysis & Genre Section */}
+          <div>
+            <h3 className="text-md font-semibold mb-2 text-primary">
+              Audio Analysis & Genre
+            </h3>
+            <dl className="space-y-0 border rounded-md p-3">
+              <DetailItem
+                label="Tempo"
+                value={
+                  currentTrack.tempo !== null &&
+                  currentTrack.tempo !== undefined
+                    ? `${Math.round(currentTrack.tempo)} BPM`
+                    : "N/A"
+                }
+              />
+              <DetailItem label="Mood" value={currentTrack.mood || "N/A"} />
+              <DetailItem
+                label="Key"
+                value={
+                  currentTrack.key && currentTrack.scale
+                    ? `${currentTrack.key} ${currentTrack.scale}`
+                    : currentTrack.key || "N/A"
+                }
+              />
+              <DetailItem
+                label="Danceability"
+                value={
+                  currentTrack.danceability !== null &&
+                  currentTrack.danceability !== undefined
+                    ? (currentTrack.danceability * 100).toFixed(0) + "%"
+                    : "N/A"
+                }
+              />
+              <DetailItem
+                label="Energy"
+                value={
+                  currentTrack.energy !== null &&
+                  currentTrack.energy !== undefined
+                    ? (currentTrack.energy * 100).toFixed(0) + "%"
+                    : "N/A"
+                }
+              />
+              <DetailItem
+                label="Genres"
+                value={
+                  currentTrack.genres && currentTrack.genres.length > 0
+                    ? currentTrack.genres.map((g) => g.genre.name).join(", ")
+                    : "N/A"
+                }
+              />
+            </dl>
+          </div>
         </div>
-        <DialogFooter className="sm:justify-between gap-2">
+        <DialogFooter className="sm:justify-between gap-2 pt-2">
           <Button
             onClick={handleReanalyze}
             disabled={loadingReanalyze}

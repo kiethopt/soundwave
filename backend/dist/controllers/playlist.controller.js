@@ -36,11 +36,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
-const aiService = __importStar(require("../services/ai.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -242,9 +241,9 @@ const getPlaylistById = async (req, res, next) => {
                                     album: true,
                                     genres: {
                                         include: {
-                                            genre: true
-                                        }
-                                    }
+                                            genre: true,
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -282,9 +281,9 @@ const getPlaylistById = async (req, res, next) => {
                                     album: true,
                                     genres: {
                                         include: {
-                                            genre: true
-                                        }
-                                    }
+                                            genre: true,
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -329,9 +328,9 @@ const getPlaylistById = async (req, res, next) => {
                                     album: true,
                                     genres: {
                                         include: {
-                                            genre: true
-                                        }
-                                    }
+                                            genre: true,
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -406,8 +405,7 @@ const addTrackToPlaylist = async (req, res, next) => {
             });
             return;
         }
-        if (playlist.type === "SYSTEM" &&
-            (playlist.name === "Welcome Mix")) {
+        if (playlist.type === "SYSTEM" && playlist.name === "Welcome Mix") {
             res.status(400).json({
                 success: false,
                 message: `Cannot manually add tracks to ${playlist.name} playlist.`,
@@ -756,61 +754,6 @@ const getUserSystemPlaylists = async (req, res, next) => {
     }
 };
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
-const generateAIPlaylist = async (req, res, next) => {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            res.status(401).json({
-                success: false,
-                message: "Unauthorized, please login",
-            });
-            return;
-        }
-        const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, } = req.body;
-        const hasSpecificParams = basedOnMood ||
-            basedOnGenre ||
-            basedOnArtist ||
-            basedOnSongLength ||
-            basedOnReleaseTime;
-        if (!hasSpecificParams) {
-            res.status(400).json({
-                success: false,
-                message: "At least one parameter (mood, genre, artist, song length, or release time) is required to generate a playlist.",
-            });
-            return;
-        }
-        const playlistData = await playlistService.generateAIPlaylist(userId, {
-            name,
-            description,
-            trackCount: trackCount ? parseInt(trackCount, 10) : undefined,
-            basedOnMood,
-            basedOnGenre,
-            basedOnArtist,
-            basedOnSongLength,
-            basedOnReleaseTime,
-        });
-        let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
-        res.status(200).json({
-            success: true,
-            message,
-            data: playlistData,
-        });
-    }
-    catch (error) {
-        console.error("Error generating AI playlist:", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const isValidationError = errorMessage.includes("required to generate") ||
-            errorMessage.includes("parameter is required");
-        res.status(isValidationError ? 400 : 500).json({
-            success: false,
-            message: isValidationError
-                ? errorMessage
-                : "Failed to generate AI playlist",
-            error: errorMessage,
-        });
-    }
-};
-exports.generateAIPlaylist = generateAIPlaylist;
 const updateAllSystemPlaylists = async (req, res, next) => {
     try {
         res.status(200).json({
@@ -1103,80 +1046,6 @@ const getPlaylistSuggestions = async (req, res, next) => {
     }
 };
 exports.getPlaylistSuggestions = getPlaylistSuggestions;
-const suggestMoreTracksForPlaylist = async (req, res, next) => {
-    try {
-        const { id: playlistId } = req.params;
-        const userId = req.user?.id;
-        const count = req.query.count ? parseInt(req.query.count, 10) : 5;
-        if (!userId) {
-            res.status(401).json({
-                success: false,
-                message: "Unauthorized, please login",
-            });
-            return;
-        }
-        const playlist = await db_1.default.playlist.findUnique({
-            where: { id: playlistId },
-            select: { userId: true, type: true },
-        });
-        if (!playlist) {
-            res.status(404).json({
-                success: false,
-                message: "Playlist not found",
-            });
-            return;
-        }
-        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
-            res.status(403).json({
-                success: false,
-                message: "You do not have permission to modify this playlist",
-            });
-            return;
-        }
-        const suggestedTrackIds = await aiService.suggestMoreTracksUsingAI(playlistId, userId, count);
-        const suggestedTracks = await db_1.default.track.findMany({
-            where: {
-                id: { in: suggestedTrackIds },
-                isActive: true,
-            },
-            include: {
-                artist: true,
-                album: true,
-            },
-        });
-        res.status(200).json({
-            success: true,
-            message: `Generated ${suggestedTrackIds.length} track suggestions for the playlist`,
-            data: suggestedTracks.map((track) => ({
-                id: track.id,
-                title: track.title,
-                artist: track.artist,
-                album: track.album,
-                duration: track.duration,
-                coverUrl: track.coverUrl,
-                audioUrl: track.audioUrl,
-            })),
-        });
-    }
-    catch (error) {
-        console.error("Playlist suggestion error:", error instanceof Error ? error.message : "Unknown error");
-        if (error instanceof Error &&
-            error.message.includes("Playlist must have at least 3 tracks")) {
-            res.status(400).json({
-                success: false,
-                message: error.message,
-            });
-        }
-        else {
-            res.status(500).json({
-                success: false,
-                message: "Failed to generate track suggestions",
-                error: error instanceof Error ? error.message : "Unknown error",
-            });
-        }
-    }
-};
-exports.suggestMoreTracksForPlaylist = suggestMoreTracksForPlaylist;
 const reorderPlaylistTracks = async (req, res, next) => {
     try {
         const { playlistId } = req.params;

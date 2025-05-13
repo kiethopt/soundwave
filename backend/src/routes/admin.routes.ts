@@ -24,7 +24,7 @@ import {
   approveArtistClaimRequest,
   rejectArtistClaimRequest,
   bulkUploadTracks,
-  generateUserAiPlaylistHandler,
+  generateAndAssignAiPlaylistToUserHandler,
   updateAiPlaylistVisibilityHandler,
   getUserAiPlaylistsHandler,
   getUserListeningHistoryHandler,
@@ -36,6 +36,8 @@ import {
   getArtistRoleRequestsHandler,
   exportTrackAndArtistData,
   fixAlbumTrackTypes,
+  removeTrackFromSystemPlaylistHandler,
+  deleteSystemPlaylistHandler,
 } from "../controllers/admin.controller";
 import * as genreController from "../controllers/genre.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
@@ -222,7 +224,7 @@ router.post(
   "/users/:userId/ai-playlists",
   authenticate,
   authorize([Role.ADMIN]),
-  generateUserAiPlaylistHandler
+  generateAndAssignAiPlaylistToUserHandler
 );
 
 router.put(
@@ -245,7 +247,22 @@ router.get(
   authorize([Role.ADMIN]),
   getUserListeningHistoryHandler
 );
-// --- End User AI Playlist Management by Admin ---
+
+// New route for removing a track from a system playlist
+router.delete(
+  "/ai-playlists/:playlistId/tracks/:trackId",
+  authenticate,
+  authorize([Role.ADMIN]),
+  removeTrackFromSystemPlaylistHandler
+);
+
+// Route để xóa toàn bộ System Playlist bởi Admin
+router.delete(
+  "/ai-playlists/:playlistId",
+  authenticate,
+  authorize([Role.ADMIN]),
+  deleteSystemPlaylistHandler
+);
 
 // --- Track Re-analysis by Admin ---
 router.post(
@@ -258,28 +275,28 @@ router.post(
 
 // --- Label Registration Management Routes (Admin) ---
 router.get(
-  '/label-registrations',
+  "/label-registrations",
   authenticate,
   authorize([Role.ADMIN]),
   getAllLabelRegistrations
 );
 
 router.get(
-  '/label-registrations/:registrationId',
+  "/label-registrations/:registrationId",
   authenticate,
   authorize([Role.ADMIN]),
   getLabelRegistrationById
 );
 
 router.put(
-  '/label-registrations/:registrationId/approve',
+  "/label-registrations/:registrationId/approve",
   authenticate,
   authorize([Role.ADMIN]),
   approveLabelRegistration
 );
 
 router.put(
-  '/label-registrations/:registrationId/reject',
+  "/label-registrations/:registrationId/reject",
   authenticate,
   authorize([Role.ADMIN]),
   rejectLabelRegistration
@@ -304,9 +321,9 @@ router.get(
 
 // Add this new route for fixing album track types
 router.post(
-  '/fix-album-track-types', 
-  authenticate, 
-  authorize([Role.ADMIN]), 
+  "/fix-album-track-types",
+  authenticate,
+  authorize([Role.ADMIN]),
   fixAlbumTrackTypes
 );
 

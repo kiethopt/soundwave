@@ -85,32 +85,26 @@ export default function Home() {
             setTrendingPlaylist(trending || null);
           }
 
-          let combinedAiPlaylists: Playlist[] = [];
-
-          if (
-            personalizedSystemPlaylists &&
-            personalizedSystemPlaylists.length > 0
-          ) {
-            combinedAiPlaylists = [...personalizedSystemPlaylists];
-          }
-
-          if (isAuthenticated && userPlaylists && userPlaylists.length > 0) {
-            const adminGeneratedPublicAi = userPlaylists.filter(
-              (playlist: Playlist) =>
-                playlist.isAIGenerated &&
-                playlist.type === "NORMAL" &&
-                playlist.privacy === PlaylistPrivacy.PUBLIC
-            );
-            adminGeneratedPublicAi.forEach((adminP: Playlist) => {
-              if (!combinedAiPlaylists.find((p) => p.id === adminP.id)) {
-                combinedAiPlaylists.push(adminP);
+          if (isAuthenticated) {
+            let processedPlaylists = personalizedSystemPlaylists || [];
+            processedPlaylists = processedPlaylists.filter((p: Playlist) => {
+              if (p.type === "SYSTEM" && p.isAIGenerated) {
+                return p.privacy === "PUBLIC";
               }
+              return true;
             });
-          }
-
-          if (isAuthenticated && combinedAiPlaylists.length > 0) {
-            setPersonalizedPlaylists(combinedAiPlaylists);
-          } else if (isAuthenticated) {
+            const welcomeMixIndex = processedPlaylists.findIndex(
+              (p: Playlist) => p.name === "Welcome Mix"
+            );
+            if (welcomeMixIndex > -1) {
+              const welcomeMixItem = processedPlaylists.splice(
+                welcomeMixIndex,
+                1
+              )[0];
+              processedPlaylists = [welcomeMixItem, ...processedPlaylists];
+            }
+            setPersonalizedPlaylists(processedPlaylists);
+          } else {
             setPersonalizedPlaylists([]);
           }
         }

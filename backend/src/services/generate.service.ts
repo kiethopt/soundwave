@@ -240,7 +240,7 @@ export async function generatePlaylistFromPrompt(userId: string, userPrompt: str
 
     try {
         // 1. Get Track Context
-        const trackContext = await getTrackContextForAI(150);
+        const trackContext = await getTrackContextForAI(400);
         if (!trackContext) {
             console.warn("[AI Playlist] No track context available. Cannot generate playlist.");
             return null;
