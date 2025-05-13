@@ -17,11 +17,24 @@ import {
   Music,
   Eye,
   Pencil,
+  Play,
+  Pause,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Verified } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { EditTrackModal } from '@/components/ui/artist-modals';
+import { useTrack } from '@/contexts/TrackContext';
+import { useAuth } from '@/hooks/useAuth';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { TrackDetailModal } from '@/components/ui/admin-modals';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogClose
+} from '@/components/ui/dialog';
 
 interface TrackDetails extends Omit<Track, 'album' | 'artist' | 'featuredArtists'> {
   artist: ArtistProfile & { avatar: string | null; isVerified?: boolean };
@@ -50,6 +63,19 @@ export default function ArtistTrackDetailsPage() {
   const [availableArtists, setAvailableArtists] = useState<{ id: string; name: string }[]>([]);
   const [availableGenres, setAvailableGenres] = useState<{ id: string; name: string }[]>([]);
   const [availableLabels, setAvailableLabels] = useState<{ id: string; name: string }[]>([]);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+
+  const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    queueType,
+    setQueueType,
+    trackQueue,
+  } = useTrack();
 
   const fetchTrackDetails = useCallback(async () => {
     if (!trackId) {
@@ -165,6 +191,20 @@ export default function ArtistTrackDetailsPage() {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleTrackClick = (track: TrackDetails) => {
+    handleProtectedAction(() => {
+      if (currentTrack?.id === track.id && isPlaying && queueType === "track") {
+        pauseTrack();
+      } else {
+        setQueueType("track");
+        if (track) {
+          trackQueue([track]);
+        }
+        playTrack(track);
+      }
+    });
   };
 
   if (loading) {
@@ -319,57 +359,105 @@ export default function ArtistTrackDetailsPage() {
         </div>
 
         <div className="mt-8 overflow-x-auto">
-          <div className={`rounded-md border backdrop-blur-sm ${theme === 'dark' ? 'border-gray-700 bg-black/20' : 'border-gray-200 bg-white/60'}`}>
-            <div className="grid grid-cols-[20px_3fr_2fr_1fr_minmax(50px,auto)] items-center gap-4 px-4 py-2 text-xs font-medium border-b text-muted-foreground">
+          <div className={`rounded-md border backdrop-blur-sm ${theme === 'dark' ? 'border-gray-700 bg-black/20' : 'border-gray-200 bg-white/60'}`}> 
+            <div className="grid grid-cols-[40px_3fr_2fr_340px_80px_70px_48px_48px] items-center gap-1.5 px-4 py-2 text-xs font-medium border-b text-muted-foreground">
               <span className="text-center">#</span>
               <span>Title</span>
-              <span>Artist</span>
+              <span>Artists</span>
+              <span className="text-center">Player</span>
+              <span className="text-center">Duration</span>
               <span className="text-center">Status</span>
-              <span className="text-right">Edit</span>
+              <span className="text-center">Edit</span>
             </div>
-
-            <div className="grid grid-cols-[20px_3fr_2fr_1fr_minmax(50px,auto)] items-center gap-4 px-4 py-3 text-sm">
-              <span className="text-muted-foreground font-medium text-center">1</span>
-              <span className={`font-medium truncate ${ theme === 'dark' ? 'text-white' : 'text-gray-900' }`}>
-                {track.title}
+            <div className="grid grid-cols-[40px_3fr_2fr_340px_80px_70px_48px_48px] items-center gap-1.5 px-4 py-3 text-sm group hover:bg-white/5">
+              <span className="text-center">1</span>
+              <span className="font-medium truncate pl-1">{track.title}</span>
+              <span className="truncate pl-1">{allArtists.map((a) => a.artistName).join(', ')}</span>
+              <span className="flex justify-center">
+                <audio
+                  controls
+                  src={track.audioUrl}
+                  style={{ width: 340, background: '#f5f6fa', borderRadius: 20, outline: 'none' }}
+                />
               </span>
-              <span className={`truncate ${ theme === 'dark' ? 'text-white/80' : 'text-gray-700' }`}>
-                {allArtists.map((a) => a.artistName).join(', ')}
+              <span className="text-center">{formatDuration(track.duration)}</span>
+              <span className="flex items-center justify-center">
+                {track.isActive ? (
+                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                ) : (
+                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-500">Hidden</span>
+                )}
               </span>
-              <div className="flex items-center justify-center">
-                <span className={`flex items-center gap-1 text-xs ${track.isActive ? (theme === 'dark' ? 'text-green-400' : 'text-green-600') : (theme === 'dark' ? 'text-gray-500' : 'text-gray-400')}`}>
-                  <Eye className="w-3 h-3" />
-                  {track.isActive ? 'Visible' : 'Hidden'}
-                </span>
-              </div>
-              <div className="flex items-center justify-end">
-                 <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleEditClick}
-                    disabled={loading || isUpdating || isMetadataLoading}
-                    className={`w-7 h-7 ${theme === 'dark' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                    title="Edit Track"
-                 >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-              </div>
+              <span className="flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleEditClick}
+                  disabled={loading || isUpdating || isMetadataLoading}
+                  className={`w-7 h-7 ${theme === 'dark' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                  title="Edit Track"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+              <span className="flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsInfoModalOpen(true)}
+                  className="w-7 h-7"
+                  title="Information"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </span>
             </div>
           </div>
         </div>
 
+        {/* Auth Dialog */}
+        <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+        {/* Edit Modal */}
         {isEditModalOpen && track && (
-            <EditTrackModal
-                track={track}
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-                onSubmit={handleUpdateTrack}
-                availableArtists={availableArtists}
-                availableGenres={availableGenres}
-                availableLabels={availableLabels}
-                theme={theme}
-            />
+          <EditTrackModal
+            track={track}
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onSubmit={handleUpdateTrack}
+            availableArtists={availableArtists}
+            availableGenres={availableGenres}
+            availableLabels={availableLabels}
+            theme={theme}
+          />
         )}
+
+        {/* Track Detail Modal */}
+        {track && (
+          <TrackDetailModal
+            track={track}
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+            theme={theme}
+          />
+        )}
+
+        <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+          <DialogContent>
+            <DialogTitle>Track Info</DialogTitle>
+            <div className="space-y-2 text-sm">
+              <div><b>Tempo:</b> {track.tempo ?? 'N/A'}</div>
+              <div><b>Mood:</b> {track.mood ?? 'N/A'}</div>
+              <div><b>Key:</b> {track.key ?? 'N/A'}</div>
+              <div><b>Scale:</b> {track.scale ?? 'N/A'}</div>
+              <div><b>Danceability:</b> {track.danceability ?? 'N/A'}</div>
+              <div><b>Energy:</b> {track.energy ?? 'N/A'}</div>
+            </div>
+            <DialogClose asChild>
+              <Button variant="outline" className="mt-4 w-full">Close</Button>
+            </DialogClose>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

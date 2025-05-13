@@ -14,10 +14,12 @@ import {
   Verified,
   Edit
 } from '@/components/ui/Icons';
+import { MoreHorizontal } from 'lucide-react';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { EditTrackModal } from '@/components/ui/artist-modals';
+import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog';
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -58,6 +60,8 @@ export default function AlbumDetailPage() {
   const { dominantColor } = useDominantColor(album?.coverUrl);
   const { theme } = useTheme();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [infoModalTrack, setInfoModalTrack] = useState<Track | null>(null);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   useEffect(() => {
     if (extractedAlbumId) {
@@ -554,179 +558,76 @@ export default function AlbumDetailPage() {
             >
               {/* Header - Desktop only */}
               <div
-                className={`hidden md:block px-6 py-4 border-b ${
-                  theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                }`}
+                className="hidden md:grid grid-cols-[40px_3fr_2fr_340px_80px_70px_48px_48px] items-center gap-1.5 px-4 py-2 text-xs font-medium border-b text-muted-foreground"
               >
-                <div
-                  className={`grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm ${
-                    theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                  }`}
-                >
-                  <div className="text-center">#</div>
-                  <div>Title</div>
-                  <div>Artists</div>
-                  <div className="text-right">Duration</div>
-                  <div></div>
-                </div>
+                <span className="text-center">#</span>
+                <span>Title</span>
+                <span>Artists</span>
+                <span className="text-center">Player</span>
+                <span className="text-center">Duration</span>
+                <span className="text-center">Status</span>
+                <span className="text-center">Edit</span>
+                <span className="text-center">Info</span>
               </div>
-
-              <div
-                className={`divide-y ${
-                  theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
-                }`}
-              >
-                {album.tracks.map((track) => (
-                  <div key={track.id}>
-                    {/* Desktop Layout */}
-                    <div
-                      className={`hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 group ${
-                        theme === 'light'
-                          ? 'hover:bg-gray-50'
-                          : 'hover:bg-white/5'
-                      }`}
-                    >
-                      <div
-                        className={`flex items-center justify-center ${
-                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                        }`}
-                      >
-                        {track.trackNumber}
-                      </div>
-                      <div className="flex items-center min-w-0">
-                        <span
-                          className={`font-medium truncate ${
-                            theme === 'light' ? 'text-gray-900' : 'text-white'
-                          }`}
-                        >
-                          {track.title}
-                        </span>
-                      </div>
-                      <div className="flex flex-col justify-center min-w-0">
-                        <div
-                          className={`truncate ${
-                            theme === 'light' ? 'text-gray-900' : 'text-white'
-                          }`}
-                        >
-                          {track.artist.artistName}
-                        </div>
-                        {track.featuredArtists?.length > 0 && (
-                          <div
-                            className={`text-sm truncate ${
-                              theme === 'light'
-                                ? 'text-gray-500'
-                                : 'text-white/60'
-                            }`}
-                          >
-                            feat.{' '}
-                            {track.featuredArtists
-                              .map(
-                                ({ artistProfile }) => artistProfile.artistName
-                              )
-                              .join(', ')}
-                          </div>
+              <div>
+                {album.tracks.map((track, idx) => {
+                  const allArtists = [
+                    track.artist,
+                    ...(track.featuredArtists?.map(fa => fa.artistProfile) || [])
+                  ];
+                  const formatDuration = (seconds: number | null | undefined): string => {
+                    if (seconds === null || seconds === undefined || isNaN(seconds) || seconds === Infinity) {
+                        return '--:--';
+                    }
+                    const minutes = Math.floor(seconds / 60);
+                    const remainingSeconds = Math.floor(seconds % 60);
+                    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                  };
+                  return (
+                    <div key={track.id} className="grid grid-cols-[40px_3fr_2fr_340px_80px_70px_48px_48px] items-center gap-1.5 px-4 py-3 text-sm group hover:bg-white/5">
+                      <span className="text-center">{track.trackNumber || idx + 1}</span>
+                      <span className="font-medium truncate pl-1">{track.title}</span>
+                      <span className="truncate pl-1">{allArtists.map((a) => a.artistName).join(', ')}</span>
+                      <span className="flex justify-center">
+                        <audio
+                          controls
+                          src={track.audioUrl}
+                          style={{ width: 340, background: '#f5f6fa', borderRadius: 20, outline: 'none' }}
+                        />
+                      </span>
+                      <span className="text-center">{formatDuration(track.duration)}</span>
+                      <span className="flex items-center justify-center">
+                        {track.isActive ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-500">Hidden</span>
                         )}
-                      </div>
-                      <div
-                        className={`flex items-center justify-end ${
-                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                        }`}
-                      >
-                        {Math.floor(track.duration / 60)}:
-                        {(track.duration % 60).toString().padStart(2, '0')}
-                      </div>
-                      <div className="flex items-center justify-center">
+                      </span>
+                      <span className="flex items-center justify-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 group-hover:opacity-100 opacity-0 transition-opacity ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
-                          onClick={(e) => { e.stopPropagation(); handleEditTrack(track); }}
-                          aria-label={`Edit track ${track.title}`}
+                          onClick={() => handleEditTrack(track)}
+                          className={`w-7 h-7 ${theme === 'dark' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                          title="Edit Track"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                      </div>
-                    </div>
-
-                    {/* Mobile Layout */}
-                    <div
-                      className={`md:hidden p-4 ${
-                        theme === 'light'
-                          ? 'hover:bg-gray-50'
-                          : 'hover:bg-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <span
-                          className={
-                            theme === 'light'
-                              ? 'text-gray-500'
-                              : 'text-white/60'
-                          }
+                      </span>
+                      <span className="flex items-center justify-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => { setInfoModalTrack(track); setIsInfoModalOpen(true); }}
+                          className="w-7 h-7"
+                          title="Information"
                         >
-                          {track.trackNumber}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className={`font-medium truncate ${
-                              theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
-                          >
-                            {track.title}
-                          </div>
-                          <div
-                            className={`text-sm truncate ${
-                              theme === 'light'
-                                ? 'text-gray-500'
-                                : 'text-white/60'
-                            }`}
-                          >
-                            {track.artist.artistName}
-                            {track.featuredArtists?.length > 0 && (
-                              <span
-                                className={
-                                  theme === 'light'
-                                    ? 'text-gray-400'
-                                    : 'text-white/40'
-                                }
-                              >
-                                {' '}
-                                • feat.{' '}
-                                {track.featuredArtists
-                                  .map(
-                                    ({ artistProfile }) =>
-                                      artistProfile.artistName
-                                  )
-                                  .join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`text-sm ${
-                              theme === 'light'
-                                ? 'text-gray-500'
-                                : 'text-white/60'
-                            }`}
-                          >
-                            {Math.floor(track.duration / 60)}:
-                            {(track.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
-                            onClick={(e) => { e.stopPropagation(); handleEditTrack(track); }}
-                            aria-label={`Edit track ${track.title}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -963,6 +864,24 @@ export default function AlbumDetailPage() {
             availableArtists={artists.map(a => ({ id: a.id, name: a.artistName }))}
           />
         )}
+
+        {/* Track Info Modal */}
+        <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+          <DialogContent>
+            <DialogTitle>Track Info</DialogTitle>
+            <div className="space-y-2 text-sm">
+              <div><b>Tempo:</b> {infoModalTrack?.tempo ?? 'N/A'}</div>
+              <div><b>Mood:</b> {infoModalTrack?.mood ?? 'N/A'}</div>
+              <div><b>Key:</b> {infoModalTrack?.key ?? 'N/A'}</div>
+              <div><b>Scale:</b> {infoModalTrack?.scale ?? 'N/A'}</div>
+              <div><b>Danceability:</b> {infoModalTrack?.danceability ?? 'N/A'}</div>
+              <div><b>Energy:</b> {infoModalTrack?.energy ?? 'N/A'}</div>
+            </div>
+            <DialogClose asChild>
+              <Button variant="outline" className="mt-4 w-full">Close</Button>
+            </DialogClose>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
