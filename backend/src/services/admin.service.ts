@@ -2998,7 +2998,7 @@ export const generateAndAssignAiPlaylistToUser = async (
     requestedTrackCount: customParams?.requestedTrackCount || 20,
     type: PlaylistType.SYSTEM, // Ensure correct type from DB schema
     customPromptKeywords: customParams?.customPromptKeywords,
-    requestedPrivacy: PlaylistPrivacy.PRIVATE, // Ensure new playlists default to PRIVATE
+    requestedPrivacy: PlaylistPrivacy.PUBLIC, 
   };
 
   // Log the input being sent to AI service
