@@ -60,6 +60,33 @@ export const validateArtistData = (data: any): string | null => {
   return null;
 };
 
+export function removeVietnameseTones(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+// Helper to normalize strings for advanced search
+function normalizeStringForSearch(str: string): string {
+  return removeVietnameseTones(str)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ') // Replace non-alphanumeric with space
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .trim();
+}
+
+// Helper to collect and normalize all relevant fields for search
+function collectAndNormalizeFields(fields: (string | undefined | null)[]): string {
+  return normalizeStringForSearch(fields.filter(Boolean).join(' '));
+}
+
+// Helper to remove all spaces from a normalized string
+function removeSpaces(str: string): string {
+  return str.replace(/\s+/g, '');
+}
+
 // Tìm kiếm tất cả
 export const search = async (user: any, query: string) => {
   if (!user) {
@@ -67,6 +94,9 @@ export const search = async (user: any, query: string) => {
   }
 
   const searchQuery = query.trim();
+  const normalizedQuery = normalizeStringForSearch(searchQuery);
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+  
   const cacheKey = `/search-all?q=${searchQuery}`;
   const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
 
@@ -82,27 +112,16 @@ export const search = async (user: any, query: string) => {
   // Lưu lịch sử tìm kiếm
   await saveSearchHistory(user.id, searchQuery);
 
-  // Thực hiện tìm kiếm song song để tối ưu hiệu suất
+  // Fetch more results to allow for JS-side accent-insensitive filtering
+  const FETCH_LIMIT = 200;
+  const RETURN_LIMIT = 30;
+
   const [artists, albums, tracks, users] = await Promise.all([
     // Artist
     prisma.artistProfile.findMany({
       where: {
         isActive: true,
-        isVerified: true, // Chỉ lấy nghệ sĩ đã được xác minh
-        OR: [
-          {
-            artistName: { contains: searchQuery, mode: 'insensitive' },
-          },
-          {
-            genres: {
-              some: {
-                genre: {
-                  name: { contains: searchQuery, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        ],
+        isVerified: true,
       },
       select: {
         id: true,
@@ -134,69 +153,26 @@ export const search = async (user: any, query: string) => {
           },
         },
       },
-      take: 15,
+      take: FETCH_LIMIT,
     }),
 
     // Album
     prisma.album.findMany({
       where: {
         isActive: true,
-        OR: [
-          { title: { contains: searchQuery, mode: 'insensitive' } },
-          {
-            artist: {
-              artistName: { contains: searchQuery, mode: 'insensitive' },
-            },
-          },
-          {
-            genres: {
-              some: {
-                genre: {
-                  name: { contains: searchQuery, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        ],
       },
       select: searchAlbumSelect,
-      take: 15,
+      take: FETCH_LIMIT,
     }),
 
     // Track
     prisma.track.findMany({
       where: {
         isActive: true,
-        OR: [
-          { title: { contains: searchQuery, mode: 'insensitive' } },
-          {
-            artist: {
-              artistName: { contains: searchQuery, mode: 'insensitive' },
-            },
-          },
-          {
-            featuredArtists: {
-              some: {
-                artistProfile: {
-                  artistName: { contains: searchQuery, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-          {
-            genres: {
-              some: {
-                genre: {
-                  name: { contains: searchQuery, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        ],
       },
       select: searchTrackSelect,
       orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-      take: 15,
+      take: FETCH_LIMIT,
     }),
 
     // User
@@ -205,17 +181,66 @@ export const search = async (user: any, query: string) => {
         id: { not: user.id }, // Không hiển thị chính mình
         role: 'USER', // Chỉ tìm USER, không tìm ADMIN
         isActive: true,
-        OR: [
-          { username: { contains: searchQuery, mode: 'insensitive' } },
-          { name: { contains: searchQuery, mode: 'insensitive' } },
-        ],
       },
       select: userSelect,
-      take: 15,
+      take: FETCH_LIMIT,
     }),
   ]);
 
-  const searchResult = { artists, albums, tracks, users };
+  // Filter artists
+  const filteredArtists = artists.filter(artist => {
+    const normalized = collectAndNormalizeFields([
+      artist.artistName,
+      ...(artist.genres ? artist.genres.map(g => g.genre.name) : [])
+    ]);
+    return (
+      queryTokens.every(token => normalized.includes(token)) ||
+      removeSpaces(normalized).includes(removeSpaces(normalizedQuery))
+    );
+  }).slice(0, RETURN_LIMIT);
+
+  // Filter albums
+  const filteredAlbums = albums.filter(album => {
+    const normalized = collectAndNormalizeFields([
+      album.title,
+      album.artist?.artistName,
+      ...(album.genres ? album.genres.map(g => g.genre.name) : [])
+    ]);
+    return (
+      queryTokens.every(token => normalized.includes(token)) ||
+      removeSpaces(normalized).includes(removeSpaces(normalizedQuery))
+    );
+  }).slice(0, RETURN_LIMIT);
+
+  // Filter tracks
+  const filteredTracks = tracks.filter(track => {
+    const featuredArtistNames = track.featuredArtists ? track.featuredArtists.map(fa => fa.artistProfile?.artistName).filter(Boolean) : [];
+    const genreNames = track.genres ? track.genres.map(g => g.genre.name) : [];
+    const normalized = collectAndNormalizeFields([
+      track.title,
+      track.artist?.artistName,
+      ...featuredArtistNames,
+      ...genreNames
+    ]);
+    return (
+      queryTokens.every(token => normalized.includes(token)) ||
+      removeSpaces(normalized).includes(removeSpaces(normalizedQuery))
+    );
+  }).slice(0, RETURN_LIMIT);
+
+  // Filter users
+  const filteredUsers = users.filter(u => {
+    const normalized = collectAndNormalizeFields([
+      u.username,
+      u.name
+    ]);
+    return (
+      queryTokens.every(token => normalized.includes(token)) ||
+      removeSpaces(normalized).includes(removeSpaces(normalizedQuery))
+    );
+  }).slice(0, RETURN_LIMIT);
+
+  const searchResult = { artists: filteredArtists, albums: filteredAlbums, tracks: filteredTracks, users: filteredUsers };
 
   // Cache kết quả
   if (useRedisCache) {
