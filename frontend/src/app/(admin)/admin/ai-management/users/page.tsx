@@ -39,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import GeneratePlaylistParamsModal from "@/components/admin/users/GeneratePlaylistParamsModal";
 
 interface SortConfig {
   key: keyof User | null;
@@ -75,6 +76,9 @@ export default function AiUserManagementPage() {
     direction: "desc",
   });
   const limit = 10;
+  const [isGenerateAllModalOpen, setIsGenerateAllModalOpen] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generateProgress, setGenerateProgress] = useState({ current: 0, total: 0 });
 
   const fetchUsers = useCallback(
     async (
@@ -360,6 +364,81 @@ export default function AiUserManagementPage() {
     );
   };
 
+  // Handler for Generate All User
+  const handleOpenGenerateAllModal = () => setIsGenerateAllModalOpen(true);
+  const handleCloseGenerateAllModal = () => setIsGenerateAllModalOpen(false);
+
+  // Helper: fetch all active users (no pagination)
+  const fetchAllActiveUsers = async (): Promise<User[]> => {
+    const token = localStorage.getItem("userToken");
+    if (!token) return [];
+    let allUsers: User[] = [];
+    let page = 1;
+    let totalPages = 1;
+    const limit = 100;
+    do {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+      params.append("status", "true");
+      const response = await api.admin.getAllUsers(token, page, limit, params.toString());
+      if (response && response.users) {
+        allUsers = allUsers.concat(response.users);
+        totalPages = response.pagination?.totalPages || 1;
+      } else {
+        break;
+      }
+      page++;
+    } while (page <= totalPages);
+    return allUsers;
+  };
+
+  const handleGenerateAllUsers = async (params: { customPromptKeywords: string; requestedTrackCount: number }) => {
+    setIsGeneratingAll(true);
+    setGenerateProgress({ current: 0, total: 0 });
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      toast.error("Authentication required.");
+      setIsGeneratingAll(false);
+      return;
+    }
+    let targetUsers: User[] = [];
+    if (selectedUserIds.size > 0) {
+      // Chỉ generate cho các user đã chọn và active
+      targetUsers = users.filter((u) => selectedUserIds.has(u.id) && u.isActive);
+    } else {
+      // Lấy toàn bộ user active trong hệ thống
+      targetUsers = await fetchAllActiveUsers();
+    }
+    if (targetUsers.length === 0) {
+      toast("No active users to generate playlists for.", { icon: "⚠️" });
+      setIsGeneratingAll(false);
+      setIsGenerateAllModalOpen(false);
+      return;
+    }
+    setGenerateProgress({ current: 0, total: targetUsers.length });
+    toast.loading(`Generating playlists for 0/${targetUsers.length} user(s)...`, { id: "generate-all" });
+    let successCount = 0;
+    let failCount = 0;
+    for (let i = 0; i < targetUsers.length; i++) {
+      try {
+        await api.admin.generateSystemPlaylist(targetUsers[i].id, params, token);
+        successCount++;
+      } catch (err) {
+        failCount++;
+      }
+      setGenerateProgress({ current: i + 1, total: targetUsers.length });
+      toast.loading(`Generating playlists for ${i + 1}/${targetUsers.length} user(s)...`, { id: "generate-all" });
+    }
+    toast.dismiss("generate-all");
+    if (successCount > 0) toast.success(`Generated playlists for ${successCount} user(s).`);
+    if (failCount > 0) toast.error(`Failed for ${failCount} user(s).`);
+    setIsGeneratingAll(false);
+    setIsGenerateAllModalOpen(false);
+    setGenerateProgress({ current: 0, total: 0 });
+    refreshTable();
+  };
+
   return (
     <div
       className={`container mx-auto px-4 py-8 ${
@@ -370,7 +449,34 @@ export default function AiUserManagementPage() {
         <h1 className="text-3xl font-bold flex items-center">
           <Bot className="mr-3 h-8 w-8 text-primary" /> AI Playlist Management
         </h1>
-        {/* Add any specific buttons for this page, e.g., "Create User with AI Playlist" if needed */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            className="h-9"
+            onClick={handleOpenGenerateAllModal}
+            disabled={loading || users.length === 0 || isGeneratingAll}
+          >
+            {selectedUserIds.size > 0
+              ? `Generate (${selectedUserIds.size}) User${selectedUserIds.size > 1 ? "s" : ""}`
+              : "Generate All User"}
+          </Button>
+          {selectedUserIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDeleteClick}
+              disabled={actionLoading === "bulk-delete"}
+            >
+              {actionLoading === "bulk-delete" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              {`Delete (${selectedUserIds.size}) Selected`}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -453,28 +559,6 @@ export default function AiUserManagementPage() {
           </div>
         </form>
       </div>
-
-      {/* Bulk Actions - kept for consistency, review if needed for AI context */}
-      {selectedUserIds.size > 0 && (
-        <div className="mb-4 flex items-center gap-2 p-3 bg-muted rounded-md border">
-          <p className="text-sm font-medium">
-            {selectedUserIds.size} user(s) selected.
-          </p>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleBulkDeleteClick}
-            disabled={actionLoading === "bulk-delete"}
-          >
-            {actionLoading === "bulk-delete" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="mr-2 h-4 w-4" />
-            )}
-            Delete Selected
-          </Button>
-        </div>
-      )}
 
       {/* Users Table */}
       <div className="overflow-x-auto rounded-xl border shadow-lg">
@@ -645,41 +729,6 @@ export default function AiUserManagementPage() {
                     >
                       <Bot className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                      title="Edit User"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction("edit", user);
-                      }}
-                    >
-                      {actionLoading === user.id &&
-                      editingUser?.id === user.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Edit className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      title="Delete User"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction("delete", user);
-                      }}
-                      disabled={actionLoading === user.id}
-                    >
-                      {actionLoading === user.id &&
-                      deletingUser?.id === user.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -761,6 +810,14 @@ export default function AiUserManagementPage() {
                   email: "",
                 }
           }
+        />
+      )}
+      {isGenerateAllModalOpen && (
+        <GeneratePlaylistParamsModal
+          isOpen={isGenerateAllModalOpen}
+          onClose={handleCloseGenerateAllModal}
+          onGenerate={handleGenerateAllUsers}
+          isLoading={isGeneratingAll}
         />
       )}
     </div>

@@ -21,6 +21,7 @@ import { PaginationControls } from "@/components/ui/PaginationControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlaylistPreviewModal } from "./PlaylistPreviewModal";
 import { DeletePlaylistModal } from "./DeletePlaylistModal";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Define the structure of the playlist data we expect from the API
 interface PlaylistWithPreview extends Omit<Playlist, "tracks"> {
@@ -82,6 +83,9 @@ export const UserSystemPlaylistsTab = ({
   const [isDeletePlaylistModalOpen, setIsDeletePlaylistModalOpen] =
     useState(false);
   const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const limit = 10; // Or fetch from config/props
 
@@ -311,6 +315,55 @@ export const UserSystemPlaylistsTab = ({
     // Consider using ArrowUp/ArrowDown for clearer indication
   };
 
+  // Checkbox handlers
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedPlaylistIds(new Set(playlists.map((p) => p.id)));
+    } else {
+      setSelectedPlaylistIds(new Set());
+    }
+  };
+  const handleSelectRow = (playlistId: string, checked: boolean | "indeterminate") => {
+    setSelectedPlaylistIds((prev) => {
+      const newSet = new Set(prev);
+      if (checked === true) {
+        newSet.add(playlistId);
+      } else {
+        newSet.delete(playlistId);
+      }
+      return newSet;
+    });
+  };
+
+  // Bulk delete handler
+  const handleBulkDeleteClick = () => {
+    if (selectedPlaylistIds.size === 0) {
+      toast("No playlists selected.", { icon: "⚠️" });
+      return;
+    }
+    setIsBulkDeleteModalOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    setIsBulkDeleting(true);
+    const ids = Array.from(selectedPlaylistIds);
+    const toastId = toast.loading(`Deleting ${ids.length} playlist(s)...`);
+    try {
+      const token = localStorage.getItem("userToken");
+      if (!token) throw new Error("No authentication token found");
+      await Promise.all(ids.map((id) => api.admin.deleteSystemPlaylist(id, token)));
+      toast.success(`Successfully deleted ${ids.length} playlist(s).`, { id: toastId });
+      setLocalRefreshTrigger((prev) => prev + 1);
+      setSelectedPlaylistIds(new Set());
+      setIsBulkDeleteModalOpen(false);
+    } catch (err: any) {
+      console.error("Error during bulk delete:", err);
+      toast.error(err.message || "Failed to delete selected playlists.", { id: toastId });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   if (loading && playlists.length === 0) {
     return (
       <div className="flex justify-center items-center h-40">
@@ -365,6 +418,22 @@ export const UserSystemPlaylistsTab = ({
               />
               Refresh
             </Button>
+            {selectedPlaylistIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDeleteClick}
+                disabled={isBulkDeleting}
+                className="h-9"
+              >
+                {isBulkDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -381,6 +450,17 @@ export const UserSystemPlaylistsTab = ({
           <Table className="w-full">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[50px] px-6 py-3 text-center">
+                  <Checkbox
+                    checked={selectedPlaylistIds.size === playlists.length && playlists.length > 0
+                      ? true
+                      : selectedPlaylistIds.size > 0
+                      ? "indeterminate"
+                      : false}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all playlists"
+                  />
+                </TableHead>
                 <TableHead className="w-[180px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Preview</TableHead>
                 <TableHead className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Name</TableHead>
                 <TableHead className="w-[100px] px-6 py-3 text-center text-xs font-bold uppercase tracking-wider">Tracks</TableHead>
@@ -397,7 +477,25 @@ export const UserSystemPlaylistsTab = ({
                 </TableRow>
               )}
               {playlists.map((playlist) => (
-                <TableRow key={playlist.id} className="hover:bg-muted/50 transition-colors">
+                <TableRow
+                  key={playlist.id}
+                  onClick={(e) => {
+                    // Prevent navigation if clicking on interactive elements
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button, input[type="checkbox"], a, [role="menuitem"]')) return;
+                    handleOpenPreviewModal(playlist);
+                  }}
+                  className="hover:bg-muted/50 cursor-pointer group rounded-lg transition-colors"
+                  aria-selected={selectedPlaylistIds.has(playlist.id)}
+                >
+                  <TableCell className="w-[50px] px-6 py-4 text-center">
+                    <Checkbox
+                      checked={selectedPlaylistIds.has(playlist.id)}
+                      onCheckedChange={(checked) => handleSelectRow(playlist.id, checked)}
+                      aria-labelledby={`playlist-name-${playlist.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </TableCell>
                   <TableCell className="px-6 py-4 text-center">
                     {playlist.tracks && playlist.tracks.length > 0 ? (
                       <div className="flex justify-center -space-x-2">
@@ -431,7 +529,7 @@ export const UserSystemPlaylistsTab = ({
                     )}
                   </TableCell>
                   <TableCell className="px-6 py-4">
-                    <div className="font-medium text-sm" title={playlist.name}>
+                    <div className="font-medium text-sm" title={playlist.name} id={`playlist-name-${playlist.id}`}>
                       {playlist.name}
                     </div>
                     {playlist.description && (
@@ -468,35 +566,12 @@ export const UserSystemPlaylistsTab = ({
                       <Switch
                         id={`visibility-switch-${playlist.id}`}
                         checked={playlist.privacy === "PUBLIC"}
-                        onCheckedChange={() =>
-                          handleVisibilityChange(playlist.id, playlist.privacy)
-                        }
+                        onCheckedChange={() => handleVisibilityChange(playlist.id, playlist.privacy)}
                         disabled={actionLoading === playlist.id}
-                        aria-label={
-                          playlist.privacy === "PUBLIC"
-                            ? "Unpublish Playlist"
-                            : "Publish Playlist"
-                        }
+                        aria-label={playlist.privacy === "PUBLIC" ? "Unpublish Playlist" : "Publish Playlist"}
                         className="h-5 w-10"
+                        onClick={(e) => e.stopPropagation()}
                       />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        title="Preview Playlist"
-                        onClick={() => handleOpenPreviewModal(playlist)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive-foreground hover:bg-destructive"
-                        title="Delete Playlist"
-                        onClick={() => handleOpenDeleteModal(playlist)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -532,6 +607,16 @@ export const UserSystemPlaylistsTab = ({
           onConfirm={handleDeletePlaylist}
           playlistName={deletingPlaylist.name}
           isDeleting={isDeletingPlaylist}
+          theme={theme}
+        />
+      )}
+      {isBulkDeleteModalOpen && (
+        <DeletePlaylistModal
+          isOpen={isBulkDeleteModalOpen}
+          onClose={() => setIsBulkDeleteModalOpen(false)}
+          onConfirm={handleBulkDeleteConfirm}
+          playlistName={`${selectedPlaylistIds.size} playlist(s)`}
+          isDeleting={isBulkDeleting}
           theme={theme}
         />
       )}
