@@ -309,12 +309,8 @@ const getUserSystemPlaylists = async (req) => {
                     track: {
                         include: {
                             artist: true,
-                            album: true,
-                            genres: {
-                                include: {
-                                    genre: true,
-                                },
-                            },
+                            album: { select: { title: true } },
+                            genres: { select: { genre: { select: { name: true } } } },
                         },
                     },
                 },

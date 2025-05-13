@@ -2221,7 +2221,7 @@ const generateAndAssignAiPlaylistToUser = async (adminExecutingId, targetUserId,
         requestedTrackCount: customParams?.requestedTrackCount || 20,
         type: client_1.PlaylistType.SYSTEM,
         customPromptKeywords: customParams?.customPromptKeywords,
-        requestedPrivacy: client_1.PlaylistPrivacy.PRIVATE,
+        requestedPrivacy: client_1.PlaylistPrivacy.PUBLIC,
     };
     console.log("[AdminService] Input for aiService.createAIGeneratedPlaylist:", JSON.stringify(aiPlaylistInput, null, 2));
     const newPlaylist = await aiService.createAIGeneratedPlaylist(aiPlaylistInput);
@@ -2330,7 +2330,10 @@ const getUserAiPlaylists = async (adminExecutingId, targetUserId, req) => {
                         id: true,
                         title: true,
                         coverUrl: true,
+                        duration: true,
                         artist: { select: { artistName: true } },
+                        album: { select: { title: true } },
+                        genres: { select: { genre: { select: { name: true } } } },
                     },
                 },
             },

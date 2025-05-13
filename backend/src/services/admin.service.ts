@@ -2998,7 +2998,7 @@ export const generateAndAssignAiPlaylistToUser = async (
     requestedTrackCount: customParams?.requestedTrackCount || 20,
     type: PlaylistType.SYSTEM, // Ensure correct type from DB schema
     customPromptKeywords: customParams?.customPromptKeywords,
-    requestedPrivacy: PlaylistPrivacy.PRIVATE, // Ensure new playlists default to PRIVATE
+    requestedPrivacy: PlaylistPrivacy.PUBLIC, 
   };
 
   // Log the input being sent to AI service
@@ -3161,7 +3161,6 @@ export const getUserAiPlaylists = async (
     userId: true,
     lastGeneratedAt: true,
     tracks: {
-      // take: 3, // REMOVED: Allow all tracks to be fetched
       orderBy: { trackOrder: "asc" as const },
       select: {
         track: {
@@ -3169,7 +3168,10 @@ export const getUserAiPlaylists = async (
             id: true,
             title: true,
             coverUrl: true,
+            duration: true,
             artist: { select: { artistName: true } },
+            album: { select: { title: true } },
+            genres: { select: { genre: { select: { name: true } } } },
           },
         },
       },

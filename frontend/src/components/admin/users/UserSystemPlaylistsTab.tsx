@@ -144,19 +144,21 @@ export const UserSystemPlaylistsTab: React.FC<UserSystemPlaylistsTabProps> = ({
               id: pt.track.id,
               title: pt.track.title,
               coverUrl: pt.track.coverUrl,
-              duration: pt.track.duration,
+              duration:
+                typeof pt.track.duration === "number"
+                  ? pt.track.duration
+                  : 0,
               artist: pt.track.artist,
-              album: pt.track.album,
+              album:
+                pt.track.album && pt.track.album.title
+                  ? { title: pt.track.album.title }
+                  : { title: "N/A" },
               genres:
-                (pt.track.genres
-                  ?.map((g_item) =>
-                    g_item && g_item.genre
-                      ? { genre: { name: g_item.genre.name } }
-                      : null
-                  )
-                  .filter((g_obj) => g_obj !== null) as {
-                  genre: { name: string };
-                }[]) || [],
+                Array.isArray(pt.track.genres) && pt.track.genres.length > 0
+                  ? pt.track.genres
+                      .filter((g) => g && g.genre && g.genre.name)
+                      .map((g) => ({ genre: { name: g.genre.name } }))
+                  : [],
             },
             addedAt: pt.addedAt,
           })),

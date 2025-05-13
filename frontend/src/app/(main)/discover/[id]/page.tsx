@@ -875,40 +875,99 @@ export default function DiscoveryGenrePage({
               {topAlbums.slice(0, 8).map((album) => (
                 <div
                   key={album.id}
-                  className="cursor-pointer flex-shrink-0 w-40 group"
+                  className="rounded-xl group cursor-pointer transition-all duration-300"
                   onClick={() => {
                     router.push(`/album/${album.id}`);
                   }}
                 >
-                  <div className="flex flex-col space-y-2">
-                    <div className="relative aspect-square overflow-hidden rounded-lg shadow-lg">
-                      <Image
-                        src={album.coverUrl || "/images/default-album.jpg"}
-                        alt={album.title}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                    </div>
-                    <h3
-                      className={`font-medium truncate ${
-                        isAlbumPlaying(album.id) && queueType === "album"
-                          ? "text-[#A57865]"
-                          : "text-white"
-                      }`}
-                    >
-                      {album.title}
-                    </h3>
-                    <p
-                      className="text-white/60 text-sm truncate hover:underline cursor-pointer"
+                  <div className="relative aspect-square rounded-md overflow-hidden mb-3">
+                    <Image
+                      src={album.coverUrl || "/images/default-album.jpg"}
+                      alt={album.title}
+                      fill
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors duration-300" />
+                    
+                    {/* Play/Pause Button */}
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/artist/profile/${album.artist.id}`);
+                        handleAlbumPlay(album);
                       }}
+                      className="absolute bottom-2 left-2 p-2 rounded-full bg-[#A57865] shadow-md 
+                               opacity-0 group-hover:opacity-100 transition-all duration-300 
+                               hover:bg-[#8D6553]"
+                      aria-label={isAlbumPlaying(album.id) ? "Pause" : "Play"}
                     >
-                      {album.artist.artistName}
-                    </p>
+                      {isAlbumPlaying(album.id) ? (
+                        <Pause className="w-4 h-4 text-white" />
+                      ) : (
+                        <Play className="w-4 h-4 text-white ml-0.5" />
+                      )}
+                    </button>
+
+                    {/* More Options Button */}
+                    <div
+                      className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="p-2 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 
+                                       opacity-0 group-hover:opacity-100 transition-all duration-200"
+                            aria-label="More options"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          className="w-56 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg"
+                        >
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              album.tracks && album.tracks.forEach(track => addToQueue(track));
+                            }}
+                          >
+                            <ListMusic className="w-4 h-4 mr-3 text-white/70" />
+                            Add All to Queue
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+
+                          <DropdownMenuItem 
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                          >
+                            <Share2 className="w-4 h-4 mr-3 text-white/70" />
+                            Share
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
+
+                  <h3
+                    className={`font-semibold text-sm truncate mb-1 transition-colors ${
+                      isAlbumPlaying(album.id) && queueType === "album"
+                        ? "text-[#A57865]"
+                        : "text-white"
+                    }`}
+                  >
+                    {album.title}
+                  </h3>
+                  <p
+                    className="text-white/60 text-xs truncate hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/artist/profile/${album.artist.id}`);
+                    }}
+                  >
+                    {album.artist.artistName}
+                  </p>
                 </div>
               ))}
             </div>
