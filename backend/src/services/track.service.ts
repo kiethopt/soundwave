@@ -1387,30 +1387,36 @@ export const updateTrack = async (req: Request, id: string) => {
     }
 
     // --- Update Featured Artists ---
-    const featuredArtistIdsFromBody = req.body.featuredArtistIds as
-      | string[]
-      | undefined;
-    const featuredArtistNamesFromBody = req.body.featuredArtistNames as
-      | string[]
-      | undefined;
+    const rawFeaturedArtistIds = req.body.featuredArtistIds as string | undefined;
+    const rawFeaturedArtistNames = req.body.featuredArtistNames as string | undefined;
 
-    // Only update featured artists if at least one of the relevant fields is present in the request body.
-    // Sending empty arrays for both means "remove all featured artists".
-    // If neither key is present, featured artists are not modified.
-    if (
-      featuredArtistIdsFromBody !== undefined ||
-      featuredArtistNamesFromBody !== undefined
-    ) {
+    // Helper to parse JSON array string
+    const parseJsonStringArray = (jsonString: string | undefined): string[] => {
+      if (!jsonString) return [];
+      try {
+        const parsed = JSON.parse(jsonString);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((item): item is string => typeof item === 'string');
+        }
+        return [];
+      } catch (e) {
+        console.warn(`[updateTrack] Failed to parse JSON string for featured artists: ${jsonString}`, e);
+        return [];
+      }
+    };
+    
+    const intentToUpdateFeaturedArtists = rawFeaturedArtistIds !== undefined || rawFeaturedArtistNames !== undefined;
+
+    if (intentToUpdateFeaturedArtists) {
       await tx.trackArtist.deleteMany({ where: { trackId: id } });
+
+      const featuredArtistIdsFromBody = parseJsonStringArray(rawFeaturedArtistIds);
+      const featuredArtistNamesFromBody = parseJsonStringArray(rawFeaturedArtistNames);
 
       const resolvedFeaturedArtistIds = new Set<string>();
 
-      // Process IDs from featuredArtistIds[]
-      if (
-        featuredArtistIdsFromBody &&
-        Array.isArray(featuredArtistIdsFromBody) &&
-        featuredArtistIdsFromBody.length > 0
-      ) {
+      // Process IDs from featuredArtistIdsFromBody
+      if (featuredArtistIdsFromBody.length > 0) {
         const existingArtists = await tx.artistProfile.findMany({
           where: { id: { in: featuredArtistIdsFromBody } },
           select: { id: true },
@@ -1435,12 +1441,8 @@ export const updateTrack = async (req: Request, id: string) => {
         });
       }
 
-      // Process names from featuredArtistNames[]
-      if (
-        featuredArtistNamesFromBody &&
-        Array.isArray(featuredArtistNamesFromBody) &&
-        featuredArtistNamesFromBody.length > 0
-      ) {
+      // Process names from featuredArtistNamesFromBody
+      if (featuredArtistNamesFromBody.length > 0) {
         for (const name of featuredArtistNamesFromBody) {
           if (typeof name === "string" && name.trim() !== "") {
             try {

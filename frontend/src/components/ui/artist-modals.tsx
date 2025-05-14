@@ -529,15 +529,13 @@ export function EditTrackModal({
     }
 
     // Featured Artists
-    if (selectedFeaturedArtists.length > 0) {
-      selectedFeaturedArtists.forEach(artist => {
-        if (artist.id) {
-          form.append('featuredArtistIds[]', artist.id);
-        } else {
-          form.append('featuredArtistNames[]', artist.name);
-        }
-      });
-    }
+    const featArtistIds = selectedFeaturedArtists.filter(a => a.id).map(a => a.id!);
+    const featArtistNames = selectedFeaturedArtists.filter(a => !a.id).map(a => a.name);
+
+    // Always append, even if arrays are empty (will send "[]")
+    // This signals to the backend that the featured artists field was part of the submission.
+    form.append('featuredArtistIds', JSON.stringify(featArtistIds));
+    form.append('featuredArtistNames', JSON.stringify(featArtistNames));
 
     // Active status
     form.append('isActive', String(isActive));
