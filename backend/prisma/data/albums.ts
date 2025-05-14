@@ -15,7 +15,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813665/covers/pcqwiqptybyfoxynansa.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "V-Pop",
+      "Pop",
+      "Ballad"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -44,7 +48,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813337/covers/pfcuxakvzjn8kltho5be.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -175,7 +182,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813304/covers/qytgxefuj3bqonnzjiun.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "V-Pop",
+      "Hip-Hop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -303,7 +313,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811131/covers/ojfp9dkuu0cy9anfoqhg.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "V-Pop",
+      "Ballad",
+      "R&B"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -440,7 +454,12 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813274/covers/de0ske7ahum6roh75ev7.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Rap",
+      "Hip-Hop",
+      "Dance",
+      "New Wave"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -535,7 +554,9 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746807833/covers/xhhmeqxvetqdggnvtbkn.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Experimental"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -563,7 +584,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746807763/covers/ejhqrvbtjmkhkaoyqhcn.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ambient",
+      "Instrumental",
+      "Jazz"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -624,7 +649,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746796415/covers/iu45h6fyjcfry67s2mfh.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Pop",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -721,7 +749,9 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746852277/covers/q1myzmpmeuumvihimph2.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Jazz"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -907,7 +937,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811897/covers/hr1hg3c5bahfejp4yps8.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Pop",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -953,7 +986,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811137/covers/npqnr7vafkfgrnvx90lj.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1083,7 +1119,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811109/covers/eic6rxppgypp0nc5kclq.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1145,7 +1184,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811087/covers/obau2kuhdmow7x3qvoko.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1207,7 +1249,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811979/covers/qfhcd5kbizpsek8xbpca.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1253,7 +1298,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746802501/covers/xtd68efgf8qvfuvbjcar.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop",
+      "Bolero"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1299,7 +1348,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746802404/covers/eoczjm7th0wzkhqgpufh.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop",
+      "Bolero"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1458,7 +1511,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746810622/covers/s77qttpmnoih3kjp741a.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop",
+      "Indie"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1746,7 +1803,9 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746852133/covers/s0phbb7vtm0860z1u5as.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Country"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -1773,7 +1832,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746802310/covers/dhhxgaigky1u2qwrjx31.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "V-Pop",
+      "Bolero"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -1836,7 +1898,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746852413/covers/qvx4v20pptaigyilbqrn.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Dance",
+      "Disco"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -2914,7 +2979,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811176/covers/cjdusyjsvdpg8zp5i107.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3011,7 +3079,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813051/covers/owlgoyouvgtptc607tiq.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3092,7 +3163,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813036/covers/eycjky7bntja31jvcuyo.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3138,7 +3212,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746813012/covers/ynu8ljsxqdtyouwity2k.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3167,7 +3244,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746812985/covers/ufzvvsarepytnu59nhpe.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3213,7 +3293,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746812770/covers/yhnkauht1ogr5mec1n1p.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop",
+      "Indie"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3344,7 +3428,9 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746812762/covers/ydw1af40by6rpcvhwphq.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Jazz"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3372,7 +3458,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://api.dicebear.com/8.x/shapes/svg?seed=The%20Chainsmokers-No%20Hard%20Feelings&radius=0&backgroundType=gradientLinear&backgroundRotation=0,360",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Country",
+      "R&B",
+      "Soul"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -3483,7 +3573,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746800967/covers/kckbq8hr0rlmigaqvmgr.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Lo-fi",
+      "Classical"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3648,7 +3741,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746796505/covers/edfyo9kekhmypadfofii.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Lo-fi",
+      "Classical"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -3728,7 +3824,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746794848/covers/vog66fdpsbuyaspk47kf.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Classical",
+      "Lo-fi"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -4298,7 +4397,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746852058/covers/iwj6eoei4jzqxxjqm6pu.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Rap",
+      "Hip-Hop"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -4362,7 +4464,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746852015/covers/mfdtxdnixuu69lfltalq.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "R&B",
+      "Soul"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -4423,7 +4528,11 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dbwhalglx/image/upload/v1746851991/covers/sbaziu91dzd1ryyjlrrl.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Jazz",
+      "R&B",
+      "Soul"
+    ],
     "releaseDate": new Date('2025-05-10'),
     "tracks": [
       {
@@ -4484,7 +4593,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746808648/covers/gzmlvubxay6z3ioracmp.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Dance",
+      "Disco"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -4530,7 +4642,12 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746808543/covers/bvqe283cvfd7e1c9ymm6.jpg",
     "type": AlbumType.ALBUM,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Country",
+      "Dance",
+      "Disco",
+      "New Wave"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
@@ -4641,7 +4758,10 @@ export const albums: AlbumData[] = [
     "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746811834/covers/ininrlzqpbstwx0cjmrx.jpg",
     "type": AlbumType.EP,
     "labelName": null,
-    "genreNames": [],
+    "genreNames": [
+      "Ballad",
+      "V-Pop"
+    ],
     "releaseDate": new Date('2025-05-09'),
     "tracks": [
       {
