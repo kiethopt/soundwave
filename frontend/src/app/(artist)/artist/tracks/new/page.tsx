@@ -281,7 +281,7 @@ export default function NewTrack() {
       if (result.copyrightDetails) {
           const details = result.copyrightDetails;
           console.log('[Frontend CheckCopyright] Received copyrightDetails from backend:', JSON.stringify(details, null, 2));
-          console.log('[Frontend CheckCopyright] External Metadata:', JSON.stringify(details.external_metadata, null, 2));
+          // console.log('[Frontend CheckCopyright] External Metadata:', JSON.stringify(details.external_metadata, null, 2));
 
           // Extract artist name(s) correctly
           let artistString = 'Unknown Artist';
@@ -295,25 +295,33 @@ export default function NewTrack() {
             album: details.album?.name,
             releaseDate: details.release_date,
             label: details.label,
-            // songLink: details.song_link, // Commented out as specific links are preferred
-            isBlocking: false, // Non-blocking scenario
-            // NEW: Extract Spotify and YouTube links for CopyrightInfo
-            // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
+            isBlocking: false,
             spotifyLink: details.external_metadata?.spotify?.track?.href,
             youtubeLink: details.external_metadata?.youtube?.vid
                            ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
                            : undefined,
+            localFingerprint: details.localFingerprint,
+            isLocalFingerprintConflict: details.isLocalFingerprintConflict,
+            conflictingTrackTitle: details.conflictingTrackTitle,
+            conflictingArtistName: details.conflictingArtistName,
           };
           setCopyrightInfo(newCopyrightInfo);
           toast.success(result.message || 'Potential match found (non-blocking)');
 
       } else {
+          setCopyrightInfo({
+            title: 'No Match Found',
+            artist: 'N/A',
+            isBlocking: false,
+            localFingerprint: result.copyrightDetails?.localFingerprint,
+          });
           toast.success(result.message || 'No copyright issues detected.');
       }
 
     } catch (error: any) {
       setIsLoading(false);
       const backendError = error.responseBody;
+      let displayToastMessage = 'Error checking copyright. Please try again.';
 
       if (error.message && (
         error.message.includes('ECONNRESET') || 
@@ -326,41 +334,51 @@ export default function NewTrack() {
       }
 
       if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
-          // Blocking copyright conflict
           const details = backendError.copyrightDetails;
-          console.log('[Frontend CheckCopyright] Received blocking copyrightDetails from backend (error path):', JSON.stringify(details, null, 2));
-          console.log('[Frontend CheckCopyright] External Metadata (error path):', JSON.stringify(details.external_metadata, null, 2));
+          console.log('[Frontend CheckCopyright] Received BLOCKING copyrightDetails from backend (error path): enhancers', JSON.stringify(details, null, 2));
 
-          // Extract artist name(s) correctly
-          let artistString = 'Unknown Artist';
+          let titleToShow = details.title || 'Unknown Title';
+          let artistToShow = 'Unknown Artist';
           if (details.artists && details.artists.length > 0) {
-            artistString = details.artists.map((a: { name: string }) => a.name).join(', ');
+            artistToShow = details.artists.map((a: { name: string }) => a.name).join(', ');
+          }
+
+          // Override with local conflict details if present
+          if (backendError.isLocalFingerprintConflict || details.isLocalFingerprintConflict || backendError.isLocalAcridConflict || details.isLocalAcridConflict) {
+            titleToShow = details.conflictingTrackTitle || titleToShow;
+            artistToShow = details.conflictingArtistName || artistToShow;
+            displayToastMessage = backendError.message || 'A local content conflict was detected.';
+          } else {
+            displayToastMessage = backendError.message || 'Copyright match detected. See details.';
+            if (backendError.message && backendError.message.includes('similarity score')) {
+                displayToastMessage = 'Copyright Match: Artist name similarity too low.';
+            }
           }
 
           const newCopyrightInfo: CopyrightInfo = {
-            title: details.title || 'Unknown Title',
-            artist: artistString,
-            album: details.album?.name,
-            releaseDate: details.release_date,
-            label: details.label,
-            // songLink: details.song_link, // Commented out as specific links are preferred
-            isBlocking: true,
-            // NEW: Extract Spotify and YouTube links for CopyrightInfo
-            // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
+            title: titleToShow,
+            artist: artistToShow,
+            album: details.album?.name, // This might be null for local conflicts
+            releaseDate: details.release_date, // This might be null for local conflicts
+            label: details.label, // This might be null for local conflicts
+            isBlocking: true, // Always blocking if isCopyrightConflict is true from backend
             spotifyLink: details.external_metadata?.spotify?.track?.href,
             youtubeLink: details.external_metadata?.youtube?.vid
                            ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
                            : undefined,
+            localFingerprint: details.localFingerprint, // Pass localFingerprint if available
+            isLocalFingerprintConflict: backendError.isLocalFingerprintConflict || details.isLocalFingerprintConflict,
+            conflictingTrackTitle: details.conflictingTrackTitle,
+            conflictingArtistName: details.conflictingArtistName,
           };
           setCopyrightInfo(newCopyrightInfo);
-          if (backendError.message && backendError.message.includes('similarity score')) {
-            toast.error('Copyright Match: Artist name similarity too low. See details below.');
-          } else {
-            toast.error('Copyright Match: Track matches existing content. See details below.');
-          }
+          toast.error(displayToastMessage);
+
+      } else if (backendError && backendError.message) {
+          toast.error(backendError.message);
       } else {
           console.error('Full error checking copyright:', error);
-          toast.error('Error checking copyright. Please try again.');
+          toast.error(displayToastMessage);
       }
     }
   };
@@ -381,14 +399,15 @@ export default function NewTrack() {
       return;
     }
 
+    // Check copyrightInfo status from checkCopyright step
     if (!copyrightInfo) {
       toast.error('Please perform the copyright check before submitting.');
       console.log('[Frontend handleSubmit] Aborted: Copyright check not performed (copyrightInfo is null).');
       return;
     }
     if (copyrightInfo.isBlocking) {
-        toast.error('Cannot submit due to a blocking copyright conflict. Please use a different audio file.');
-        console.log('[Frontend handleSubmit] Aborted: Copyright conflict is blocking.');
+        toast.error('Cannot submit due to a blocking conflict (copyright or local content). Please resolve the issue shown above.');
+        console.log('[Frontend handleSubmit] Aborted: Conflict is blocking (isBlocking: true).');
         return;
     }
 
@@ -399,7 +418,6 @@ export default function NewTrack() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      // Create FormData for the actual submission
       const formData = new FormData();
       formData.append('title', trackData.title);
       formData.append('type', 'SINGLE');
@@ -415,6 +433,12 @@ export default function NewTrack() {
         formData.append('labelId', selectedLabel);
       }
 
+      // Pass localFingerprint if available from copyrightInfo (set by checkCopyright)
+      if (copyrightInfo?.localFingerprint) {
+        formData.append('localFingerprint', copyrightInfo.localFingerprint);
+        console.log('[Frontend handleSubmit] Appended localFingerprint to FormData:', copyrightInfo.localFingerprint);
+      }
+
       await api.tracks.create(formData, token);
       toast.success('Track created successfully');
       router.push('/artist/tracks');
@@ -424,29 +448,24 @@ export default function NewTrack() {
       const backendError = error.responseBody;
       let displayMessage = error.message || 'Failed to create track';
 
-      if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
-        const details = backendError.copyrightDetails;
-        const newCopyrightInfo: CopyrightInfo = {
-          title: details.title || 'Unknown Title',
-          artist: details.artist || 'Unknown Artist',
-          album: details.album,
-          releaseDate: details.release_date,
-          label: details.label,
-          // songLink: details.song_link, // Commented out as specific links are preferred
-          isBlocking: true,
-          // NEW: Extract Spotify and YouTube links for CopyrightInfo
-          // Ensure your CopyrightInfo type in CopyrightAlert.tsx supports these fields.
-          spotifyLink: details.external_metadata?.spotify?.track?.href,
-          youtubeLink: details.external_metadata?.youtube?.vid
-                         ? `https://www.youtube.com/watch?v=${details.external_metadata.youtube.vid}`
-                         : undefined,
-        };
-        setCopyrightInfo(newCopyrightInfo);
-        displayMessage = backendError.message || 'Copyright match detected, upload failed.';
-      } else if (error.statusCode === 409 && error.message?.includes('already exists')) {
-         displayMessage = 'A track with this title already exists for you.';
+      // Simplified error handling since checkCopyright should catch most blocking issues.
+      // Focus on P2002 (unique constraint) and general errors.
+      if (backendError) {
+        if (backendError.code === 'P2002' || (error.statusCode === 409 && error.message?.includes('P2002'))) {
+          // More specific P2002 handling can be done in the controller, 
+          // but frontend can show a generic duplicate message or rely on backend message.
+          displayMessage = backendError.message || 'This track (or its fingerprint) conflicts with an existing entry.';
+        } else if (backendError.message) {
+          displayMessage = backendError.message; 
+        }
+        // Removed specific checks for isFingerprintConflict and isDuplicateFingerprintBySameArtist
+        // as they are handled by checkCopyright or result in P2002 from DB.
       }
+      // The old handling for isCopyrightConflict in handleSubmit might be redundant 
+      // if checkCopyright correctly sets isBlocking.
+      // else if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) { ... }
       
+      console.error('[Frontend handleSubmit] Error creating track:', error);
       toast.error(displayMessage);
     }
   };

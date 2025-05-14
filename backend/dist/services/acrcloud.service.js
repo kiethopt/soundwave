@@ -45,7 +45,6 @@ const recognizeAudioWithACRCloud = async (audioBuffer, originalFileName, trackTi
                     score: sdkMatch.score,
                     play_offset_ms: sdkMatch.play_offset_ms,
                     external_ids: sdkMatch.external_ids,
-                    acrid: sdkMatch.acrid,
                     external_metadata: undefined,
                 };
                 if (rawExternalMetadata) {

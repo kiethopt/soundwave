@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getDiscoverGenres = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.removeVietnameseTones = removeVietnameseTones;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -80,11 +81,33 @@ const validateArtistData = (data) => {
     return null;
 };
 exports.validateArtistData = validateArtistData;
+function removeVietnameseTones(str) {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+}
+function normalizeStringForSearch(str) {
+    return removeVietnameseTones(str)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+function collectAndNormalizeFields(fields) {
+    return normalizeStringForSearch(fields.filter(Boolean).join(' '));
+}
+function removeSpaces(str) {
+    return str.replace(/\s+/g, '');
+}
 const search = async (user, query) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const searchQuery = query.trim();
+    const normalizedQuery = normalizeStringForSearch(searchQuery);
+    const queryTokens = normalizedQuery.split(' ').filter(Boolean);
     const cacheKey = `/search-all?q=${searchQuery}`;
     const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
     if (useRedisCache) {
@@ -95,25 +118,12 @@ const search = async (user, query) => {
         }
     }
     await saveSearchHistory(user.id, searchQuery);
+    const RETURN_LIMIT = 15;
     const [artists, albums, tracks, users] = await Promise.all([
         db_1.default.artistProfile.findMany({
             where: {
                 isActive: true,
                 isVerified: true,
-                OR: [
-                    {
-                        artistName: { contains: searchQuery, mode: 'insensitive' },
-                    },
-                    {
-                        genres: {
-                            some: {
-                                genre: {
-                                    name: { contains: searchQuery, mode: 'insensitive' },
-                                },
-                            },
-                        },
-                    },
-                ],
             },
             select: {
                 id: true,
@@ -145,81 +155,67 @@ const search = async (user, query) => {
                     },
                 },
             },
-            take: 15,
         }),
         db_1.default.album.findMany({
             where: {
                 isActive: true,
-                OR: [
-                    { title: { contains: searchQuery, mode: 'insensitive' } },
-                    {
-                        artist: {
-                            artistName: { contains: searchQuery, mode: 'insensitive' },
-                        },
-                    },
-                    {
-                        genres: {
-                            some: {
-                                genre: {
-                                    name: { contains: searchQuery, mode: 'insensitive' },
-                                },
-                            },
-                        },
-                    },
-                ],
             },
             select: prisma_selects_1.searchAlbumSelect,
-            take: 15,
         }),
         db_1.default.track.findMany({
             where: {
                 isActive: true,
-                OR: [
-                    { title: { contains: searchQuery, mode: 'insensitive' } },
-                    {
-                        artist: {
-                            artistName: { contains: searchQuery, mode: 'insensitive' },
-                        },
-                    },
-                    {
-                        featuredArtists: {
-                            some: {
-                                artistProfile: {
-                                    artistName: { contains: searchQuery, mode: 'insensitive' },
-                                },
-                            },
-                        },
-                    },
-                    {
-                        genres: {
-                            some: {
-                                genre: {
-                                    name: { contains: searchQuery, mode: 'insensitive' },
-                                },
-                            },
-                        },
-                    },
-                ],
             },
             select: prisma_selects_1.searchTrackSelect,
             orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-            take: 15,
         }),
         db_1.default.user.findMany({
             where: {
                 id: { not: user.id },
                 role: 'USER',
                 isActive: true,
-                OR: [
-                    { username: { contains: searchQuery, mode: 'insensitive' } },
-                    { name: { contains: searchQuery, mode: 'insensitive' } },
-                ],
             },
             select: prisma_selects_1.userSelect,
-            take: 15,
         }),
     ]);
-    const searchResult = { artists, albums, tracks, users };
+    const filteredArtists = artists.filter(artist => {
+        const normalized = collectAndNormalizeFields([
+            artist.artistName,
+            ...(artist.genres ? artist.genres.map(g => g.genre.name) : [])
+        ]);
+        return (queryTokens.every(token => normalized.includes(token)) ||
+            removeSpaces(normalized).includes(removeSpaces(normalizedQuery)));
+    }).slice(0, RETURN_LIMIT);
+    const filteredAlbums = albums.filter(album => {
+        const normalized = collectAndNormalizeFields([
+            album.title,
+            album.artist?.artistName,
+            ...(album.genres ? album.genres.map(g => g.genre.name) : [])
+        ]);
+        return (queryTokens.every(token => normalized.includes(token)) ||
+            removeSpaces(normalized).includes(removeSpaces(normalizedQuery)));
+    }).slice(0, RETURN_LIMIT);
+    const filteredTracks = tracks.filter(track => {
+        const featuredArtistNames = track.featuredArtists ? track.featuredArtists.map(fa => fa.artistProfile?.artistName).filter(Boolean) : [];
+        const genreNames = track.genres ? track.genres.map(g => g.genre.name) : [];
+        const normalized = collectAndNormalizeFields([
+            track.title,
+            track.artist?.artistName,
+            ...featuredArtistNames,
+            ...genreNames
+        ]);
+        return (queryTokens.every(token => normalized.includes(token)) ||
+            removeSpaces(normalized).includes(removeSpaces(normalizedQuery)));
+    }).slice(0, RETURN_LIMIT);
+    const filteredUsers = users.filter(u => {
+        const normalized = collectAndNormalizeFields([
+            u.username,
+            u.name
+        ]);
+        return (queryTokens.every(token => normalized.includes(token)) ||
+            removeSpaces(normalized).includes(removeSpaces(normalizedQuery)));
+    }).slice(0, RETURN_LIMIT);
+    const searchResult = { artists: filteredArtists, albums: filteredAlbums, tracks: filteredTracks, users: filteredUsers };
     if (useRedisCache) {
         await (0, cache_middleware_1.setCache)(cacheKey, searchResult, 600);
     }

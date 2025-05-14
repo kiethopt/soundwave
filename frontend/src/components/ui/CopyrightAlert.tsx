@@ -10,11 +10,15 @@ export interface CopyrightInfo {
   album?: string;
   releaseDate?: string;
   label?: string;
-  similarity?: number; // Optional: if you want to show similarity score
-  songLink?: string; // This can be a generic link or fallback
-  spotifyLink?: string; // Specific link for Spotify
-  youtubeLink?: string; // Specific link for YouTube
+  similarity?: number;
+  songLink?: string;
+  spotifyLink?: string; 
+  youtubeLink?: string; 
   isBlocking: boolean;
+  localFingerprint?: string;
+  isLocalFingerprintConflict?: boolean;
+  conflictingTrackTitle?: string;
+  conflictingArtistName?: string;
 }
 
 // Component to display copyright information
@@ -71,6 +75,23 @@ export const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo,
     }
   }
 
+  const isLocalConflict = copyright.isLocalFingerprintConflict === true;
+
+  let mainTitle = copyright.isBlocking ? 'Copyright Match Detected' : 'Potential Match Information';
+  let mainMessage = copyright.isBlocking
+    ? 'The uploaded audio appears to match an existing copyrighted track.'
+    : 'The uploaded audio matches the following track. Please review carefully before proceeding.';
+
+  if (isLocalConflict) {
+    mainTitle = 'Local Content Conflict Detected';
+    mainMessage = 'The uploaded audio content matches a track already on our platform.';
+  }
+
+  const displayTitle = isLocalConflict ? (copyright.conflictingTrackTitle || 'N/A') : copyright.title;
+  const displayArtist = isLocalConflict ? (copyright.conflictingArtistName || 'N/A') : copyright.artist;
+  // Album and other details might not be relevant for local conflict, or could be from `copyright.conflicting...` if available
+  const displayAlbum = isLocalConflict ? undefined : copyright.album;
+
   return (
     <div 
       className={cn(
@@ -87,12 +108,9 @@ export const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo,
           )}
         </div>
         <div>
-          <h3 className="text-sm font-medium">{copyright.isBlocking ? 'Copyright Match Detected' : 'Potential Match Information'}</h3>
+          <h3 className="text-sm font-medium">{mainTitle}</h3>
           <p className="text-xs mt-1 opacity-80">
-            {copyright.isBlocking
-              ? 'The uploaded audio appears to match an existing copyrighted track.'
-              : 'The uploaded audio matches the following track. Please review carefully before proceeding.' // Modified for generic use
-            }
+            {mainMessage}
           </p>
         </div>
       </div>
@@ -109,83 +127,86 @@ export const CopyrightAlert = ({ copyright, theme }: { copyright: CopyrightInfo,
         </div>
         
         <div className="flex-1">
-          <h4 className="font-medium">{copyright.title}</h4>
+          <h4 className="font-medium">{displayTitle}</h4>
           <p className={cn("text-sm", theme === 'light' ? 'text-gray-600' : 'text-gray-400')}>
-            by <span className="font-medium">{copyright.artist}</span>
-            {copyright.album && <> &middot; {copyright.album}</>}
+            by <span className="font-medium">{displayArtist}</span>
+            {displayAlbum && <> &middot; {displayAlbum}</>}
           </p>
           
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
-            {copyright.releaseDate && (
-              <div className="flex items-center gap-1">
-                <Info className="h-3.5 w-3.5" />
-                <span>Released: {copyright.releaseDate}</span>
-              </div>
-            )}
-            {copyright.label && (
-              <div className="flex items-center gap-1">
-                <Info className="h-3.5 w-3.5" />
-                <span>Label: {copyright.label}</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Link Section */}
-          <div className="mt-3 flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-2">
-            {copyright.songLink && !copyright.spotifyLink && !copyright.youtubeLink && ( // Fallback if specific links aren't available
-              <a
-                href={copyright.songLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
-                  linkStyles[alertType][theme]
+          {/* Conditionally render releaseDate and label if not a local conflict, or if they are part of local conflict details */}
+          {!isLocalConflict && (
+            <>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
+                {copyright.releaseDate && (
+                  <div className="flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" />
+                    <span>Released: {copyright.releaseDate}</span>
+                  </div>
                 )}
-              >
-                View Source <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-            {copyright.spotifyLink && (
-              <a
-                href={copyright.spotifyLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
-                  // Consider specific styling for Spotify if desired, e.g., green-ish
-                  linkStyles[alertType][theme], // Using general link style for now
-                  theme === 'light' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-green-800/30 text-green-300 hover:bg-green-800/50'
+                {copyright.label && (
+                  <div className="flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" />
+                    <span>Label: {copyright.label}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Link Section - Only show if not a local conflict, or if links are relevant */}
+              <div className="mt-3 flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-2">
+                {copyright.songLink && !copyright.spotifyLink && !copyright.youtubeLink && ( // Fallback if specific links aren't available
+                  <a
+                    href={copyright.songLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                      linkStyles[alertType][theme]
+                    )}
+                  >
+                    View Source <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+                {copyright.spotifyLink && (
+                  <a
+                    href={copyright.spotifyLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                      linkStyles[alertType][theme], 
+                      theme === 'light' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-green-800/30 text-green-300 hover:bg-green-800/50'
 
+                    )}
+                  >
+                    Check on Spotify <ExternalLink className="h-3 w-3" />
+                  </a>
                 )}
-              >
-                {/* Optional: Spotify Icon */}
-                Check on Spotify <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-            {copyright.youtubeLink && (
-              <a
-                href={copyright.youtubeLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
-                  // Consider specific styling for YouTube if desired, e.g., red-ish
-                  linkStyles[alertType][theme], // Using general link style for now
-                  theme === 'light' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-red-800/30 text-red-300 hover:bg-red-800/50'
+                {copyright.youtubeLink && (
+                  <a
+                    href={copyright.youtubeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 transition-colors",
+                      linkStyles[alertType][theme], 
+                      theme === 'light' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-red-800/30 text-red-300 hover:bg-red-800/50'
+                    )}
+                  >
+                    Check on YouTube <ExternalLink className="h-3 w-3" />
+                  </a>
                 )}
-              >
-                {/* Optional: YouTube Icon */}
-                Check on YouTube <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
       
       <div className={cn("text-xs px-1", messageStyles[alertType][theme])}>
-        {copyright.isBlocking
-          ? 'To upload this track, you generally need permission to use this content. If this is your content and it was blocked in error, ensure your artist name matches or contact support for verification.'
-          : 'If this is not your content, or if you do not have the rights to use it, please do not proceed with the upload.'
+        {isLocalConflict 
+          ? `This audio content is identical to "${copyright.conflictingTrackTitle || 'an existing track'}" by ${copyright.conflictingArtistName || 'another artist'} already on our platform. You cannot upload duplicate content that belongs to another artist.`
+          : copyright.isBlocking
+            ? 'To upload this track, you generally need permission to use this content. If this is your content and it was blocked in error, ensure your artist name matches or contact support for verification.'
+            : 'If this is not your content, or if you do not have the rights to use it, please do not proceed with the upload.'
         }
       </div>
     </div>

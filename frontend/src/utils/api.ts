@@ -1254,16 +1254,14 @@ export const api = {
     },
 
     checkCopyright: async (formData: FormData, token: string) => {
-      // This function specifically calls the new check-copyright endpoint
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/tracks/check-copyright`,
           {
             method: "POST",
-            body: formData, // Should contain audioFile, title, releaseDate
+            body: formData,
             headers: {
               Authorization: `Bearer ${token}`,
-              // Content-Type is handled automatically for FormData
             },
           }
         );
@@ -1271,7 +1269,6 @@ export const api = {
         const responseBody = await response.json();
 
         if (!response.ok) {
-          // Throw error with response body for detailed handling
           const error: any = new Error(
             responseBody.message || `HTTP error! status: ${response.status}`
           );
@@ -1280,20 +1277,18 @@ export const api = {
           throw error;
         }
 
-        // On success, return the response which includes { isSafeToUpload, message, copyrightDetails? }
         return responseBody;
       } catch (error) {
         console.error("Error checking track copyright:", error);
-        throw error; // Re-throw to be handled by the caller
+        throw error; 
       }
     },
 
     create: async (formData: FormData, token: string) => {
-      // This calls the original /api/tracks POST endpoint for actual creation
       try {
         const response = await fetch(`${API_BASE_URL}/api/tracks`, {
           method: "POST",
-          body: formData, // Contains all track details + files
+          body: formData,
           headers: {
             Authorization: `Bearer ${token}`,
           },

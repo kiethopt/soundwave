@@ -80,7 +80,6 @@ export interface ACRCloudMusicEntry { // Keeping our existing interface for cons
     youtube?: { vid: string };
     deezer?: any;
   };
-  acrid?: string;
 }
 
 // buildSignature is no longer needed as SDK handles it.
@@ -118,7 +117,6 @@ export const recognizeAudioWithACRCloud = async (
           score: sdkMatch.score,
           play_offset_ms: sdkMatch.play_offset_ms,
           external_ids: sdkMatch.external_ids,
-          acrid: sdkMatch.acrid,
           external_metadata: undefined, // Initialize
         };
 
