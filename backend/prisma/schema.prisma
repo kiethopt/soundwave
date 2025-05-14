@@ -142,37 +142,38 @@ model Album {
 }
 
 model Track {
-  id              String          @id @default(cuid())
-  title           String
-  duration        Int             @default(0)
-  releaseDate     DateTime
-  trackNumber     Int?
-  coverUrl        String?
-  audioUrl        String
-  playCount       Int             @default(0)
-  type            AlbumType       @default(SINGLE)
-  isActive        Boolean         @default(false)
-  tempo           Int? // Added tempo field
-  mood            String? // Added mood field (e.g., Happy, Sad, Energetic)
-  key             String? // e.g., "C#", "Fm"
-  scale           String? // e.g., "major", "minor"
-  danceability    Float? // Value indicating danceability
-  energy          Float? // Value indicating perceived energy
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  artistId        String
-  albumId         String?
-  history         History[]
-  playlists       PlaylistTrack[]
-  featuredArtists TrackArtist[]
-  genres          TrackGenre[]
-  album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  artist          ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  likedBy         UserLikeTrack[]
-  labelId         String?
-  label           Label?          @relation(fields: [labelId], references: [id], onDelete: SetNull)
-  notifications   Notification[]
-  reports         Report[]
+  id               String          @id @default(cuid())
+  title            String
+  duration         Int             @default(0)
+  releaseDate      DateTime
+  trackNumber      Int?
+  coverUrl         String?
+  audioUrl         String
+  playCount        Int             @default(0)
+  type             AlbumType       @default(SINGLE)
+  isActive         Boolean         @default(false)
+  tempo            Int? // Added tempo field
+  mood             String? // Added mood field (e.g., Happy, Sad, Energetic)
+  key              String? // e.g., "C#", "Fm"
+  scale            String? // e.g., "major", "minor"
+  danceability     Float? // Value indicating danceability
+  energy           Float? // Value indicating perceived energy
+  localFingerprint String?         @unique // <<< Dấu vân tay cục bộ cho file audio
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  artistId         String
+  albumId          String?
+  history          History[]
+  playlists        PlaylistTrack[]
+  featuredArtists  TrackArtist[]
+  genres           TrackGenre[]
+  album            Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  artist           ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  likedBy          UserLikeTrack[]
+  labelId          String?
+  label            Label?          @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  notifications    Notification[]
+  reports          Report[]
 
   @@unique([title, artistId])
   @@index([title])
@@ -247,26 +248,26 @@ model Genre {
 }
 
 model Notification {
-  id            String           @id @default(cuid())
-  type          NotificationType
-  message       String
-  isRead        Boolean          @default(false)
-  recipientType RecipientType
-  userId        String?
-  artistId      String?
-  senderId      String?
-  trackId       String?
-  albumId       String?
-  claimId       String?
+  id              String           @id @default(cuid())
+  type            NotificationType
+  message         String
+  isRead          Boolean          @default(false)
+  recipientType   RecipientType
+  userId          String?
+  artistId        String?
+  senderId        String?
+  trackId         String?
+  albumId         String?
+  claimId         String?
   artistRequestId String?
-  count         Int?             @default(1)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  artist        ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
-  user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  track         Track?           @relation(fields: [trackId], references: [id], onDelete: SetNull)
-  album         Album?           @relation(fields: [albumId], references: [id], onDelete: SetNull)
-  artistRequest ArtistRequest?   @relation(fields: [artistRequestId], references: [id], onDelete: SetNull)
+  count           Int?             @default(1)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  artist          ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
+  user            User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  track           Track?           @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  album           Album?           @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  artistRequest   ArtistRequest?   @relation(fields: [artistRequestId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([artistId])
@@ -459,18 +460,18 @@ model LabelRegistrationRequest {
 }
 
 model ArtistRequest {
-  id                        String        @id @default(cuid())  
-  artistName                String
-  bio                       String?       @db.Text
-  avatarUrl                 String?
-  socialMediaLinks          Json?
-  requestedGenres           String[]      @default([])
-  status                    RequestStatus @default(PENDING)
-  rejectionReason           String?       @db.Text
-  requestedLabelName        String?
+  id                 String        @id @default(cuid())
+  artistName         String
+  bio                String?       @db.Text
+  avatarUrl          String?
+  socialMediaLinks   Json?
+  requestedGenres    String[]      @default([])
+  status             RequestStatus @default(PENDING)
+  rejectionReason    String?       @db.Text
+  requestedLabelName String?
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications Notification[]
 
   @@index([userId])

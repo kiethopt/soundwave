@@ -49,6 +49,7 @@ const artist_service_1 = require("./artist.service");
 const mm = __importStar(require("music-metadata"));
 const mpg123_decoder_1 = require("mpg123-decoder");
 const acrcloudService = __importStar(require("./acrcloud.service"));
+const crypto = __importStar(require("crypto"));
 function normalizeString(str) {
     if (!str)
         return "";
@@ -423,7 +424,15 @@ const getTracks = async (req) => {
 exports.getTracks = getTracks;
 class TrackService {
     static async createTrack(artistProfileId, data, audioFile, coverFile, requestUser) {
-        const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId, } = data;
+        const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId, localFingerprint, } = data;
+        let localFingerprintToSave = localFingerprint;
+        if (!localFingerprintToSave && audioFile) {
+            const audioBuffer = audioFile.buffer;
+            const hash = crypto.createHash('sha256');
+            hash.update(audioBuffer);
+            localFingerprintToSave = hash.digest('hex');
+            console.warn(`[CreateTrack] localFingerprint was not provided, calculated new one: ${localFingerprintToSave}. This might indicate an outdated client or flow.`);
+        }
         const mainArtist = await db_1.default.artistProfile.findUnique({
             where: { id: artistProfileId },
             select: {
@@ -507,6 +516,7 @@ class TrackService {
             energy: audioFeatures.energy,
             playCount: 0,
             label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
+            localFingerprint: localFingerprintToSave,
         };
         if (audioFeatures.genreIds && audioFeatures.genreIds.length > 0) {
             trackData.genres = {
@@ -613,6 +623,29 @@ class TrackService {
         console.log(`[CopyrightCheckOnly] Checking track "${title}" for artist "${artistName}" (ID: ${artistProfileId}) with ACRCloud`);
         console.log(`[CopyrightCheckOnly] Declared featured IDs: ${declaredFeaturedArtistIds.join(", ") || "None"}, Names: ${declaredFeaturedArtistNames.join(", ") || "None"}`);
         const copyrightCheckResult = await checkCopyrightWithACRCloud(audioFile.buffer, audioFile.originalname, title);
+        const audioBufferForFingerprint = audioFile.buffer;
+        const hash = crypto.createHash('sha256');
+        hash.update(audioBufferForFingerprint);
+        const calculatedLocalFingerprint = hash.digest('hex');
+        const existingTrackWithFingerprint = await db_1.default.track.findUnique({
+            where: { localFingerprint: calculatedLocalFingerprint },
+            select: { id: true, artistId: true, title: true, artist: { select: { artistName: true } } },
+        });
+        if (existingTrackWithFingerprint) {
+            if (existingTrackWithFingerprint.artistId !== artistProfileId) {
+                const error = new Error(`Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`);
+                error.isCopyrightConflict = true;
+                error.isLocalFingerprintConflict = true;
+                error.copyrightDetails = {
+                    conflictingTrackTitle: existingTrackWithFingerprint.title,
+                    conflictingArtistName: existingTrackWithFingerprint.artist?.artistName || 'Unknown Artist',
+                    isLocalFingerprintConflict: true,
+                    localFingerprint: calculatedLocalFingerprint,
+                };
+                throw error;
+            }
+            console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track by the same artist. Fingerprint will be passed.`);
+        }
         if (copyrightCheckResult.error) {
             console.warn(`[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`);
             return {
@@ -625,6 +658,7 @@ class TrackService {
                         message: copyrightCheckResult.errorMessage,
                         code: copyrightCheckResult.errorCode,
                     },
+                    localFingerprint: calculatedLocalFingerprint,
                 },
             };
         }
@@ -642,7 +676,10 @@ class TrackService {
                 console.warn(`[CopyrightCheckOnly] ACRCloud matched song "${match.title}" but did not provide a primary artist name for track "${title}".`);
                 const error = new Error(`Copyright violation detected. The uploaded audio appears to match "${match.title}" but the original artist couldn't be determined by the check.`);
                 error.isCopyrightConflict = true;
-                error.copyrightDetails = match;
+                error.copyrightDetails = {
+                    ...match,
+                    localFingerprint: calculatedLocalFingerprint,
+                };
                 throw error;
             }
             if (mainArtist.isVerified || isAdminUpload) {
@@ -764,13 +801,19 @@ class TrackService {
                         return {
                             isSafeToUpload: true,
                             message: `Copyright check passed. The audio matches "${match.title}" by ${canonicalArtistDisplay}${messageSuffix}`,
-                            copyrightDetails: match,
+                            copyrightDetails: {
+                                ...match,
+                                localFingerprint: calculatedLocalFingerprint,
+                            }
                         };
                     }
                     else {
                         const error = new Error(blockingReason);
                         error.isCopyrightConflict = true;
-                        error.copyrightDetails = match;
+                        error.copyrightDetails = {
+                            ...match,
+                            localFingerprint: calculatedLocalFingerprint,
+                        };
                         throw error;
                     }
                 }
@@ -781,7 +824,10 @@ class TrackService {
                         errorMessage += ` (Album: ${match.album.name})`;
                     const error = new Error(errorMessage);
                     error.isCopyrightConflict = true;
-                    error.copyrightDetails = match;
+                    error.copyrightDetails = {
+                        ...match,
+                        localFingerprint: calculatedLocalFingerprint,
+                    };
                     throw error;
                 }
             }
@@ -792,7 +838,10 @@ class TrackService {
                     errorMessage += ` (Album: ${match.album.name})`;
                 const error = new Error(errorMessage);
                 error.isCopyrightConflict = true;
-                error.copyrightDetails = match;
+                error.copyrightDetails = {
+                    ...match,
+                    localFingerprint: calculatedLocalFingerprint,
+                };
                 throw error;
             }
         }
@@ -801,6 +850,9 @@ class TrackService {
             return {
                 isSafeToUpload: true,
                 message: "No copyright match found by detection service.",
+                copyrightDetails: {
+                    localFingerprint: calculatedLocalFingerprint
+                }
             };
         }
     }
