@@ -1,7 +1,7 @@
 import { AlbumType } from '@prisma/client';
 
 export interface TrackData {
-  title: string; audioUrl: string; trackNumber: number; featuredArtists?: string[]; coverUrl?: string; tempo?: number; mood?: string; key?: string; scale?: string; danceability?: number; energy?: number;
+  title: string; audioUrl: string; trackNumber: number; featuredArtists?: string[]; coverUrl?: string; tempo?: number; mood?: string; key?: string; scale?: string; danceability?: number; energy?: number; genres?: string[];
 }
 
 export interface AlbumData {
@@ -29,7 +29,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.7286,
-        "energy": 0.6161
+        "energy": 0.6161,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -54,7 +58,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.5231,
-        "energy": 0.0992
+        "energy": 0.0992,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "gr8teful (intro)",
@@ -67,7 +75,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.4896,
-        "energy": 0.1513
+        "energy": 0.1513,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "yêu thì yêu không yêu thì yêu",
@@ -80,7 +91,12 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.6666,
-        "energy": 0.1911
+        "energy": 0.1911,
+        "genres": [
+          "Ballad",
+          "V-Pop",
+          "Indie"
+        ]
       },
       {
         "title": "sao anh chưa về nhà",
@@ -93,7 +109,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.4519,
-        "energy": 0.1428
+        "energy": 0.1428,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "xuân hạ thu đông rồi lại xuân",
@@ -106,7 +126,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.501,
-        "energy": 0.0544
+        "energy": 0.0544,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "nàng thơ… trời giấu trời mang đi",
@@ -119,7 +143,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.4941,
-        "energy": 0.053
+        "energy": 0.053,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "anh nhà ở đâu thế",
@@ -132,7 +160,11 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.6772,
-        "energy": 0.1271
+        "energy": 0.1271,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -157,7 +189,10 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.369,
-        "energy": 0.0654
+        "energy": 0.0654,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "mama boy",
@@ -170,7 +205,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.5938,
-        "energy": 0.545
+        "energy": 0.545,
+        "genres": [
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "đen đá không đường",
@@ -183,7 +222,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.723,
-        "energy": 0.1587
+        "energy": 0.1587,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "dreAMEE (intro)",
@@ -196,7 +239,10 @@ export const albums: AlbumData[] = [
         "key": "A#",
         "scale": "minor",
         "danceability": 0.4672,
-        "energy": 0.162
+        "energy": 0.162,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "xuân, hạ, thu, đông rồi lại xuân",
@@ -209,7 +255,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.4983,
-        "energy": 0.0518
+        "energy": 0.0518,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "ex's hate me, Pt.2",
@@ -222,7 +272,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.5921,
-        "energy": 0.1025
+        "energy": 0.1025,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "trời giấu trời mang đi",
@@ -235,7 +288,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.4469,
-        "energy": 0.109
+        "energy": 0.109,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -260,7 +317,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.5047,
-        "energy": 0.1851
+        "energy": 0.1851,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -289,7 +350,12 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "MỘNG YU",
@@ -304,7 +370,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.75,
-        "energy": 0.68
+        "energy": 0.68,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "Miền Mộng Mị",
@@ -317,7 +388,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.7,
-        "energy": 0.6
+        "energy": 0.6,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cuộc gọi lúc nửa đêm",
@@ -330,7 +406,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.62,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "Beautiful nightmare (interlude)",
@@ -343,7 +424,12 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "minor",
         "danceability": 0.4,
-        "energy": 0.35
+        "energy": 0.35,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -368,7 +454,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.727,
-        "energy": 0.6335
+        "energy": 0.6335,
+        "genres": [
+          "Dance",
+          "New Wave"
+        ]
       },
       {
         "title": "Do For Love (feat. AMEE) - Lofi",
@@ -381,7 +471,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.5087,
-        "energy": 0.1827
+        "energy": 0.1827,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Do For Love (feat. AMEE) - Remix",
@@ -394,7 +488,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.7922,
-        "energy": 0.5856
+        "energy": 0.5856,
+        "genres": [
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "Do For Love (feat. AMEE) - Spedup",
@@ -407,7 +505,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.722,
-        "energy": 0.5884
+        "energy": 0.5884,
+        "genres": [
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Do For Love (feat. AMEE) - Masew Remix",
@@ -420,7 +521,10 @@ export const albums: AlbumData[] = [
         "key": "G#",
         "scale": "major",
         "danceability": 0.7854,
-        "energy": 0.4699
+        "energy": 0.4699,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -445,7 +549,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.7322,
-        "energy": 0.6967
+        "energy": 0.6967,
+        "genres": [
+          "Experimental"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -470,7 +577,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.2965,
-        "energy": 0.3227
+        "energy": 0.3227,
+        "genres": [
+          "Ambient",
+          "Instrumental"
+        ]
       },
       {
         "title": "Overture",
@@ -483,7 +594,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.4652,
-        "energy": 0.5135
+        "energy": 0.5135,
+        "genres": [
+          "Blues"
+        ]
       },
       {
         "title": "Hit Me Up (feat. Nomovodka)",
@@ -496,7 +610,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.5302,
-        "energy": 0.1474
+        "energy": 0.1474,
+        "genres": [
+          "Jazz"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -521,7 +638,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.4017,
-        "energy": 0.4503
+        "energy": 0.4503,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Rượu Độc",
@@ -534,7 +655,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.425,
-        "energy": 0.1934
+        "energy": 0.1934,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Hồn Lỡ Sa Vào",
@@ -547,7 +672,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.4031,
-        "energy": 0.2845
+        "energy": 0.2845,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Chưa Yêu Lần Nao",
@@ -560,7 +689,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.5562,
-        "energy": 0.3158
+        "energy": 0.3158,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Đêm Vũ Trường",
@@ -573,7 +706,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.6495,
-        "energy": 0.3831
+        "energy": 0.3831,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -598,7 +735,10 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "major",
         "danceability": 0.3819,
-        "energy": 0.1073
+        "energy": 0.1073,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "overboard",
@@ -611,7 +751,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.4022,
-        "energy": 0.0905
+        "energy": 0.0905,
+        "genres": [
+          "Acoustic",
+          "Instrumental"
+        ]
       },
       {
         "title": "afternoons",
@@ -624,7 +768,10 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.4348,
-        "energy": 0.0819
+        "energy": 0.0819,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "picking berries",
@@ -637,7 +784,10 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.5311,
-        "energy": 0.1592
+        "energy": 0.1592,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "waiting",
@@ -650,7 +800,10 @@ export const albums: AlbumData[] = [
         "key": "Ab",
         "scale": "major",
         "danceability": 0.646,
-        "energy": 0.1499
+        "energy": 0.1499,
+        "genres": [
+          "Jazz"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -680,7 +833,13 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.68,
-        "energy": 0.6
+        "energy": 0.6,
+        "genres": [
+          "Pop",
+          "R&B",
+          "Indie",
+          "V-Pop"
+        ]
       },
       {
         "title": "Chập Chờn",
@@ -693,7 +852,13 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.65,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "R&B",
+          "Indie",
+          "V-Pop"
+        ]
       },
       {
         "title": "Mất Kết Nối",
@@ -706,7 +871,13 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.6,
-        "energy": 0.52
+        "energy": 0.52,
+        "genres": [
+          "Pop",
+          "R&B",
+          "Indie",
+          "V-Pop"
+        ]
       },
       {
         "title": "Tràn Bộ Nhớ",
@@ -719,7 +890,13 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.72,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Pop",
+          "R&B",
+          "Indie",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -744,7 +921,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.6541,
-        "energy": 0.4302
+        "energy": 0.4302,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "nhạt-fine (blue ver.)",
@@ -757,7 +938,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "major",
         "danceability": 0.266,
-        "energy": 0.1469
+        "energy": 0.1469,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -782,7 +967,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.3911,
-        "energy": 0.2672
+        "energy": 0.2672,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "tình yêu chậm trễ (live piano ver.)",
@@ -795,7 +984,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.4237,
-        "energy": 0.0975
+        "energy": 0.0975,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "dự báo thời tiết hôm nay mưa - live from GENfest 23",
@@ -808,7 +1001,11 @@ export const albums: AlbumData[] = [
         "key": "G#",
         "scale": "minor",
         "danceability": 0.2296,
-        "energy": 0.4841
+        "energy": 0.4841,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "giữ lấy làm gì - live from GENfest 23",
@@ -821,7 +1018,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "major",
         "danceability": 0.6273,
-        "energy": 0.4771
+        "energy": 0.4771,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "đưa em về nhàa - live from GENfest 23",
@@ -834,7 +1035,11 @@ export const albums: AlbumData[] = [
         "key": "A#",
         "scale": "minor",
         "danceability": 0.1547,
-        "energy": 0.3155
+        "energy": 0.3155,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "vaicaunoicokhiennguoithaydoi - live from GENfest 23",
@@ -847,7 +1052,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.3271,
-        "energy": 0.0876
+        "energy": 0.0876,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "badadu - live from GENfest 23",
@@ -860,7 +1068,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.1603,
-        "energy": 0.0638
+        "energy": 0.0638,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -885,7 +1097,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.3449,
-        "energy": 0.3078
+        "energy": 0.3078,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "vaicaunoicokhiennguoithaydoi - storm version",
@@ -898,7 +1114,10 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.355,
-        "energy": 0.1198
+        "energy": 0.1198,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "tỉnh thức sau giấc ngủ đông - storm version",
@@ -911,7 +1130,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.2029,
-        "energy": 0.0649
+        "energy": 0.0649,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -936,7 +1159,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.186,
-        "energy": 0.0579
+        "energy": 0.0579,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "dự báo thời tiết hôm nay mưa",
@@ -949,7 +1176,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.326,
-        "energy": 0.2793
+        "energy": 0.2793,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "vaicaunoicokhiennguoithaydoi",
@@ -962,7 +1193,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.4726,
-        "energy": 0.0697
+        "energy": 0.0697,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -987,7 +1221,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.5521,
-        "energy": 0.2917
+        "energy": 0.2917,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "để tôi ôm em bằng giai điệu này",
@@ -1000,7 +1238,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "major",
         "danceability": 0.5889,
-        "energy": 0.2178
+        "energy": 0.2178,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1025,7 +1267,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.468,
-        "energy": 0.365
+        "energy": 0.365,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "Sầu Tím Thiệp Hồng",
@@ -1038,7 +1284,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.4633,
-        "energy": 0.4417
+        "energy": 0.4417,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1063,7 +1313,11 @@ export const albums: AlbumData[] = [
         "key": "Eb",
         "scale": "minor",
         "danceability": 0.4175,
-        "energy": 0.1766
+        "energy": 0.1766,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "Tình Đời",
@@ -1076,7 +1330,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.5129,
-        "energy": 0.3648
+        "energy": 0.3648,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "Sầu Lẻ Bóng",
@@ -1089,7 +1347,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.4454,
-        "energy": 0.2437
+        "energy": 0.2437,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1120,7 +1382,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.9,
-        "energy": 0.92
+        "energy": 0.92,
+        "genres": [
+          "Hip-Hop",
+          "V-Pop",
+          "Rap"
+        ]
       },
       {
         "title": "HOP ON DA SHOW",
@@ -1135,7 +1402,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.88,
-        "energy": 0.9
+        "energy": 0.9,
+        "genres": [
+          "Hip-Hop",
+          "V-Pop",
+          "Rap"
+        ]
       },
       {
         "title": "DÂU TẰM",
@@ -1150,7 +1422,12 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Hip-Hop",
+          "V-Pop",
+          "Rap"
+        ]
       },
       {
         "title": "NGÂN",
@@ -1165,7 +1442,12 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.8,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Hip-Hop",
+          "V-Pop",
+          "Rap"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1190,7 +1472,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.4817,
-        "energy": 0.2047
+        "energy": 0.2047,
+        "genres": [
+          "Ballad",
+          "V-Pop",
+          "Indie"
+        ]
       },
       {
         "title": "Do You",
@@ -1203,7 +1490,10 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.4846,
-        "energy": 0.3342
+        "energy": 0.3342,
+        "genres": [
+          "Blues"
+        ]
       },
       {
         "title": "MONOlogue",
@@ -1216,7 +1506,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.3718,
-        "energy": 0.188
+        "energy": 0.188,
+        "genres": [
+          "Folk",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Cô nương Ahhhh~",
@@ -1229,7 +1523,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.544,
-        "energy": 0.7326
+        "energy": 0.7326,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Quên Anh Đi",
@@ -1242,7 +1540,11 @@ export const albums: AlbumData[] = [
         "key": "Ab",
         "scale": "minor",
         "danceability": 0.3978,
-        "energy": 0.2943
+        "energy": 0.2943,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Waiting For You",
@@ -1255,7 +1557,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.5311,
-        "energy": 0.419
+        "energy": 0.419,
+        "genres": [
+          "Alternative",
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "L.I.E",
@@ -1268,7 +1575,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.3731,
-        "energy": 0.2142
+        "energy": 0.2142,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "Kill Me",
@@ -1281,7 +1591,12 @@ export const albums: AlbumData[] = [
         "key": "Eb",
         "scale": "major",
         "danceability": 0.585,
-        "energy": 0.2937
+        "energy": 0.2937,
+        "genres": [
+          "Alternative",
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "Em Là",
@@ -1294,7 +1609,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.3635,
-        "energy": 0.148
+        "energy": 0.148,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Buông",
@@ -1307,7 +1626,12 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.612,
-        "energy": 0.2706
+        "energy": 0.2706,
+        "genres": [
+          "Ballad",
+          "V-Pop",
+          "Indie"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1335,7 +1659,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.45,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cười Lên",
@@ -1348,7 +1676,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.8,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Em Xinh",
@@ -1363,7 +1695,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Open Your Eyes",
@@ -1378,7 +1714,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Young",
@@ -1391,7 +1731,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.85,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1415,7 +1759,10 @@ export const albums: AlbumData[] = [
         "mood": "Melancholic",
         "key": "A",
         "scale": "minor",
-        "danceability": 0.4936
+        "danceability": 0.4936,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1440,7 +1787,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.4409,
-        "energy": 0.2678
+        "energy": 0.2678,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "Xin Thời Gian Qua Mau",
@@ -1453,7 +1804,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.463,
-        "energy": 0.2257
+        "energy": 0.2257,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "Đôi Mắt Người Xưa",
@@ -1466,7 +1821,11 @@ export const albums: AlbumData[] = [
         "key": "Ab",
         "scale": "minor",
         "danceability": 0.3674,
-        "energy": 0.3891
+        "energy": 0.3891,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1491,7 +1850,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.8109,
-        "energy": 0.6076
+        "energy": 0.6076,
+        "genres": [
+          "Dance",
+          "Disco"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1519,7 +1882,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.78,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Change",
@@ -1532,7 +1899,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Her",
@@ -1545,7 +1916,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.6,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Kill Me",
@@ -1558,7 +1933,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.75,
-        "energy": 0.82
+        "energy": 0.82,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Fuck Off",
@@ -1571,7 +1950,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.82,
-        "energy": 0.88
+        "energy": 0.88,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Deep",
@@ -1584,7 +1967,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.65,
-        "energy": 0.6
+        "energy": 0.6,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Fight",
@@ -1597,7 +1984,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.8,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "How Come ?",
@@ -1610,7 +2001,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.68,
-        "energy": 0.62
+        "energy": 0.62,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Myself",
@@ -1623,7 +2018,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.62,
-        "energy": 0.58
+        "energy": 0.58,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "BADAK",
@@ -1636,7 +2035,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.9
+        "energy": 0.9,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Love Yaaa",
@@ -1649,7 +2052,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.72,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Heaven-Sent",
@@ -1662,7 +2069,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "major",
         "danceability": 0.7,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Grateful To Us",
@@ -1675,7 +2086,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.65,
-        "energy": 0.6
+        "energy": 0.6,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Tease My Lover",
@@ -1688,7 +2103,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.85,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       },
       {
         "title": "Get Closer",
@@ -1701,7 +2120,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.72
+        "energy": 0.72,
+        "genres": [
+          "Pop",
+          "R&B"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1730,7 +2153,12 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.48,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Lặng",
@@ -1743,7 +2171,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.42,
-        "energy": 0.3
+        "energy": 0.3,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "1000 Ánh Mắt",
@@ -1756,7 +2189,12 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.6,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Perfect",
@@ -1769,7 +2207,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.65,
-        "energy": 0.5
+        "energy": 0.5,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Có Đôi Điều",
@@ -1782,7 +2225,12 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.55,
-        "energy": 0.48
+        "energy": 0.48,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Night Time",
@@ -1795,7 +2243,12 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.58,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       },
       {
         "title": "Take Off Your Hands",
@@ -1808,7 +2261,12 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.62,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "Indie",
+          "V-Pop",
+          "Lo-fi"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -1836,7 +2294,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.82,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Không Phải Dạng Vừa Đâu",
@@ -1849,7 +2311,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.88,
-        "energy": 0.92
+        "energy": 0.92,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Intro 2022",
@@ -1862,7 +2328,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.4,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Buông Đôi Tay Nhau Ra",
@@ -1875,7 +2345,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.68,
-        "energy": 0.62
+        "energy": 0.62,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Chắc Ai Đó Sẽ Về",
@@ -1888,7 +2362,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.55,
-        "energy": 0.48
+        "energy": 0.48,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Nắng Ấm Xa Dần",
@@ -1901,7 +2379,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.7,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Thái Bình Mồ Hôi Rơi",
@@ -1914,7 +2396,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.82,
-        "energy": 0.78
+        "energy": 0.78,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Âm Thầm Bên Em",
@@ -1927,7 +2413,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.68
+        "energy": 0.68,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Ấn Nút Nhớ... Thả Giấc Mơ",
@@ -1940,7 +2430,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.6,
-        "energy": 0.52
+        "energy": 0.52,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Tiến Lên Việt Nam Ơi",
@@ -1953,7 +2447,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.9,
-        "energy": 0.95
+        "energy": 0.95,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Nắng Ấm Ngang Qua",
@@ -1966,7 +2464,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "major",
         "danceability": 0.85,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Special Thanks",
@@ -1979,7 +2481,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.6,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Anh Sai Rồi",
@@ -1992,7 +2498,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.62,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Remember Me - SlimV Remix",
@@ -2007,7 +2517,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.95,
-        "energy": 0.9
+        "energy": 0.9,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Nơi Này Có Anh",
@@ -2020,7 +2534,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.88,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Chúng Ta Không Thuộc Về Nhau",
@@ -2033,7 +2551,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.82
+        "energy": 0.82,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Một Năm Mới Bình An",
@@ -2046,7 +2568,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Em Của Ngày Hôm Qua",
@@ -2059,7 +2585,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.72
+        "energy": 0.72,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cơn Mưa Ngang Qua",
@@ -2072,7 +2602,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Khuôn Mặt Đáng Thương",
@@ -2085,7 +2619,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.65,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cơn Mưa Xa Dần",
@@ -2098,7 +2636,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2129,7 +2671,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.9,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "Trò Chơi",
@@ -2142,7 +2689,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       },
       {
         "title": "Tháng Năm",
@@ -2155,7 +2707,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.7,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Pop",
+          "R&B",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2185,7 +2742,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.8,
-        "energy": 0.72
+        "energy": 0.72,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Bật Nó Lên",
@@ -2198,7 +2759,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.9,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Sunset In the City - Deluxe Version",
@@ -2211,7 +2776,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Ai Mà Biết Được",
@@ -2226,7 +2795,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.82,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "giá như",
@@ -2239,7 +2812,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.55,
-        "energy": 0.48
+        "energy": 0.48,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Intro",
@@ -2252,7 +2829,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.5,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "DANCING IN THE DARK",
@@ -2265,7 +2846,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.88,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Luật Anh",
@@ -2280,7 +2865,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.88,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Heyyy",
@@ -2293,7 +2882,11 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "major",
         "danceability": 0.85,
-        "energy": 0.78
+        "energy": 0.78,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "Sẽ Quên Em Nhanh Thôi",
@@ -2306,7 +2899,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.65,
-        "energy": 0.62
+        "energy": 0.62,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2331,7 +2928,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.5012,
-        "energy": 0.1495
+        "energy": 0.1495,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "vaicaunoicokhiennguoithaydoi - Acoustic",
@@ -2344,7 +2945,11 @@ export const albums: AlbumData[] = [
         "key": "G#",
         "scale": "minor",
         "danceability": 0.4033,
-        "energy": 0.1242
+        "energy": 0.1242,
+        "genres": [
+          "Folk",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "thích em hơi nhiều",
@@ -2357,7 +2962,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.4946,
-        "energy": 0.0516
+        "energy": 0.0516,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "tóc ngắn",
@@ -2370,7 +2979,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.4536,
-        "energy": 0.1355
+        "energy": 0.1355,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "vào hạ",
@@ -2383,7 +2996,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.5103,
-        "energy": 0.1298
+        "energy": 0.1298,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2408,7 +3025,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.4247,
-        "energy": 0.0081
+        "energy": 0.0081,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Một Bài Hát Không Vui Mấy - The Recap",
@@ -2421,7 +3042,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.4994,
-        "energy": 0.1954
+        "energy": 0.1954,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Trở Thành Quá Khứ - The Recap",
@@ -2434,7 +3059,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.438,
-        "energy": 0.0171
+        "energy": 0.0171,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Lễ Đường Của Em - The Recap",
@@ -2447,7 +3076,12 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.5285,
-        "energy": 0.0839
+        "energy": 0.0839,
+        "genres": [
+          "Ballad",
+          "V-Pop",
+          "Indie"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2472,7 +3106,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.3202,
-        "energy": 0.0532
+        "energy": 0.0532,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "Sau Chia Tay... Ai Cũng Khác - Beat Version",
@@ -2485,7 +3123,11 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.316,
-        "energy": 0.0468
+        "energy": 0.0468,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2510,7 +3152,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.4268,
-        "energy": 0.0668
+        "energy": 0.0668,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2535,7 +3181,11 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.4482,
-        "energy": 0.1579
+        "energy": 0.1579,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "lặng im và tan vỡ (Làm Lại)",
@@ -2548,7 +3198,11 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.4958,
-        "energy": 0.1925
+        "energy": 0.1925,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2573,7 +3227,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.477,
-        "energy": 0.3636
+        "energy": 0.3636,
+        "genres": [
+          "Ballad",
+          "V-Pop",
+          "Indie"
+        ]
       },
       {
         "title": "bướngg",
@@ -2586,7 +3245,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.6478,
-        "energy": 0.3214
+        "energy": 0.3214,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "si mê",
@@ -2599,7 +3262,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.4763,
-        "energy": 0.3093
+        "energy": 0.3093,
+        "genres": [
+          "V-Pop",
+          "Bolero"
+        ]
       },
       {
         "title": "sao phải yêu? (Intro)",
@@ -2612,7 +3279,11 @@ export const albums: AlbumData[] = [
         "key": "A#",
         "scale": "minor",
         "danceability": 0.5542,
-        "energy": 0.4529
+        "energy": 0.4529,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "ra là vậy. (Outro)",
@@ -2625,7 +3296,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.7459,
-        "energy": 0.6525
+        "energy": 0.6525,
+        "genres": [
+          "Pop",
+          "V-Pop"
+        ]
       },
       {
         "title": "hơi sai",
@@ -2638,7 +3313,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.5941,
-        "energy": 0.2883
+        "energy": 0.2883,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "toihomquaemtuyetlam",
@@ -2651,7 +3330,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.4574,
-        "energy": 0.0955
+        "energy": 0.0955,
+        "genres": [
+          "Jazz"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2676,7 +3358,10 @@ export const albums: AlbumData[] = [
         "key": "D#",
         "scale": "minor",
         "danceability": 0.3637,
-        "energy": 0.0836
+        "energy": 0.0836,
+        "genres": [
+          "Jazz"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2701,7 +3386,10 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.4138,
-        "energy": 0.3827
+        "energy": 0.3827,
+        "genres": [
+          "Blues"
+        ]
       },
       {
         "title": "Tennis Court",
@@ -2714,7 +3402,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "major",
         "danceability": 0.6091,
-        "energy": 0.6095
+        "energy": 0.6095,
+        "genres": [
+          "Soul",
+          "R&B"
+        ]
       },
       {
         "title": "No Shade at Pitti",
@@ -2727,7 +3419,11 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "major",
         "danceability": 0.3833,
-        "energy": 0.2784
+        "energy": 0.2784,
+        "genres": [
+          "Folk",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Friday",
@@ -2740,7 +3436,10 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "major",
         "danceability": 0.4307,
-        "energy": 0.2953
+        "energy": 0.2953,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "Bad Advice",
@@ -2753,7 +3452,11 @@ export const albums: AlbumData[] = [
         "key": "Ab",
         "scale": "major",
         "danceability": 0.7664,
-        "energy": 0.3909
+        "energy": 0.3909,
+        "genres": [
+          "Soul",
+          "R&B"
+        ]
       },
       {
         "title": "Addicted (feat. The Chainsmokers & INK)",
@@ -2766,7 +3469,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.6127,
-        "energy": 0.3521
+        "energy": 0.3521,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2791,7 +3497,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.6286,
-        "energy": 0.13
+        "energy": 0.13,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "dreamscape",
@@ -2804,7 +3514,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.4726,
-        "energy": 0.085
+        "energy": 0.085,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "lullaby dreams",
@@ -2817,7 +3531,11 @@ export const albums: AlbumData[] = [
         "key": "Eb",
         "scale": "minor",
         "danceability": 0.373,
-        "energy": 0.1109
+        "energy": 0.1109,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "relaxation station",
@@ -2830,7 +3548,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.4791,
-        "energy": 0.0908
+        "energy": 0.0908,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "serenity",
@@ -2843,7 +3565,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.4549,
-        "energy": 0.0552
+        "energy": 0.0552,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "mindful moments",
@@ -2856,7 +3582,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.5279,
-        "energy": 0.1186
+        "energy": 0.1186,
+        "genres": [
+          "Lo-fi",
+          "Jazz"
+        ]
       },
       {
         "title": "tranquil nights",
@@ -2869,7 +3599,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.3066,
-        "energy": 0.048
+        "energy": 0.048,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "lofi bliss",
@@ -2882,7 +3616,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.5264,
-        "energy": 0.1262
+        "energy": 0.1262,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "chill waves",
@@ -2895,7 +3633,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.5206,
-        "energy": 0.0732
+        "energy": 0.0732,
+        "genres": [
+          "Lo-fi",
+          "Jazz"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2920,7 +3662,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.477,
-        "energy": 0.1234
+        "energy": 0.1234,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "happiness is a choice",
@@ -2933,7 +3679,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "major",
         "danceability": 0.5945,
-        "energy": 0.1675
+        "energy": 0.1675,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "good things ahead",
@@ -2946,7 +3696,11 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "major",
         "danceability": 0.6121,
-        "energy": 0.1496
+        "energy": 0.1496,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "enjoy the ride",
@@ -2959,7 +3713,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.7661,
-        "energy": 0.2228
+        "energy": 0.2228,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -2984,7 +3742,10 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.6958,
-        "energy": 0.1885
+        "energy": 0.1885,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "flow flow",
@@ -2997,7 +3758,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.7563,
-        "energy": 0.2132
+        "energy": 0.2132,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "still need swing",
@@ -3010,7 +3774,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.5506,
-        "energy": 0.1106
+        "energy": 0.1106,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "rest sugar",
@@ -3023,7 +3790,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.6828,
-        "energy": 0.1919
+        "energy": 0.1919,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "fire and ice",
@@ -3036,7 +3806,10 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "major",
         "danceability": 0.7574,
-        "energy": 0.1907
+        "energy": 0.1907,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "i'll always be nice to you",
@@ -3049,7 +3822,10 @@ export const albums: AlbumData[] = [
         "key": "Ab",
         "scale": "major",
         "danceability": 0.4793,
-        "energy": 0.069
+        "energy": 0.069,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "mystical feeling",
@@ -3062,7 +3838,10 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.5163,
-        "energy": 0.1043
+        "energy": 0.1043,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "earning",
@@ -3075,7 +3854,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.6017,
-        "energy": 0.1488
+        "energy": 0.1488,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       },
       {
         "title": "tropical evening",
@@ -3088,7 +3871,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.5974,
-        "energy": 0.1667
+        "energy": 0.1667,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "napping storm",
@@ -3101,7 +3887,10 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.6185,
-        "energy": 0.171
+        "energy": 0.171,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "sweet walk",
@@ -3114,7 +3903,10 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.5872,
-        "energy": 0.0931
+        "energy": 0.0931,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "time for",
@@ -3127,7 +3919,10 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.6648,
-        "energy": 0.1825
+        "energy": 0.1825,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "I love lights",
@@ -3140,7 +3935,11 @@ export const albums: AlbumData[] = [
         "key": "C#",
         "scale": "minor",
         "danceability": 0.5737,
-        "energy": 0.1772
+        "energy": 0.1772,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       },
       {
         "title": "no nightmare",
@@ -3153,7 +3952,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.6151,
-        "energy": 0.167
+        "energy": 0.167,
+        "genres": [
+          "Instrumental",
+          "Lo-fi"
+        ]
       },
       {
         "title": "late evening",
@@ -3166,7 +3969,10 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.5432,
-        "energy": 0.1362
+        "energy": 0.1362,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "still need evening",
@@ -3179,7 +3985,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.4708,
-        "energy": 0.0985
+        "energy": 0.0985,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "infinite trouble",
@@ -3192,7 +4001,10 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.539,
-        "energy": 0.1261
+        "energy": 0.1261,
+        "genres": [
+          "Classical"
+        ]
       },
       {
         "title": "fake feeling",
@@ -3205,7 +4017,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.5379,
-        "energy": 0.1068
+        "energy": 0.1068,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "black coffee",
@@ -3218,7 +4034,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.6952,
-        "energy": 0.2088
+        "energy": 0.2088,
+        "genres": [
+          "Lo-fi",
+          "Jazz"
+        ]
       },
       {
         "title": "more juice",
@@ -3231,7 +4051,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.439,
-        "energy": 0.0819
+        "energy": 0.0819,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "skyline to mind",
@@ -3241,7 +4065,11 @@ export const albums: AlbumData[] = [
         "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746794907/covers/e2lz4ekbczyztsmzsmhc.jpg",
         "tempo": 100,
         "key": "C",
-        "scale": "major"
+        "scale": "major",
+        "genres": [
+          "Lo-fi",
+          "Pop"
+        ]
       },
       {
         "title": "another sauce",
@@ -3251,7 +4079,11 @@ export const albums: AlbumData[] = [
         "coverUrl": "https://res.cloudinary.com/dtvrby0wr/image/upload/v1746794917/covers/yh4ajna4z3yt9wcglawz.jpg",
         "tempo": 97,
         "key": "G",
-        "scale": "major"
+        "scale": "major",
+        "genres": [
+          "Lo-fi",
+          "Pop"
+        ]
       },
       {
         "title": "feel life",
@@ -3264,7 +4096,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.5711,
-        "energy": 0.1242
+        "energy": 0.1242,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "another break",
@@ -3277,7 +4113,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.5982,
-        "energy": 0.1369
+        "energy": 0.1369,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "far from life",
@@ -3290,7 +4130,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.5688,
-        "energy": 0.1732
+        "energy": 0.1732,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "the time",
@@ -3303,7 +4147,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.4311,
-        "energy": 0.0804
+        "energy": 0.0804,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "it's love lights",
@@ -3316,7 +4164,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.7002,
-        "energy": 0.1786
+        "energy": 0.1786,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "space for lies",
@@ -3329,7 +4181,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.7859,
-        "energy": 0.2552
+        "energy": 0.2552,
+        "genres": [
+          "Lo-fi",
+          "Jazz"
+        ]
       },
       {
         "title": "one coffee break",
@@ -3342,7 +4198,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.4002,
-        "energy": 0.0772
+        "energy": 0.0772,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "inspired side",
@@ -3355,7 +4215,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.5709,
-        "energy": 0.1003
+        "energy": 0.1003,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "classic freedom",
@@ -3368,7 +4232,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "major",
         "danceability": 0.574,
-        "energy": 0.0936
+        "energy": 0.0936,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "call me coward",
@@ -3381,7 +4249,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.7099,
-        "energy": 0.2131
+        "energy": 0.2131,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "civilized",
@@ -3394,7 +4266,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.6487,
-        "energy": 0.0684
+        "energy": 0.0684,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       },
       {
         "title": "the biggest motion",
@@ -3407,7 +4283,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "major",
         "danceability": 0.6076,
-        "energy": 0.0985
+        "energy": 0.0985,
+        "genres": [
+          "Lo-fi",
+          "Classical"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3432,7 +4312,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "minor",
         "danceability": 0.7246,
-        "energy": 0.746
+        "energy": 0.746,
+        "genres": [
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "Long Way",
@@ -3445,7 +4329,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.7003,
-        "energy": 0.7302
+        "energy": 0.7302,
+        "genres": [
+          "Rap",
+          "Hip-Hop"
+        ]
       },
       {
         "title": "Feels",
@@ -3458,7 +4346,12 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.515,
-        "energy": 0.5625
+        "energy": 0.5625,
+        "genres": [
+          "Alternative",
+          "Rap",
+          "Hip-Hop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3483,7 +4376,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "major",
         "danceability": 0.7367,
-        "energy": 0.3475
+        "energy": 0.3475,
+        "genres": [
+          "Soul",
+          "R&B"
+        ]
       },
       {
         "title": "Timedilation",
@@ -3496,7 +4393,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.6952,
-        "energy": 0.2744
+        "energy": 0.2744,
+        "genres": [
+          "Pop"
+        ]
       },
       {
         "title": "Goodbyelullaby",
@@ -3509,7 +4409,10 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.6459,
-        "energy": 0.7535
+        "energy": 0.7535,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3534,7 +4437,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.8489,
-        "energy": 0.3789
+        "energy": 0.3789,
+        "genres": [
+          "Soul",
+          "R&B"
+        ]
       },
       {
         "title": "Fall Breeze - Remastered",
@@ -3547,7 +4454,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.7533,
-        "energy": 0.351
+        "energy": 0.351,
+        "genres": [
+          "Jazz"
+        ]
       },
       {
         "title": "Float - Remastered",
@@ -3560,7 +4470,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.6713,
-        "energy": 0.2427
+        "energy": 0.2427,
+        "genres": [
+          "Country"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3585,7 +4498,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.8602,
-        "energy": 0.8365
+        "energy": 0.8365,
+        "genres": [
+          "Dance",
+          "Disco"
+        ]
       },
       {
         "title": "Gene (GET LOOZE Remix) [Extended Mix]",
@@ -3598,7 +4515,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.9071,
-        "energy": 0.6349
+        "energy": 0.6349,
+        "genres": [
+          "Dance",
+          "Disco"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3623,7 +4544,10 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.7823,
-        "energy": 0.4779
+        "energy": 0.4779,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "Gene (55 Remix)",
@@ -3636,7 +4560,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.827,
-        "energy": 0.6053
+        "energy": 0.6053,
+        "genres": [
+          "Dance",
+          "New Wave"
+        ]
       },
       {
         "title": "Gene (Steji Remix)",
@@ -3649,7 +4577,10 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.5273,
-        "energy": 0.6287
+        "energy": 0.6287,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "Gene (Monotape Remix) [Radio Edit]",
@@ -3662,7 +4593,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "minor",
         "danceability": 0.8357,
-        "energy": 0.8747
+        "energy": 0.8747,
+        "genres": [
+          "Rock",
+          "Punk"
+        ]
       },
       {
         "title": "Gene (Get Looze Remix) [Radio Edit]",
@@ -3675,7 +4610,10 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.7055,
-        "energy": 0.5083
+        "energy": 0.5083,
+        "genres": [
+          "Country"
+        ]
       },
       {
         "title": "Gene (OLY Remix) [Radio Edit]",
@@ -3688,7 +4626,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.7559,
-        "energy": 0.377
+        "energy": 0.377,
+        "genres": [
+          "Rap",
+          "Hip-Hop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3713,7 +4655,11 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "minor",
         "danceability": 0.6319,
-        "energy": 0.2652
+        "energy": 0.2652,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       },
       {
         "title": "mưa tháng sáu - suy version",
@@ -3726,7 +4672,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.5527,
-        "energy": 0.1582
+        "energy": 0.1582,
+        "genres": [
+          "Ballad",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3755,7 +4705,12 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.58,
-        "energy": 0.62
+        "energy": 0.62,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Mùa Mưa Ấy",
@@ -3768,7 +4723,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.5,
-        "energy": 0.42
+        "energy": 0.42,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Nếu Những Tiếc Nuối",
@@ -3781,7 +4741,12 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "minor",
         "danceability": 0.45,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Những Lời Hứa Bỏ Quên",
@@ -3794,7 +4759,12 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "minor",
         "danceability": 0.5,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Ngồi Chờ Trong Vấn Vương",
@@ -3807,7 +4777,12 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.55,
-        "energy": 0.48
+        "energy": 0.48,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "bình yên",
@@ -3820,7 +4795,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.4,
-        "energy": 0.35
+        "energy": 0.35,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Mây Khóc Vì Điều Gì",
@@ -3833,7 +4813,12 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.45,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Những Chuyến Bay",
@@ -3846,7 +4831,12 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "major",
         "danceability": 0.6,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Và Em Sẽ Luôn Là Người Tôi Yêu Nhất",
@@ -3859,7 +4849,12 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.52,
-        "energy": 0.5
+        "energy": 0.5,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       },
       {
         "title": "Dành Hết Xuân Thì Để Chờ Nhau",
@@ -3872,7 +4867,12 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.48,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "V-Pop",
+          "Ballad",
+          "Singer-Songwriter"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -3902,7 +4902,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.8,
-        "energy": 0.88
+        "energy": 0.88,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Lối Chơi (Interlude)",
@@ -3917,7 +4921,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.6,
-        "energy": 0.55
+        "energy": 0.55,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Việt Kiều",
@@ -3932,7 +4940,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.82,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "ĐĐĐ",
@@ -3947,7 +4959,11 @@ export const albums: AlbumData[] = [
         "key": "F#",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.9
+        "energy": 0.9,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "bé ơi từ từ",
@@ -3962,7 +4978,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.78,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Tò Te Tí",
@@ -3977,7 +4997,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.85,
-        "energy": 0.82
+        "energy": 0.82,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cầu Vĩnh Tuy",
@@ -3992,7 +5016,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "major",
         "danceability": 0.8,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Phóng Đổ Tim Em",
@@ -4007,7 +5035,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "major",
         "danceability": 0.88,
-        "energy": 0.92
+        "energy": 0.92,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Call Me",
@@ -4022,7 +5054,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.85,
-        "energy": 0.9
+        "energy": 0.9,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Tình Yêu Vĩ Mô",
@@ -4037,7 +5073,11 @@ export const albums: AlbumData[] = [
         "key": "B",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.8
+        "energy": 0.8,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
@@ -4065,7 +5105,11 @@ export const albums: AlbumData[] = [
         "key": "F",
         "scale": "major",
         "danceability": 0.7,
-        "energy": 0.65
+        "energy": 0.65,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Chiều Hôm Ấy (Intro)",
@@ -4078,7 +5122,11 @@ export const albums: AlbumData[] = [
         "key": "G",
         "scale": "minor",
         "danceability": 0.45,
-        "energy": 0.4
+        "energy": 0.4,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Mấy Khi",
@@ -4091,7 +5139,11 @@ export const albums: AlbumData[] = [
         "key": "Bb",
         "scale": "major",
         "danceability": 0.75,
-        "energy": 0.7
+        "energy": 0.7,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Màu Đỏ (Interlude)",
@@ -4104,7 +5156,11 @@ export const albums: AlbumData[] = [
         "key": "E",
         "scale": "minor",
         "danceability": 0.5,
-        "energy": 0.45
+        "energy": 0.45,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Cơn Đau",
@@ -4117,7 +5173,11 @@ export const albums: AlbumData[] = [
         "key": "D",
         "scale": "minor",
         "danceability": 0.78,
-        "energy": 0.85
+        "energy": 0.85,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Anh Thấy (Interlude)",
@@ -4130,7 +5190,11 @@ export const albums: AlbumData[] = [
         "key": "A",
         "scale": "minor",
         "danceability": 0.55,
-        "energy": 0.48
+        "energy": 0.48,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       },
       {
         "title": "Gặp May",
@@ -4143,7 +5207,11 @@ export const albums: AlbumData[] = [
         "key": "C",
         "scale": "major",
         "danceability": 0.8,
-        "energy": 0.75
+        "energy": 0.75,
+        "genres": [
+          "Alternative",
+          "V-Pop"
+        ]
       }
     ],
     "featuredArtistNames": []
