@@ -558,7 +558,7 @@ export class TrackService {
     audioFile: Express.Multer.File,
     coverFile?: Express.Multer.File,
     requestUser?: any
-  ): Promise<Track> {
+  ): Promise<Track | { status: string; message: string; track: any }> {
     const {
       title,
       releaseDate,
@@ -578,6 +578,44 @@ export class TrackService {
         localFingerprintToSave = hash.digest('hex');
         console.warn(`[CreateTrack] localFingerprint was not provided, calculated new one: ${localFingerprintToSave}. This might indicate an outdated client or flow.`);
     }
+
+    // <<< Check for existing track by fingerprint AND same artist BEFORE creating >>>
+    if (localFingerprintToSave) {
+      const existingTrackByFingerprint = await prisma.track.findUnique({
+        where: { localFingerprint: localFingerprintToSave },
+        select: { ...trackSelect, artistId: true }, // Ensure artistId is selected
+      });
+
+      if (existingTrackByFingerprint) {
+        if (existingTrackByFingerprint.artistId === artistProfileId) {
+          // Track with same fingerprint by the same artist already exists
+          console.log(`[CreateTrack] Track with fingerprint ${localFingerprintToSave} by artist ${artistProfileId} already exists (ID: ${existingTrackByFingerprint.id}). Returning existing track info.`);
+          // Optionally, consider if metadata (title, genres etc.) should be updated on the existing track here.
+          // For now, just return info about the existing track.
+          return {
+            status: 'duplicate_by_same_artist',
+            message: `This audio content already exists as track "${existingTrackByFingerprint.title}" by you.`,
+            track: existingTrackByFingerprint,
+          };
+        } else {
+          // Fingerprint matches a track by a DIFFERENT artist - this is a conflict
+          // This should ideally be caught by checkTrackCopyrightOnly, but as a safeguard:
+          const error: any = new Error(
+            `Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackByFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackByFingerprint.title}).`
+          );
+          error.isCopyrightConflict = true;
+          error.isLocalFingerprintConflict = true;
+          error.copyrightDetails = {
+            conflictingTrackTitle: existingTrackByFingerprint.title,
+            conflictingArtistName: existingTrackByFingerprint.artist?.artistName || 'Unknown Artist',
+            isLocalFingerprintConflict: true,
+            localFingerprint: localFingerprintToSave,
+          };
+          throw error; // This will be caught by the route handler
+        }
+      }
+    }
+    // <<< End of pre-check >>>
 
     const mainArtist = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
@@ -685,19 +723,15 @@ export class TrackService {
       localFingerprint: localFingerprintToSave,
     };
 
-    if (audioFeatures.genreIds && audioFeatures.genreIds.length > 0) {
+    // Use user-provided genreIds if available, otherwise, no genres initially.
+    if (genreIds && genreIds.length > 0) {
       trackData.genres = {
-        create: audioFeatures.genreIds.map((genreId: string) => ({
+        create: genreIds.map((genreId: string) => ({
           genre: { connect: { id: genreId } },
         })),
       };
     } else {
-      const defaultGenre = await prisma.genre.findFirst({ where: { name: "Pop" } }) || await prisma.genre.findFirst();
-      if (defaultGenre) {
-        trackData.genres = {
-          create: [{ genre: { connect: { id: defaultGenre.id } } }],
-        };
-      }
+      console.log(`[CreateTrack] No genres provided by user for track "${title}". Track will be created without genres.`);
     }
 
     const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);

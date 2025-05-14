@@ -8,6 +8,22 @@ import { paginate } from 'src/utils/handle-utils';
 import { getIO, getUserSockets } from '../config/socket';
 import { getOrCreateArtistProfile } from './artist.service';
 import * as mm from 'music-metadata';
+import * as crypto from 'crypto';
+
+// Define a type for skipped track information
+interface SkippedTrackInfo {
+  status: 'skipped_duplicate_self_already_in_album' | 'skipped_duplicate_self_moved_album' | 'linked_existing_to_album' | 'error_processing' | 'skipped_generic_duplicate_self';
+  fileName: string;
+  track?: Prisma.TrackGetPayload<{ select: typeof trackSelect }>; // For linked/updated tracks
+  existingTrackTitle?: string;
+  existingTrackId?: string;
+  localFingerprint?: string;
+  errorMessage?: string;
+  oldAlbumId?: string | null; // To track if moved from another album
+}
+
+// Type for the elements in trackProcessingResults
+type TrackProcessingResultItem = Prisma.TrackGetPayload<{ select: typeof trackSelect }> | SkippedTrackInfo;
 
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
   if (!user) return false;
@@ -322,13 +338,16 @@ export const addTracksToAlbum = async (req: Request) => {
 
   // console.time('[addTracksToAlbum] Total Processing Time'); // Start total timer
 
-  const createdTracks = await Promise.all(
-    files.map(async (file, index) => {
+  const trackProcessingResults: TrackProcessingResultItem[] = await Promise.all(
+    files.map(async (file, index): Promise<TrackProcessingResultItem> => {
       // Get metadata for the current track using the index
       const titleForTrack = titles[index];
       const featuredArtistIdsForTrack = JSON.parse(featuredArtistIdsJson[index] || '[]');
       const featuredArtistNamesForTrack = JSON.parse(featuredArtistNamesJson[index] || '[]');
-      // const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]'); // <<< REMOVED: genres will come from analysis
+      const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]') as string[];
+
+      // Calculate newTrackNumber at the beginning of the iteration
+      const newTrackNumber = maxTrackNumber + index + 1;
 
       if (!titleForTrack) { // Simplified check for title presence
         console.error(`Missing title for track at index ${index}`);
@@ -373,6 +392,106 @@ export const addTracksToAlbum = async (req: Request) => {
       }
       // >>> END OF AUDIO ANALYSIS <<<
 
+      // <<< START: Local Fingerprint Check >>>
+      const audioBufferForFingerprint = file.buffer;
+      const hash = crypto.createHash('sha256');
+      hash.update(audioBufferForFingerprint);
+      const calculatedLocalFingerprint = hash.digest('hex');
+
+      const existingTrackWithFingerprint = await prisma.track.findUnique({
+        where: { localFingerprint: calculatedLocalFingerprint },
+        select: { ...trackSelect, id: true, artistId: true, title: true, albumId: true, labelId: true }, // Select more fields
+      });
+
+      if (existingTrackWithFingerprint) {
+        if (existingTrackWithFingerprint.artistId !== mainArtistId) {
+          // Fingerprint matches a track by a DIFFERENT artist - this is a conflict
+          const error: any = new Error(
+            `Nội dung bài hát "${file.originalname}" (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`
+          );
+          error.isCopyrightConflict = true;
+          error.isLocalFingerprintConflict = true;
+          error.conflictingFile = file.originalname;
+          error.copyrightDetails = {
+            conflictingTrackTitle: existingTrackWithFingerprint.title,
+            conflictingArtistName: existingTrackWithFingerprint.artist?.artistName || 'Unknown Artist',
+            isLocalFingerprintConflict: true,
+            localFingerprint: calculatedLocalFingerprint,
+          };
+          throw error; // This error will be caught by the calling function/frontend
+        } else {
+          // <<< Track with same fingerprint by the SAME artist already exists >>>
+          console.log(`[addTracksToAlbum] File ${file.originalname} (fingerprint ${calculatedLocalFingerprint}) matches existing track (ID: ${existingTrackWithFingerprint.id}, Title: "${existingTrackWithFingerprint.title}") by the same artist (ID: ${mainArtistId}).`);
+
+          const oldAlbumIdOfExistingTrack = existingTrackWithFingerprint.albumId;
+
+          // Prepare updates for the existing track to link it to the current album
+          // and update its metadata based on the current form submission for this file.
+          const featuredArtistIdsForThisFile = new Set<string>();
+          if (featuredArtistIdsForTrack.length > 0) {
+            const existingArtists = await prisma.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
+            existingArtists.forEach(artist => { if (artist.id !== mainArtistId) featuredArtistIdsForThisFile.add(artist.id) });
+          }
+          if (featuredArtistNamesForTrack.length > 0) {
+            for (const name of featuredArtistNamesForTrack) {
+              try {
+                const profile = await getOrCreateArtistProfile(name); // Assuming tx is not needed here or handled by getOrCreate
+                if (profile.id !== mainArtistId) featuredArtistIdsForThisFile.add(profile.id);
+              } catch (error) { console.error(`Error resolving artist name "${name}" for track ${index}:`, error); }
+            }
+          }
+
+          const updatesForExistingTrack: Prisma.TrackUpdateInput = {
+            title: titleForTrack, // Update title from current form input
+            album: { connect: { id: albumId } },
+            trackNumber: newTrackNumber,
+            coverUrl: albumWithLabel.coverUrl,
+            type: albumWithLabel.type,
+            releaseDate: new Date((albumWithLabel as any)?.releaseDate || Date.now()),
+            label: albumLabelId ? { connect: { id: albumLabelId } } : (existingTrackWithFingerprint.labelId ? { disconnect: true } : undefined), // Update label
+            artist: { connect: { id: mainArtistId } }, // Should already be connected, but good for consistency
+            // Update genres based on current form input for this file
+            genres: {
+              deleteMany: {}, // Remove old genres
+              create: genreIdsForTrack && genreIdsForTrack.length > 0
+                ? genreIdsForTrack.map((genreId: string) => ({ genre: { connect: { id: genreId } } }))
+                : undefined,
+            },
+            // Update featured artists based on current form input for this file
+            featuredArtists: {
+              deleteMany: {}, // Remove old featured artists
+              create: Array.from(featuredArtistIdsForThisFile).map(artistId => ({ artistProfile: { connect: { id: artistId } } }))
+            }
+            // Other fields like duration, audioUrl, playCount should remain from the original track.
+            // Audio features (tempo, mood etc.) would also typically remain, unless re-analysis is intended.
+          };
+
+          const updatedTrack = await prisma.track.update({
+            where: { id: existingTrackWithFingerprint.id },
+            data: updatesForExistingTrack,
+            select: trackSelect,
+          });
+          
+          let statusMsg: SkippedTrackInfo['status'] = 'linked_existing_to_album';
+          if (oldAlbumIdOfExistingTrack && oldAlbumIdOfExistingTrack !== albumId) {
+             statusMsg = 'skipped_duplicate_self_moved_album';
+          } else if (oldAlbumIdOfExistingTrack === albumId) {
+             statusMsg = 'skipped_duplicate_self_already_in_album';
+          }
+
+
+          return {
+            status: statusMsg,
+            fileName: file.originalname,
+            track: updatedTrack, // Return the updated track details
+            oldAlbumId: oldAlbumIdOfExistingTrack, // For transaction logic later if needed
+            localFingerprint: calculatedLocalFingerprint,
+          };
+        }
+      }
+      // <<< END: Local Fingerprint Check (and handling for same artist) >>>
+
+      // If we reach here, the fingerprint is new, so create a new track.
       const existingTrackCheck = await prisma.track.findFirst({
         where: { title: titleForTrack, artistId: mainArtistId, albumId: albumId }, // More specific check
       });
@@ -384,8 +503,6 @@ export const addTracksToAlbum = async (req: Request) => {
         // throw new Error(`Track "${titleForTrack}" already exists in this album.`);
       }
 
-      const newTrackNumber = maxTrackNumber + index + 1;
-      
       // Resolve featured artists for *this* track
       // console.time(`[addTracksToAlbum] Resolve Artists ${index}`);
       const allFeaturedArtistIds = new Set<string>();
@@ -422,22 +539,14 @@ export const addTracksToAlbum = async (req: Request) => {
         scale: audioFeatures.scale,
         danceability: audioFeatures.danceability,
         energy: audioFeatures.energy,
-        // Note: instrumentalness, acousticness, etc. from audioFeatures are not on the base Track model by default
-        // If your Track model has these, uncomment and map them here.
-        // instrumentalness: audioFeatures.instrumentalness,
-        // acousticness: audioFeatures.acousticness,
-        // valence: audioFeatures.valence,
-        // loudness: audioFeatures.loudness,
-        // speechiness: audioFeatures.speechiness,
-        // >>> END OF AUDIO FEATURE POPULATION <<<
+        localFingerprint: calculatedLocalFingerprint, // <<< Save calculated fingerprint
         featuredArtists:
           allFeaturedArtistIds.size > 0
             ? { create: Array.from(allFeaturedArtistIds).map(artistId => ({ artistProfile: { connect: { id: artistId } } })) }
             : undefined,
-        // >>> MODIFIED: Use genreIds from audioFeatures <<<
         genres:
-          audioFeatures.genreIds && audioFeatures.genreIds.length > 0
-            ? { create: audioFeatures.genreIds.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
+          genreIdsForTrack && genreIdsForTrack.length > 0
+            ? { create: genreIdsForTrack.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
             : undefined, 
       };
 
@@ -456,16 +565,26 @@ export const addTracksToAlbum = async (req: Request) => {
     })
   );
 
-  // Filter out any nulls if tracks were skipped due to duplication
-  const validCreatedTracks = createdTracks.filter(track => track !== null) as NonNullable<typeof createdTracks[0]>[];
+  // Filter out successfully created tracks and skipped tracks
+  const successfullyAddedTracks = trackProcessingResults.filter(
+    (result): result is Prisma.TrackGetPayload<{ select: typeof trackSelect }> => 
+      result && !('status' in result) // Successfully created tracks won't have a 'status' field
+  );
 
-  const tracks = await prisma.track.findMany({ where: { albumId }, select: { duration: true, id: true, title: true } }); // Added id and title for logging
-  const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+  const skippedTracks = trackProcessingResults.filter(
+    (result): result is SkippedTrackInfo => 
+      result && 'status' in result
+  );
 
-  // Enhanced Logging
+  const tracksForAlbumUpdate = await prisma.track.findMany({ 
+    where: { albumId }, 
+    select: { duration: true, id: true, title: true } 
+  });
+  const totalDuration = tracksForAlbumUpdate.reduce((sum, track) => sum + (track.duration || 0), 0);
+
   const updatedAlbum = await prisma.album.update({
     where: { id: albumId },
-    data: { duration: totalDuration, totalTracks: tracks.length },
+    data: { duration: totalDuration, totalTracks: tracksForAlbumUpdate.length },
     select: albumSelect,
   });
 
@@ -473,9 +592,35 @@ export const addTracksToAlbum = async (req: Request) => {
   const io = getIO();
   io.emit('album:updated', { album: updatedAlbum });
 
+  // After processing all files, handle album track count updates for moved tracks
+  // This is a simplified approach; a full transaction might be better for atomicity.
+  const movedTracksInfo = skippedTracks.filter(
+    (item): item is SkippedTrackInfo & { status: 'skipped_duplicate_self_moved_album', oldAlbumId: string, track: { id: string } } => 
+      item.status === 'skipped_duplicate_self_moved_album' && !!item.oldAlbumId && item.oldAlbumId !== albumId && !!item.track
+  );
+
+  for (const movedTrack of movedTracksInfo) {
+    if (movedTrack.oldAlbumId) { // oldAlbumId is confirmed to be non-null and different from current albumId
+      try {
+        await prisma.album.update({
+          where: { id: movedTrack.oldAlbumId },
+          data: { totalTracks: { decrement: 1 } },
+        });
+        console.log(`[addTracksToAlbum] Decremented track count for old album ${movedTrack.oldAlbumId} due to track ${movedTrack.track?.id} moving.`);
+      } catch (error) {
+        console.error(`[addTracksToAlbum] Failed to decrement track count for old album ${movedTrack.oldAlbumId}:`, error);
+      }
+    }
+  }
+
   // console.timeEnd('[addTracksToAlbum] Total Processing Time'); // End total timer
 
-  return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: validCreatedTracks };
+  return { 
+    message: 'Tracks processing complete.', 
+    album: updatedAlbum, 
+    successfullyAddedTracks, 
+    skippedTracks 
+  };
 };
 
 export const updateAlbum = async (req: Request) => {
