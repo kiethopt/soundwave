@@ -140,6 +140,7 @@ exports.trackSelect = {
     energy: true,
     createdAt: true,
     updatedAt: true,
+    localFingerprint: true,
     artistId: true,
     labelId: true,
     label: {
@@ -724,6 +725,7 @@ exports.searchTrackSelect = {
     energy: true,
     createdAt: true,
     updatedAt: true,
+    localFingerprint: true,
     artist: {
         select: {
             id: true,

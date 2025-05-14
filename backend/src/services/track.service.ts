@@ -23,6 +23,7 @@ import * as acrcloudService from "./acrcloud.service"; // Import the new ACRClou
 import * as fs from "fs/promises";
 import * as path from "path";
 import { tmpdir } from "os";
+import * as crypto from 'crypto'; // <<< Import crypto
 
 // Comment out or remove AudD specific initialization
 // const auddApiKey = process.env.AUDD_API_KEY;
@@ -527,6 +528,7 @@ interface CreateTrackData {
   featuredArtistIds?: string[];
   featuredArtistNames?: string[];
   labelId?: string;
+  localFingerprint?: string;
 }
 
 // --- START: Refactored Audio Analysis Helper ---
@@ -556,7 +558,7 @@ export class TrackService {
     audioFile: Express.Multer.File,
     coverFile?: Express.Multer.File,
     requestUser?: any
-  ): Promise<Track> {
+  ): Promise<Track | { status: string; message: string; track: any }> {
     const {
       title,
       releaseDate,
@@ -565,7 +567,55 @@ export class TrackService {
       featuredArtistIds = [],
       featuredArtistNames = [],
       labelId,
+      localFingerprint, // <<< Expect localFingerprint from data
     } = data;
+
+    let localFingerprintToSave = localFingerprint;
+    if (!localFingerprintToSave && audioFile) { // Only calculate if not provided AND audioFile exists (for safety/legacy)
+        const audioBuffer = audioFile.buffer;
+        const hash = crypto.createHash('sha256');
+        hash.update(audioBuffer);
+        localFingerprintToSave = hash.digest('hex');
+        console.warn(`[CreateTrack] localFingerprint was not provided, calculated new one: ${localFingerprintToSave}. This might indicate an outdated client or flow.`);
+    }
+
+    // <<< Check for existing track by fingerprint AND same artist BEFORE creating >>>
+    if (localFingerprintToSave) {
+      const existingTrackByFingerprint = await prisma.track.findUnique({
+        where: { localFingerprint: localFingerprintToSave },
+        select: { ...trackSelect, artistId: true }, // Ensure artistId is selected
+      });
+
+      if (existingTrackByFingerprint) {
+        if (existingTrackByFingerprint.artistId === artistProfileId) {
+          // Track with same fingerprint by the same artist already exists
+          console.log(`[CreateTrack] Track with fingerprint ${localFingerprintToSave} by artist ${artistProfileId} already exists (ID: ${existingTrackByFingerprint.id}). Returning existing track info.`);
+          // Optionally, consider if metadata (title, genres etc.) should be updated on the existing track here.
+          // For now, just return info about the existing track.
+          return {
+            status: 'duplicate_by_same_artist',
+            message: `This audio content already exists as track "${existingTrackByFingerprint.title}" by you.`,
+            track: existingTrackByFingerprint,
+          };
+        } else {
+          // Fingerprint matches a track by a DIFFERENT artist - this is a conflict
+          // This should ideally be caught by checkTrackCopyrightOnly, but as a safeguard:
+          const error: any = new Error(
+            `Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackByFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackByFingerprint.title}).`
+          );
+          error.isCopyrightConflict = true;
+          error.isLocalFingerprintConflict = true;
+          error.copyrightDetails = {
+            conflictingTrackTitle: existingTrackByFingerprint.title,
+            conflictingArtistName: existingTrackByFingerprint.artist?.artistName || 'Unknown Artist',
+            isLocalFingerprintConflict: true,
+            localFingerprint: localFingerprintToSave,
+          };
+          throw error; // This will be caught by the route handler
+        }
+      }
+    }
+    // <<< End of pre-check >>>
 
     const mainArtist = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
@@ -582,9 +632,6 @@ export class TrackService {
       throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
     }
     const artistName = mainArtist.artistName;
-
-    // THE FULL COPYRIGHT CHECK LOGIC WILL BE MOVED TO checkTrackCopyrightOnly
-    // For now, we assume checkTrackCopyrightOnly was called and its result is passed or handled
 
     const finalLabelId = labelId || mainArtist.labelId;
 
@@ -673,21 +720,18 @@ export class TrackService {
       energy: audioFeatures.energy,
       playCount: 0,
       label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
+      localFingerprint: localFingerprintToSave,
     };
 
-    if (audioFeatures.genreIds && audioFeatures.genreIds.length > 0) {
+    // Use user-provided genreIds if available, otherwise, no genres initially.
+    if (genreIds && genreIds.length > 0) {
       trackData.genres = {
-        create: audioFeatures.genreIds.map((genreId: string) => ({
+        create: genreIds.map((genreId: string) => ({
           genre: { connect: { id: genreId } },
         })),
       };
     } else {
-      const defaultGenre = await prisma.genre.findFirst({ where: { name: "Pop" } }) || await prisma.genre.findFirst();
-      if (defaultGenre) {
-        trackData.genres = {
-          create: [{ genre: { connect: { id: defaultGenre.id } } }],
-        };
-      }
+      console.log(`[CreateTrack] No genres provided by user for track "${title}". Track will be created without genres.`);
     }
 
     const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);
@@ -841,12 +885,41 @@ export class TrackService {
       title
     );
 
+    // <<< Check dấu vân tay cục bộ >>>
+    const audioBufferForFingerprint = audioFile.buffer;
+    const hash = crypto.createHash('sha256');
+    hash.update(audioBufferForFingerprint);
+    const calculatedLocalFingerprint = hash.digest('hex');
+
+    const existingTrackWithFingerprint = await prisma.track.findUnique({
+      where: { localFingerprint: calculatedLocalFingerprint },
+      select: { id: true, artistId: true, title: true, artist: { select: { artistName: true } } },
+    });
+
+    if (existingTrackWithFingerprint) {
+      if (existingTrackWithFingerprint.artistId !== artistProfileId) {
+        const error: any = new Error(
+          `Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`
+        );
+        error.isCopyrightConflict = true; 
+        error.isLocalFingerprintConflict = true; 
+        error.copyrightDetails = { 
+          conflictingTrackTitle: existingTrackWithFingerprint.title, 
+          conflictingArtistName: existingTrackWithFingerprint.artist?.artistName || 'Unknown Artist', 
+          isLocalFingerprintConflict: true, 
+          localFingerprint: calculatedLocalFingerprint, 
+        };
+        throw error;
+      }
+      console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track by the same artist. Fingerprint will be passed.`);
+    }
+
     if (copyrightCheckResult.error) {
       console.warn(
         `[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`
       );
       return {
-        isSafeToUpload: false, // Treat ACRCloud error as potentially unsafe
+        isSafeToUpload: false, 
         message:
           copyrightCheckResult.errorMessage ||
           "Copyright check service failed. Cannot confirm safety.",
@@ -856,19 +929,18 @@ export class TrackService {
             message: copyrightCheckResult.errorMessage,
             code: copyrightCheckResult.errorCode,
           },
+          localFingerprint: calculatedLocalFingerprint,
         },
       };
     }
 
     if (copyrightCheckResult.isMatched && copyrightCheckResult.match) {
       const match = copyrightCheckResult.match;
+
       const isAdminUpload =
         requestUser &&
         requestUser.role === Role.ADMIN &&
-        requestUser.id !== mainArtist.id; // Assuming requestUser has id for comparison
-
-      // Extract matched artist name from ACRCloud response
-      // ACRCloud returns artists as an array of objects, e.g., [{ name: "Artist A" }, { name: "Artist B" }]
+        requestUser.id !== mainArtist.id;
       const matchedArtistNames =
         match.artists
           ?.map((a) => a.name)
@@ -884,7 +956,10 @@ export class TrackService {
           `Copyright violation detected. The uploaded audio appears to match "${match.title}" but the original artist couldn't be determined by the check.`
         );
         error.isCopyrightConflict = true;
-        error.copyrightDetails = match; // Send the full ACRCloud match object
+        error.copyrightDetails = {
+          ...match,
+          localFingerprint: calculatedLocalFingerprint,
+        };
         throw error;
       }
 
@@ -1082,12 +1157,18 @@ export class TrackService {
             return {
               isSafeToUpload: true,
               message: `Copyright check passed. The audio matches "${match.title}" by ${canonicalArtistDisplay}${messageSuffix}`,
-              copyrightDetails: match,
+              copyrightDetails: {
+                ...match,
+                localFingerprint: calculatedLocalFingerprint,
+              }
             };
           } else {
             const error: any = new Error(blockingReason);
             error.isCopyrightConflict = true;
-            error.copyrightDetails = match;
+            error.copyrightDetails = {
+              ...match,
+              localFingerprint: calculatedLocalFingerprint,
+            };
             throw error;
           }
         } else {
@@ -1102,7 +1183,10 @@ export class TrackService {
             errorMessage += ` (Album: ${match.album.name})`;
           const error: any = new Error(errorMessage);
           error.isCopyrightConflict = true;
-          error.copyrightDetails = match;
+          error.copyrightDetails = {
+            ...match,
+            localFingerprint: calculatedLocalFingerprint,
+          };
           throw error;
         }
       } else {
@@ -1112,7 +1196,10 @@ export class TrackService {
         if (match.album?.name) errorMessage += ` (Album: ${match.album.name})`;
         const error: any = new Error(errorMessage);
         error.isCopyrightConflict = true;
-        error.copyrightDetails = match;
+        error.copyrightDetails = {
+          ...match,
+          localFingerprint: calculatedLocalFingerprint,
+        };
         throw error;
       }
     } else {
@@ -1123,6 +1210,9 @@ export class TrackService {
       return {
         isSafeToUpload: true,
         message: "No copyright match found by detection service.",
+        copyrightDetails: {
+          localFingerprint: calculatedLocalFingerprint
+        }
       };
     }
   }
@@ -1297,30 +1387,36 @@ export const updateTrack = async (req: Request, id: string) => {
     }
 
     // --- Update Featured Artists ---
-    const featuredArtistIdsFromBody = req.body.featuredArtistIds as
-      | string[]
-      | undefined;
-    const featuredArtistNamesFromBody = req.body.featuredArtistNames as
-      | string[]
-      | undefined;
+    const rawFeaturedArtistIds = req.body.featuredArtistIds as string | undefined;
+    const rawFeaturedArtistNames = req.body.featuredArtistNames as string | undefined;
 
-    // Only update featured artists if at least one of the relevant fields is present in the request body.
-    // Sending empty arrays for both means "remove all featured artists".
-    // If neither key is present, featured artists are not modified.
-    if (
-      featuredArtistIdsFromBody !== undefined ||
-      featuredArtistNamesFromBody !== undefined
-    ) {
+    // Helper to parse JSON array string
+    const parseJsonStringArray = (jsonString: string | undefined): string[] => {
+      if (!jsonString) return [];
+      try {
+        const parsed = JSON.parse(jsonString);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((item): item is string => typeof item === 'string');
+        }
+        return [];
+      } catch (e) {
+        console.warn(`[updateTrack] Failed to parse JSON string for featured artists: ${jsonString}`, e);
+        return [];
+      }
+    };
+    
+    const intentToUpdateFeaturedArtists = rawFeaturedArtistIds !== undefined || rawFeaturedArtistNames !== undefined;
+
+    if (intentToUpdateFeaturedArtists) {
       await tx.trackArtist.deleteMany({ where: { trackId: id } });
+
+      const featuredArtistIdsFromBody = parseJsonStringArray(rawFeaturedArtistIds);
+      const featuredArtistNamesFromBody = parseJsonStringArray(rawFeaturedArtistNames);
 
       const resolvedFeaturedArtistIds = new Set<string>();
 
-      // Process IDs from featuredArtistIds[]
-      if (
-        featuredArtistIdsFromBody &&
-        Array.isArray(featuredArtistIdsFromBody) &&
-        featuredArtistIdsFromBody.length > 0
-      ) {
+      // Process IDs from featuredArtistIdsFromBody
+      if (featuredArtistIdsFromBody.length > 0) {
         const existingArtists = await tx.artistProfile.findMany({
           where: { id: { in: featuredArtistIdsFromBody } },
           select: { id: true },
@@ -1345,12 +1441,8 @@ export const updateTrack = async (req: Request, id: string) => {
         });
       }
 
-      // Process names from featuredArtistNames[]
-      if (
-        featuredArtistNamesFromBody &&
-        Array.isArray(featuredArtistNamesFromBody) &&
-        featuredArtistNamesFromBody.length > 0
-      ) {
+      // Process names from featuredArtistNamesFromBody
+      if (featuredArtistNamesFromBody.length > 0) {
         for (const name of featuredArtistNamesFromBody) {
           if (typeof name === "string" && name.trim() !== "") {
             try {

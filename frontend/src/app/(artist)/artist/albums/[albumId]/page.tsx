@@ -585,7 +585,7 @@ export default function AlbumDetailPage() {
                   };
                   return (
                     <div key={track.id} className="grid grid-cols-[40px_3fr_2fr_340px_80px_70px_48px_48px] items-center gap-1.5 px-4 py-3 text-sm group hover:bg-white/5">
-                      <span className="text-center">{track.trackNumber || idx + 1}</span>
+                      <span className="text-center">{idx + 1}</span>
                       <span className="font-medium truncate pl-1">{track.title}</span>
                       <span className="truncate pl-1">{allArtists.map((a) => a.artistName).join(', ')}</span>
                       <span className="flex justify-center">

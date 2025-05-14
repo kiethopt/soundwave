@@ -281,24 +281,48 @@ const TrackUploadForm = ({
         toast.error('Connection timeout. Server might be busy. Please try again.');
       } else if (backendError && backendError.isCopyrightConflict && backendError.copyrightDetails) {
         const details = backendError.copyrightDetails;
-        let artistString = 'Unknown Artist';
-        if (details.artists && details.artists.length > 0) {
-          artistString = details.artists.map((a: { name: string }) => a.name).join(', ');
+        const isLocalConflictCheck = !!details.isLocalFingerprintConflict;
+
+        let finalTitle = 'Unknown Title';
+        let finalArtist = 'Unknown Artist';
+        let finalAlbum = details.album?.name;
+        let finalReleaseDate = details.release_date;
+        let finalLabel = details.label;
+        let finalSongLink = details.song_link;
+        let originalConflictingFile = backendError.conflictingFile || fileName;
+
+        if (isLocalConflictCheck) {
+          finalTitle = details.conflictingTrackTitle || 'Conflict Title (Local)';
+          finalArtist = details.conflictingArtistName || 'Conflict Artist (Local)';
+          finalAlbum = undefined;
+          finalReleaseDate = undefined;
+          finalLabel = undefined;
+          finalSongLink = undefined;
+        } else {
+          // This is for non-local (e.g., ACRCloud) copyright matches
+          finalTitle = details.title || 'Unknown Title';
+          if (details.artists && details.artists.length > 0) {
+            finalArtist = details.artists.map((a: { name: string }) => a.name).join(', ');
+          }
         }
+
         const newCopyrightInfo: CopyrightInfo = {
-          title: details.title || 'Unknown Title',
-          artist: artistString,
-          album: details.album?.name,
-          releaseDate: details.release_date,
-          label: details.label,
-          songLink: details.song_link,
-          isBlocking: true,
+          title: finalTitle,
+          artist: finalArtist,
+          album: finalAlbum,
+          releaseDate: finalReleaseDate,
+          label: finalLabel,
+          songLink: finalSongLink,
+          isBlocking: true, 
         };
         setCopyrightInfos(prev => ({ ...prev, [fileName]: newCopyrightInfo }));
-        if (backendError.message?.includes('similarity score')) {
-          toast.error(`Copyright Match for "${trackTitle}": Artist name similarity too low.`);
+
+        if (isLocalConflictCheck) {
+          toast.error(`Local Content Conflict for "${originalConflictingFile}": Audio matches "${finalTitle}" by ${finalArtist}.`);
+        } else if (backendError.message?.includes('similarity score')) {
+          toast.error(`Copyright Match for "${finalTitle || trackTitle}": Artist name similarity too low with ${finalArtist}.`);
         } else {
-          toast.error(`Copyright Match for "${trackTitle}": Track matches existing content.`);
+          toast.error(`Copyright Match for "${finalTitle || trackTitle}" by ${finalArtist}.`);
         }
       } else {
         console.error(`Full error checking copyright for "${trackTitle}":`, error);

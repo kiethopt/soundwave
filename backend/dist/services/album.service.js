@@ -46,6 +46,7 @@ const handle_utils_1 = require("src/utils/handle-utils");
 const socket_1 = require("../config/socket");
 const artist_service_1 = require("./artist.service");
 const mm = __importStar(require("music-metadata"));
+const crypto = __importStar(require("crypto"));
 const canManageAlbum = (user, albumArtistId) => {
     if (!user)
         return false;
@@ -309,10 +310,12 @@ const addTracksToAlbum = async (req) => {
     if (files.length !== titles.length) {
         throw new Error(`Mismatch between uploaded files (${files.length}) and titles (${titles.length}).`);
     }
-    const createdTracks = await Promise.all(files.map(async (file, index) => {
+    const trackProcessingResults = await Promise.all(files.map(async (file, index) => {
         const titleForTrack = titles[index];
         const featuredArtistIdsForTrack = JSON.parse(featuredArtistIdsJson[index] || '[]');
         const featuredArtistNamesForTrack = JSON.parse(featuredArtistNamesJson[index] || '[]');
+        const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]');
+        const newTrackNumber = maxTrackNumber + index + 1;
         if (!titleForTrack) {
             console.error(`Missing title for track at index ${index}`);
             throw new Error(`Missing title or metadata for track at index ${index} (file: ${file.originalname})`);
@@ -340,13 +343,96 @@ const addTracksToAlbum = async (req) => {
         catch (analysisError) {
             console.error(`[addTracksToAlbum] Audio analysis failed for track ${index} (${file.originalname}):`, analysisError);
         }
+        const audioBufferForFingerprint = file.buffer;
+        const hash = crypto.createHash('sha256');
+        hash.update(audioBufferForFingerprint);
+        const calculatedLocalFingerprint = hash.digest('hex');
+        const existingTrackWithFingerprint = await db_1.default.track.findUnique({
+            where: { localFingerprint: calculatedLocalFingerprint },
+            select: { ...prisma_selects_1.trackSelect, id: true, artistId: true, title: true, albumId: true, labelId: true },
+        });
+        if (existingTrackWithFingerprint) {
+            if (existingTrackWithFingerprint.artistId !== mainArtistId) {
+                const error = new Error(`Nội dung bài hát "${file.originalname}" (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`);
+                error.isCopyrightConflict = true;
+                error.isLocalFingerprintConflict = true;
+                error.conflictingFile = file.originalname;
+                error.copyrightDetails = {
+                    conflictingTrackTitle: existingTrackWithFingerprint.title,
+                    conflictingArtistName: existingTrackWithFingerprint.artist?.artistName || 'Unknown Artist',
+                    isLocalFingerprintConflict: true,
+                    localFingerprint: calculatedLocalFingerprint,
+                };
+                throw error;
+            }
+            else {
+                console.log(`[addTracksToAlbum] File ${file.originalname} (fingerprint ${calculatedLocalFingerprint}) matches existing track (ID: ${existingTrackWithFingerprint.id}, Title: "${existingTrackWithFingerprint.title}") by the same artist (ID: ${mainArtistId}).`);
+                const oldAlbumIdOfExistingTrack = existingTrackWithFingerprint.albumId;
+                const featuredArtistIdsForThisFile = new Set();
+                if (featuredArtistIdsForTrack.length > 0) {
+                    const existingArtists = await db_1.default.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
+                    existingArtists.forEach(artist => { if (artist.id !== mainArtistId)
+                        featuredArtistIdsForThisFile.add(artist.id); });
+                }
+                if (featuredArtistNamesForTrack.length > 0) {
+                    for (const name of featuredArtistNamesForTrack) {
+                        try {
+                            const profile = await (0, artist_service_1.getOrCreateArtistProfile)(name);
+                            if (profile.id !== mainArtistId)
+                                featuredArtistIdsForThisFile.add(profile.id);
+                        }
+                        catch (error) {
+                            console.error(`Error resolving artist name "${name}" for track ${index}:`, error);
+                        }
+                    }
+                }
+                const updatesForExistingTrack = {
+                    title: titleForTrack,
+                    album: { connect: { id: albumId } },
+                    trackNumber: newTrackNumber,
+                    coverUrl: albumWithLabel.coverUrl,
+                    type: albumWithLabel.type,
+                    releaseDate: new Date(albumWithLabel?.releaseDate || Date.now()),
+                    label: albumLabelId ? { connect: { id: albumLabelId } } : (existingTrackWithFingerprint.labelId ? { disconnect: true } : undefined),
+                    artist: { connect: { id: mainArtistId } },
+                    genres: {
+                        deleteMany: {},
+                        create: genreIdsForTrack && genreIdsForTrack.length > 0
+                            ? genreIdsForTrack.map((genreId) => ({ genre: { connect: { id: genreId } } }))
+                            : undefined,
+                    },
+                    featuredArtists: {
+                        deleteMany: {},
+                        create: Array.from(featuredArtistIdsForThisFile).map(artistId => ({ artistProfile: { connect: { id: artistId } } }))
+                    }
+                };
+                const updatedTrack = await db_1.default.track.update({
+                    where: { id: existingTrackWithFingerprint.id },
+                    data: updatesForExistingTrack,
+                    select: prisma_selects_1.trackSelect,
+                });
+                let statusMsg = 'linked_existing_to_album';
+                if (oldAlbumIdOfExistingTrack && oldAlbumIdOfExistingTrack !== albumId) {
+                    statusMsg = 'skipped_duplicate_self_moved_album';
+                }
+                else if (oldAlbumIdOfExistingTrack === albumId) {
+                    statusMsg = 'skipped_duplicate_self_already_in_album';
+                }
+                return {
+                    status: statusMsg,
+                    fileName: file.originalname,
+                    track: updatedTrack,
+                    oldAlbumId: oldAlbumIdOfExistingTrack,
+                    localFingerprint: calculatedLocalFingerprint,
+                };
+            }
+        }
         const existingTrackCheck = await db_1.default.track.findFirst({
             where: { title: titleForTrack, artistId: mainArtistId, albumId: albumId },
         });
         if (existingTrackCheck) {
             console.warn(`Track with title "${titleForTrack}" already exists in this album for this artist. Skipping.`);
         }
-        const newTrackNumber = maxTrackNumber + index + 1;
         const allFeaturedArtistIds = new Set();
         if (featuredArtistIdsForTrack.length > 0) {
             const existingArtists = await db_1.default.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
@@ -382,11 +468,12 @@ const addTracksToAlbum = async (req) => {
             scale: audioFeatures.scale,
             danceability: audioFeatures.danceability,
             energy: audioFeatures.energy,
+            localFingerprint: calculatedLocalFingerprint,
             featuredArtists: allFeaturedArtistIds.size > 0
                 ? { create: Array.from(allFeaturedArtistIds).map(artistId => ({ artistProfile: { connect: { id: artistId } } })) }
                 : undefined,
-            genres: audioFeatures.genreIds && audioFeatures.genreIds.length > 0
-                ? { create: audioFeatures.genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })) }
+            genres: genreIdsForTrack && genreIdsForTrack.length > 0
+                ? { create: genreIdsForTrack.map((genreId) => ({ genre: { connect: { id: genreId } } })) }
                 : undefined,
         };
         if (albumLabelId) {
@@ -398,17 +485,41 @@ const addTracksToAlbum = async (req) => {
         });
         return track;
     }));
-    const validCreatedTracks = createdTracks.filter(track => track !== null);
-    const tracks = await db_1.default.track.findMany({ where: { albumId }, select: { duration: true, id: true, title: true } });
-    const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+    const successfullyAddedTracks = trackProcessingResults.filter((result) => result && !('status' in result));
+    const skippedTracks = trackProcessingResults.filter((result) => result && 'status' in result);
+    const tracksForAlbumUpdate = await db_1.default.track.findMany({
+        where: { albumId },
+        select: { duration: true, id: true, title: true }
+    });
+    const totalDuration = tracksForAlbumUpdate.reduce((sum, track) => sum + (track.duration || 0), 0);
     const updatedAlbum = await db_1.default.album.update({
         where: { id: albumId },
-        data: { duration: totalDuration, totalTracks: tracks.length },
+        data: { duration: totalDuration, totalTracks: tracksForAlbumUpdate.length },
         select: prisma_selects_1.albumSelect,
     });
     const io = (0, socket_1.getIO)();
     io.emit('album:updated', { album: updatedAlbum });
-    return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: validCreatedTracks };
+    const movedTracksInfo = skippedTracks.filter((item) => item.status === 'skipped_duplicate_self_moved_album' && !!item.oldAlbumId && item.oldAlbumId !== albumId && !!item.track);
+    for (const movedTrack of movedTracksInfo) {
+        if (movedTrack.oldAlbumId) {
+            try {
+                await db_1.default.album.update({
+                    where: { id: movedTrack.oldAlbumId },
+                    data: { totalTracks: { decrement: 1 } },
+                });
+                console.log(`[addTracksToAlbum] Decremented track count for old album ${movedTrack.oldAlbumId} due to track ${movedTrack.track?.id} moving.`);
+            }
+            catch (error) {
+                console.error(`[addTracksToAlbum] Failed to decrement track count for old album ${movedTrack.oldAlbumId}:`, error);
+            }
+        }
+    }
+    return {
+        message: 'Tracks processing complete.',
+        album: updatedAlbum,
+        successfullyAddedTracks,
+        skippedTracks
+    };
 };
 exports.addTracksToAlbum = addTracksToAlbum;
 const updateAlbum = async (req) => {

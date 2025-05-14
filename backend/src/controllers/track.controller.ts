@@ -31,7 +31,8 @@ export const createTrack = async (req: Request, res: Response): Promise<void> =>
       genreIds,
       featuredArtistIds,
       featuredArtistNames,
-      labelId
+      labelId,
+      localFingerprint,
     } = req.body;
 
     if (!title || !releaseDate) {
@@ -59,7 +60,8 @@ export const createTrack = async (req: Request, res: Response): Promise<void> =>
       genreIds: genreIds || [],
       featuredArtistIds: featuredArtistIds || [],
       featuredArtistNames: featuredArtistNames || [],
-      labelId: labelId || undefined
+      labelId: labelId || undefined,
+      localFingerprint: localFingerprint || undefined,
     };
 
     const newTrack = await TrackService.createTrack(
@@ -73,8 +75,26 @@ export const createTrack = async (req: Request, res: Response): Promise<void> =>
     res.status(201).json({ message: 'Track created successfully', track: newTrack });
 
   } catch (error: any) {
-    if (error.code === 'P2002') {
-      res.status(409).json({ message: `A track with this title likely already exists for this artist.`, code: error.code });
+    if (error.isFingerprintConflict) {
+      res.status(409).json({
+        message: error.message,
+        isFingerprintConflict: true,
+        conflictingTrackTitle: error.conflictingTrackTitle,
+        conflictingArtistName: error.conflictingArtistName,
+      });
+    } else if (error.isDuplicateFingerprintBySameArtist) {
+      res.status(409).json({
+        message: error.message,
+        isDuplicateFingerprintBySameArtist: true,
+      });
+    } else if (error.code === 'P2002') {
+      let specificMessage = `A track with this title likely already exists for this artist.`;
+      if (error.meta?.target?.includes('localFingerprint')) {
+        specificMessage = `A different track with the exact same audio content already exists.`;
+      } else if (error.meta?.target?.includes('title') && error.meta?.target?.includes('artistId')) {
+        specificMessage = `You already have a track with the title: "${req.body.title}".`;
+      }
+      res.status(409).json({ message: specificMessage, code: error.code });
     } else {
       handleError(res, error, 'Create track');
     }
