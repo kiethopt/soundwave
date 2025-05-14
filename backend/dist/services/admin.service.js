@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteSystemPlaylist = exports.removeTrackFromSystemPlaylist = exports.fixAlbumTrackTypeConsistency = exports.extractTrackAndArtistData = exports.getPendingArtistRoleRequests = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updatePlaylistVisibility = exports.deleteSystemPlaylist = exports.removeTrackFromSystemPlaylist = exports.fixAlbumTrackTypeConsistency = exports.extractTrackAndArtistData = exports.getPendingArtistRoleRequests = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.getUserListeningHistoryDetails = exports.getUserAiPlaylists = exports.setAiPlaylistVisibilityForUser = exports.generateAndAssignAiPlaylistToUser = exports.processBulkUpload = exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.getAIModelStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 exports.getOrCreateVerifiedArtistProfile = getOrCreateVerifiedArtistProfile;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -3152,7 +3152,7 @@ const removeTrackFromSystemPlaylist = async (adminExecutingId, playlistId, track
         where: { id: playlistId },
         select: {
             id: true,
-            isAIGenerated: true,
+            type: true,
             tracks: {
                 where: { trackId: trackToRemoveId },
                 select: {
@@ -3164,8 +3164,8 @@ const removeTrackFromSystemPlaylist = async (adminExecutingId, playlistId, track
     if (!playlistDetails) {
         throw new errors_1.HttpError(404, "Playlist not found");
     }
-    if (!playlistDetails.isAIGenerated) {
-        throw new errors_1.HttpError(403, "Forbidden: Can only remove tracks from AI-generated system playlists using this method.");
+    if (playlistDetails.type !== client_1.PlaylistType.SYSTEM) {
+        throw new errors_1.HttpError(403, "Forbidden: Can only remove tracks from playlists of type SYSTEM using this method.");
     }
     const playlistTrackEntry = playlistDetails.tracks.length > 0 ? playlistDetails.tracks[0] : null;
     if (!playlistTrackEntry) {
@@ -3250,4 +3250,64 @@ const deleteSystemPlaylist = async (playlistId, adminUserId) => {
     console.log(`[Admin Service] System Playlist ${playlistId} deleted by admin ${adminUserId}`);
 };
 exports.deleteSystemPlaylist = deleteSystemPlaylist;
+const updatePlaylistVisibility = async (adminExecutingId, playlistId, newVisibility) => {
+    const adminUser = await db_1.default.user.findUnique({
+        where: { id: adminExecutingId },
+    });
+    if (!adminUser) {
+        throw new errors_1.HttpError(404, "Admin user not found");
+    }
+    if (adminUser.role !== client_1.Role.ADMIN) {
+        throw new errors_1.HttpError(403, "Forbidden: Insufficient privileges");
+    }
+    if (newVisibility !== client_1.PlaylistPrivacy.PUBLIC &&
+        newVisibility !== client_1.PlaylistPrivacy.PRIVATE) {
+        throw new errors_1.HttpError(400, "Invalid visibility value. Must be PUBLIC or PRIVATE.");
+    }
+    const playlist = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+    });
+    if (!playlist) {
+        throw new errors_1.HttpError(404, "Playlist not found");
+    }
+    if (playlist.type !== client_1.PlaylistType.SYSTEM) {
+        throw new errors_1.HttpError(403, `Forbidden: Cannot change visibility for playlists of type '${playlist.type}'. Only SYSTEM playlists are allowed.`);
+    }
+    const updatedPlaylist = await db_1.default.playlist.update({
+        where: { id: playlistId },
+        data: { privacy: newVisibility, updatedAt: new Date() },
+        select: {
+            id: true,
+            name: true,
+            description: true,
+            coverUrl: true,
+            privacy: true,
+            type: true,
+            isAIGenerated: true,
+            totalTracks: true,
+            totalDuration: true,
+            createdAt: true,
+            updatedAt: true,
+            userId: true,
+            lastGeneratedAt: true,
+            tracks: {
+                take: 3,
+                orderBy: { trackOrder: "asc" },
+                select: {
+                    track: {
+                        select: {
+                            id: true,
+                            title: true,
+                            coverUrl: true,
+                            artist: { select: { artistName: true } },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    console.log(`[AdminService] Updated playlist ${playlistId} visibility to ${newVisibility} by admin ${adminExecutingId}`);
+    return updatedPlaylist;
+};
+exports.updatePlaylistVisibility = updatePlaylistVisibility;
 //# sourceMappingURL=admin.service.js.map

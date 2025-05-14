@@ -1186,3 +1186,43 @@ export const deleteSystemPlaylistHandler = async (
     }
   }
 };
+
+export const updatePlaylistVisibilityHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { playlistId } = req.params;
+    const { privacy } = req.body;
+    const adminUserId = (req.user as PrismaUser)?.id;
+
+    if (!adminUserId) {
+      res.status(401).json({ message: "Unauthorized: Admin user ID missing." });
+      return;
+    }
+
+    if (
+      !privacy ||
+      (privacy !== PlaylistPrivacy.PUBLIC &&
+        privacy !== PlaylistPrivacy.PRIVATE)
+    ) {
+      res
+        .status(400)
+        .json({ message: "Invalid privacy value. Must be PUBLIC or PRIVATE." });
+      return;
+    }
+
+    const updatedPlaylist = await adminService.updatePlaylistVisibility(
+      adminUserId,
+      playlistId,
+      privacy as PlaylistPrivacy
+    );
+
+    res.json({
+      message: "Playlist visibility updated successfully.",
+      playlist: updatedPlaylist,
+    });
+  } catch (error) {
+    handleError(res, error, "Update playlist visibility by admin");
+  }
+};

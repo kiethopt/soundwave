@@ -23,6 +23,8 @@ import {
   Edit,
   Bot,
   Loader2,
+  ArrowLeft,
+  PlusCircle,
 } from "lucide-react";
 import { UserInfoModal } from "@/components/ui/data-table/data-table-modals";
 import {
@@ -40,6 +42,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import GeneratePlaylistParamsModal from "@/components/admin/users/GeneratePlaylistParamsModal";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface SortConfig {
   key: keyof User | null;
@@ -67,10 +71,6 @@ export default function AiUserManagementPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearchTerm, setActiveSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"ALL" | "ADMIN" | "USER">("ALL");
-  const [statusFilter, setStatusFilter] = useState<
-    "ALL" | "ACTIVE" | "INACTIVE"
-  >("ALL");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "createdAt",
     direction: "desc",
@@ -78,16 +78,23 @@ export default function AiUserManagementPage() {
   const limit = 10;
   const [isGenerateAllModalOpen, setIsGenerateAllModalOpen] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [generateProgress, setGenerateProgress] = useState({ current: 0, total: 0 });
+  const [generateProgress, setGenerateProgress] = useState({
+    current: 0,
+    total: 0,
+  });
+  const [isParamsModalOpen, setIsParamsModalOpen] = useState(false);
+  const [modalFeatureAvailability, setModalFeatureAvailability] = useState({
+    // Initialize feature availability state
+  });
+  const [
+    modalFeatureAvailabilityDetermined,
+    setModalFeatureAvailabilityDetermined,
+  ] = useState(false);
+  const [systemPlaylistsRefreshTrigger, setSystemPlaylistsRefreshTrigger] =
+    useState(0);
 
   const fetchUsers = useCallback(
-    async (
-      page: number,
-      search: string,
-      role: "ALL" | "ADMIN" | "USER",
-      status: "ALL" | "ACTIVE" | "INACTIVE",
-      sort: SortConfig
-    ) => {
+    async (page: number, search: string, sort: SortConfig) => {
       setLoading(true);
       setError(null);
       try {
@@ -100,12 +107,6 @@ export default function AiUserManagementPage() {
         params.append("limit", limit.toString());
         if (search) {
           params.append("search", search);
-        }
-        if (role !== "ALL") {
-          params.append("role", role);
-        }
-        if (status !== "ALL") {
-          params.append("status", status === "ACTIVE" ? "true" : "false");
         }
         if (sort.key) {
           params.append("sortBy", sort.key);
@@ -134,22 +135,9 @@ export default function AiUserManagementPage() {
   );
 
   const refreshTable = useCallback(() => {
-    fetchUsers(
-      currentPage,
-      activeSearchTerm,
-      roleFilter,
-      statusFilter,
-      sortConfig
-    );
+    fetchUsers(currentPage, activeSearchTerm, sortConfig);
     setSelectedUserIds(new Set());
-  }, [
-    currentPage,
-    activeSearchTerm,
-    roleFilter,
-    statusFilter,
-    sortConfig,
-    fetchUsers,
-  ]);
+  }, [currentPage, activeSearchTerm, sortConfig, fetchUsers]);
 
   useEffect(() => {
     refreshTable();
@@ -157,7 +145,7 @@ export default function AiUserManagementPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeSearchTerm, roleFilter, statusFilter, sortConfig]);
+  }, [activeSearchTerm, sortConfig]);
 
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -381,7 +369,12 @@ export default function AiUserManagementPage() {
       params.append("page", page.toString());
       params.append("limit", limit.toString());
       params.append("status", "true");
-      const response = await api.admin.getAllUsers(token, page, limit, params.toString());
+      const response = await api.admin.getAllUsers(
+        token,
+        page,
+        limit,
+        params.toString()
+      );
       if (response && response.users) {
         allUsers = allUsers.concat(response.users);
         totalPages = response.pagination?.totalPages || 1;
@@ -393,7 +386,12 @@ export default function AiUserManagementPage() {
     return allUsers;
   };
 
-  const handleGenerateAllUsers = async (params: { customPromptKeywords: string; requestedTrackCount: number }) => {
+  const handleGenerateAllUsers = async (params: {
+    focusOnFeatures: string[];
+    requestedTrackCount: number;
+    playlistName?: string;
+    playlistDescription?: string;
+  }) => {
     setIsGeneratingAll(true);
     setGenerateProgress({ current: 0, total: 0 });
     const token = localStorage.getItem("userToken");
@@ -405,7 +403,9 @@ export default function AiUserManagementPage() {
     let targetUsers: User[] = [];
     if (selectedUserIds.size > 0) {
       // Chỉ generate cho các user đã chọn và active
-      targetUsers = users.filter((u) => selectedUserIds.has(u.id) && u.isActive);
+      targetUsers = users.filter(
+        (u) => selectedUserIds.has(u.id) && u.isActive
+      );
     } else {
       // Lấy toàn bộ user active trong hệ thống
       targetUsers = await fetchAllActiveUsers();
@@ -417,26 +417,109 @@ export default function AiUserManagementPage() {
       return;
     }
     setGenerateProgress({ current: 0, total: targetUsers.length });
-    toast.loading(`Generating playlists for 0/${targetUsers.length} user(s)...`, { id: "generate-all" });
+    toast.loading(
+      `Generating playlists for 0/${targetUsers.length} user(s)...`,
+      { id: "generate-all" }
+    );
     let successCount = 0;
     let failCount = 0;
     for (let i = 0; i < targetUsers.length; i++) {
       try {
-        await api.admin.generateSystemPlaylist(targetUsers[i].id, params, token);
+        const formData = new FormData();
+        formData.append("userId", targetUsers[i].id);
+        formData.append(
+          "focusOnFeatures",
+          JSON.stringify(params.focusOnFeatures)
+        );
+        formData.append(
+          "requestedTrackCount",
+          params.requestedTrackCount.toString()
+        );
+
+        await api.admin.createSystemPlaylist(formData, token);
         successCount++;
       } catch (err) {
         failCount++;
       }
       setGenerateProgress({ current: i + 1, total: targetUsers.length });
-      toast.loading(`Generating playlists for ${i + 1}/${targetUsers.length} user(s)...`, { id: "generate-all" });
+      toast.loading(
+        `Generating playlists for ${i + 1}/${targetUsers.length} user(s)...`,
+        { id: "generate-all" }
+      );
     }
     toast.dismiss("generate-all");
-    if (successCount > 0) toast.success(`Generated playlists for ${successCount} user(s).`);
+    if (successCount > 0)
+      toast.success(`Generated playlists for ${successCount} user(s).`);
     if (failCount > 0) toast.error(`Failed for ${failCount} user(s).`);
     setIsGeneratingAll(false);
     setIsGenerateAllModalOpen(false);
     setGenerateProgress({ current: 0, total: 0 });
     refreshTable();
+  };
+
+  const handleGenerateWithParams = async (params: {
+    focusOnFeatures: string[];
+    requestedTrackCount: number;
+    playlistName?: string;
+    playlistDescription?: string;
+  }) => {
+    if (!viewingUser?.id) {
+      toast.error("No user selected or user ID is missing.");
+      return;
+    }
+    if (!params.playlistName) {
+      toast.error("Playlist name is required to generate.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("userId", viewingUser.id);
+    formData.append("name", params.playlistName);
+    if (params.playlistDescription) {
+      formData.append("description", params.playlistDescription);
+    }
+    formData.append("focusOnFeatures", JSON.stringify(params.focusOnFeatures));
+    formData.append(
+      "requestedTrackCount",
+      params.requestedTrackCount.toString()
+    );
+
+    console.log(
+      "[AdminUserDetailsPage] Attempting to generate playlist with FormData payload"
+    );
+    const toastId = toast.loading("Generating system playlist...");
+
+    try {
+      const token = localStorage.getItem("userToken");
+      if (!token) throw new Error("Authentication token not found.");
+
+      const result = await api.admin.createSystemPlaylist(formData, token);
+
+      console.log(
+        "[AdminUserDetailsPage] Playlist generation API result:",
+        result
+      );
+
+      if (result.success && result.data?.name) {
+        toast.success(
+          `Playlist "${result.data.name}" generated successfully for ${viewingUser.name}.`,
+          { id: toastId }
+        );
+        setIsParamsModalOpen(false);
+        setSystemPlaylistsRefreshTrigger((prev) => prev + 1);
+      } else {
+        throw new Error(
+          result.message ||
+            "Failed to generate playlist. API returned no success."
+        );
+      }
+    } catch (error: any) {
+      console.error("Error generating playlist with params:", error);
+      toast.error(
+        error.message || "An unexpected error occurred. Please try again.",
+        { id: toastId }
+      );
+    }
   };
 
   return (
@@ -458,7 +541,9 @@ export default function AiUserManagementPage() {
             disabled={loading || users.length === 0 || isGeneratingAll}
           >
             {selectedUserIds.size > 0
-              ? `Generate (${selectedUserIds.size}) User${selectedUserIds.size > 1 ? "s" : ""}`
+              ? `Generate (${selectedUserIds.size}) User${
+                  selectedUserIds.size > 1 ? "s" : ""
+                }`
               : "Generate All User"}
           </Button>
           {selectedUserIds.size > 0 && (
@@ -481,11 +566,8 @@ export default function AiUserManagementPage() {
 
       {/* Filters and Search */}
       <div className="mb-6 p-4 rounded-lg shadow-md bg-card border">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-        >
-          <div className="md:col-span-2">
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 gap-4">
+          <div>
             <label
               htmlFor="search-users"
               className="block text-sm font-medium mb-1"
@@ -510,52 +592,6 @@ export default function AiUserManagementPage() {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-          </div>
-          <div>
-            <label
-              htmlFor="role-filter"
-              className="block text-sm font-medium mb-1"
-            >
-              Filter by Role
-            </label>
-            <Select
-              value={roleFilter}
-              onValueChange={(value: "ALL" | "ADMIN" | "USER") =>
-                setRoleFilter(value)
-              }
-            >
-              <SelectTrigger id="role-filter">
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Roles</SelectItem>
-                <SelectItem value="USER">User</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label
-              htmlFor="status-filter"
-              className="block text-sm font-medium mb-1"
-            >
-              Filter by Status
-            </label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value: "ALL" | "ACTIVE" | "INACTIVE") =>
-                setStatusFilter(value)
-              }
-            >
-              <SelectTrigger id="status-filter">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </form>
       </div>
@@ -818,6 +854,14 @@ export default function AiUserManagementPage() {
           onClose={handleCloseGenerateAllModal}
           onGenerate={handleGenerateAllUsers}
           isLoading={isGeneratingAll}
+        />
+      )}
+      {viewingUser && (
+        <GeneratePlaylistParamsModal
+          isOpen={isParamsModalOpen}
+          onClose={() => setIsParamsModalOpen(false)}
+          onGenerate={handleGenerateWithParams}
+          featureAvailability={modalFeatureAvailability}
         />
       )}
     </div>

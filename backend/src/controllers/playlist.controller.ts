@@ -8,6 +8,8 @@ import { Prisma } from "@prisma/client";
 import prisma from "../config/db";
 import { uploadFile } from "../services/upload.service";
 import { trackSelect } from "../utils/prisma-selects";
+import { Role } from "@prisma/client";
+import upload from "../middleware/upload.middleware";
 
 // Tạo playlist mới
 export const createPlaylist = async (
@@ -204,13 +206,19 @@ export const getPlaylistById = async (
 ) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id; // Will be undefined for unauthenticated users
+    const userId = req.user?.id;
     const userRole = req.user?.role;
     const isAuthenticated = !!userId;
 
-    // Kiểm tra xem playlist có tồn tại không, không cần check userId
     const playlistExists = await prisma.playlist.findUnique({
       where: { id },
+      select: {
+        // Select only necessary fields for permission check
+        id: true,
+        type: true,
+        privacy: true,
+        userId: true,
+      },
     });
 
     if (!playlistExists) {
@@ -221,175 +229,101 @@ export const getPlaylistById = async (
       return;
     }
 
-    // Check if this is a system playlist, favorite playlist, or public playlist
     const isSystemPlaylist = playlistExists.type === "SYSTEM";
-    const isFavoritePlaylist = playlistExists.type === "FAVORITE";
     const isPublicPlaylist = playlistExists.privacy === "PUBLIC";
+    const isOwnedByUser = playlistExists.userId === userId;
 
-    // For unauthenticated users, only allow PUBLIC or SYSTEM playlists
-    if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
-      res.status(401).json({
+    let canView = false;
+
+    if (isPublicPlaylist) {
+      canView = true;
+    } else if (isAuthenticated) {
+      if (isOwnedByUser) {
+        canView = true;
+      } else if (isSystemPlaylist && playlistExists.privacy === "PRIVATE") {
+        // If it's a PRIVATE SYSTEM playlist not owned by the current user, they cannot view it (unless admin)
+        if (userRole === "ADMIN") {
+          canView = true;
+        } else {
+          canView = false;
+        }
+      } else if (userRole === "ADMIN") {
+        canView = true;
+      }
+      // For NORMAL/FAVORITE private playlists not owned by user, canView remains false unless admin
+    }
+    // Unauthenticated users trying to access non-public playlists: canView remains false
+
+    if (!canView) {
+      res.status(isAuthenticated ? 403 : 401).json({
         success: false,
-        message: "Please log in to view this playlist",
+        message: isAuthenticated
+          ? "You do not have permission to view this playlist"
+          : "Please log in to view this playlist",
       });
       return;
     }
 
-    let playlist;
-
-    // For SYSTEM playlists or PUBLIC playlists, allow viewing by anyone
-    if (isSystemPlaylist || isPublicPlaylist) {
-      playlist = await prisma.playlist.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatar: true,
-            },
-          },
-          tracks: {
-            include: {
-              track: {
-                include: {
-                  artist: true,
-                  album: true,
-                  genres: {
-                    include: {
-                      genre: true,
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: {
-              trackOrder: "asc",
-            },
+    // If canView is true, fetch the full playlist details
+    const playlist = await prisma.playlist.findUnique({
+      where: { id },
+      include: {
+        user: {
+          // Owner of the playlist
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
           },
         },
-      });
-    }
-    // For FAVORITE playlists, only allow the owner to view it
-    else if (isFavoritePlaylist) {
-      // Ensure the user is the owner of this favorite playlist
-      if (!isAuthenticated || playlistExists.userId !== userId) {
-        res.status(403).json({
-          success: false,
-          message: "You don't have permission to view this playlist",
-        });
-        return;
-      }
-
-      playlist = await prisma.playlist.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatar: true,
+        tracks: {
+          where: {
+            track: {
+              isActive: true, // Only include active tracks in the playlist view
             },
           },
-          tracks: {
-            include: {
-              track: {
-                include: {
-                  artist: true,
-                  album: true,
-                  genres: {
-                    include: {
-                      genre: true,
-                    },
-                  },
+          select: {
+            addedAt: true,
+            trackOrder: true,
+            track: {
+              select: {
+                ...trackSelect, // Use the predefined selection set for tracks
+                album: { select: { id: true, title: true, coverUrl: true } },
+                artist: {
+                  select: { id: true, artistName: true, avatar: true },
                 },
+                genres: { include: { genre: true } }, // Include genre details
               },
             },
-            orderBy: {
-              trackOrder: "asc",
-            },
+          },
+          orderBy: {
+            trackOrder: "asc",
           },
         },
-      });
-    }
-    // For regular playlists, check if the user owns it
-    else {
-      if (!isAuthenticated) {
-        res.status(401).json({
-          success: false,
-          message: "Please log in to view this playlist",
-        });
-        return;
-      }
-
-      // Check if the user is the owner
-      if (playlistExists.userId !== userId) {
-        res.status(403).json({
-          success: false,
-          message: "You don't have permission to view this playlist",
-        });
-        return;
-      }
-
-      playlist = await prisma.playlist.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatar: true,
-            },
-          },
-          tracks: {
-            include: {
-              track: {
-                include: {
-                  artist: true,
-                  album: true,
-                  genres: {
-                    include: {
-                      genre: true,
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: {
-              trackOrder: "asc",
-            },
-          },
+        _count: {
+          select: { tracks: true },
         },
-      });
-    }
+      },
+    });
 
     if (!playlist) {
-      res.status(403).json({
+      // This should theoretically not happen if playlistExists was found and canView is true
+      // but as a safeguard:
+      res.status(404).json({
         success: false,
-        message: "You don't have permission to view this playlist",
+        message: "Playlist details not found after permission check.",
       });
       return;
     }
 
-    const canEdit =
-      isAuthenticated &&
-      ((isSystemPlaylist && userRole === "ADMIN") ||
-        (!isSystemPlaylist && playlist.userId === userId));
-
-    // Transform data structure
-    const formattedTracks = playlist.tracks.map((pt) => ({
-      id: pt.track.id,
-      title: pt.track.title,
-      audioUrl: pt.track.audioUrl,
-      duration: pt.track.duration,
-      coverUrl: pt.track.coverUrl,
-      artist: pt.track.artist,
-      album: pt.track.album,
-      createdAt: pt.track.createdAt.toISOString(),
-      genres: pt.track.genres,
+    const formattedTracks = playlist.tracks.map((pt: any) => ({
+      ...pt.track,
+      albumTitle: pt.track.album?.title,
+      artistName: pt.track.artist?.artistName,
+      addedAt: pt.addedAt,
+      trackOrder: pt.trackOrder,
+      // genres: pt.track.genres.map((g: any) => g.genre.name), // Example if you want just names
     }));
 
     res.json({
@@ -397,11 +331,12 @@ export const getPlaylistById = async (
       data: {
         ...playlist,
         tracks: formattedTracks,
-        canEdit,
+        totalTracks: playlist._count.tracks,
+        canEdit: playlist.userId === userId || userRole === "ADMIN",
+        _count: undefined, // Remove _count from final response
       },
     });
   } catch (error) {
-    console.error("Error in getPlaylistById:", error);
     next(error);
   }
 };
@@ -883,13 +818,29 @@ export const getUserSystemPlaylists = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    const result = await playlistService.getUserSystemPlaylists(req);
+    const { userId: targetUserId } = req.params;
 
-    res.json(result);
+    if (!targetUserId) {
+      res.status(400).json({
+        success: false,
+        message: "User ID is required in route parameters.",
+      });
+      return;
+    }
+
+    const result = await playlistService.getUserSystemPlaylists(
+      req,
+      targetUserId
+    );
+
+    res.json({ success: true, ...result });
   } catch (error) {
-    console.error("Error in getSystemPlaylists:", error);
+    console.error(
+      "[PlaylistController] Error in getUserSystemPlaylists:",
+      error
+    );
     next(error);
   }
 };
@@ -1265,6 +1216,7 @@ export const getHomePageData = async (
             where: {
               userId,
               type: "SYSTEM",
+              privacy: "PUBLIC",
             },
             include: {
               _count: {
@@ -1518,5 +1470,230 @@ export const reorderPlaylistTracks = async (
   } catch (error) {
     console.error("Error in reorderPlaylistTracks controller:", error);
     next(error); // Pass error to the global error handler
+  }
+};
+
+// User listening stats route
+export const getUserListeningStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+    // @ts-ignore - Assuming getUserListeningStats is correctly added to playlistService
+    const stats = await playlistService.getUserListeningStats(userId);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Controller action to generate a system playlist for a specific user by an admin
+export const generateSystemPlaylistForUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const adminUserId = req.user?.id; // ID của admin thực hiện yêu cầu
+    const { userId } = req.params; // ID của user mà playlist được tạo cho
+    const {
+      name, // Sẽ được truyền vào customName trong service
+      description, // Sẽ được truyền vào customDescription trong service
+      focusOnFeatures,
+      requestedTrackCount = 20, // Giá trị mặc định nếu không được cung cấp
+    } = req.body;
+
+    if (!adminUserId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized: Admin access required",
+      });
+      return;
+    }
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: "User ID is required to generate a system playlist.",
+      });
+      return;
+    }
+
+    // Giữ lại việc bắt buộc name và description theo logic modal và controller hiện tại
+    if (!name) {
+      res.status(400).json({
+        success: false,
+        message: "Playlist name is required.",
+      });
+      return;
+    }
+    // Kiểm tra độ dài của name
+    if (name.length > 50) {
+      res.status(400).json({
+        success: false,
+        message: "Playlist name cannot exceed 50 characters.",
+      });
+      return;
+    }
+    // Kiểm tra độ dài của description nếu nó được cung cấp
+    if (description && description.trim().length > 150) {
+      res.status(400).json({
+        success: false,
+        message: "Playlist description cannot exceed 150 characters.",
+      });
+      return;
+    }
+
+    if (
+      !focusOnFeatures ||
+      !Array.isArray(focusOnFeatures) ||
+      focusOnFeatures.length === 0
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "focusOnFeatures must be a non-empty array of strings.",
+      });
+      return;
+    }
+
+    if (
+      typeof requestedTrackCount !== "number" ||
+      requestedTrackCount < 10 ||
+      requestedTrackCount > 50
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Requested track count must be a number between 10 and 50.",
+      });
+      return;
+    }
+
+    const playlist =
+      await playlistService.generateSystemPlaylistFromHistoryFeatures(
+        userId,
+        focusOnFeatures,
+        requestedTrackCount,
+        name, // customName
+        description // customDescription
+      );
+
+    res.status(201).json({
+      success: true,
+      message: "System playlist generated successfully for user.",
+      data: playlist,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("No listening history found")
+    ) {
+      res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    } else if (
+      error instanceof Error &&
+      error.message.includes("Insufficient data for features")
+    ) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    } else {
+      next(error);
+    }
+  }
+};
+
+export const deleteUserPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  // ... (nội dung hàm deleteUserPlaylist giữ nguyên) ...
+};
+
+// NEW CONTROLLER ACTION
+export const getPlaylistDetails = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { playlistId } = req.params;
+    if (!playlistId) {
+      res
+        .status(400)
+        .json({ success: false, message: "Playlist ID is required" });
+      return;
+    }
+
+    // Optional: Check if user has permission to view this playlist if it's not public
+    // For admin panel, this might not be needed if admin can see all, or could be added based on playlist.userId
+    // const requestingUserId = (req.user as AuthenticatedUser)?.id;
+    // const requestingUserRole = (req.user as AuthenticatedUser)?.role;
+
+    const playlistDetails = await playlistService.getPlaylistDetailsById(
+      playlistId
+    );
+
+    // Service throws an error if not found, which will be caught by the error handler
+    // or you can handle it here:
+    // if (!playlistDetails) {
+    //   res.status(404).json({ success: false, message: "Playlist not found" });
+    //   return;
+    // }
+
+    res.json({ success: true, data: playlistDetails });
+  } catch (error) {
+    // Log the error for debugging on the backend
+    console.error("[PlaylistController] Error in getPlaylistDetails:", error);
+    // Forward the error to the global error handler (or handle specific errors here)
+    next(error);
+  }
+};
+// END OF NEW CONTROLLER ACTION
+
+// NEW ADMIN CONTROLLER ACTION to delete a user-specific system playlist
+export const adminDeleteSystemPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { playlistId } = req.params;
+    if (!playlistId) {
+      res
+        .status(400)
+        .json({ success: false, message: "Playlist ID is required" });
+      return;
+    }
+
+    // Assuming admin role is already verified by middleware
+    await playlistService.deleteUserSpecificSystemPlaylist(playlistId);
+
+    res.status(200).json({
+      success: true,
+      message: "System playlist deleted successfully.",
+    });
+  } catch (error) {
+    // Handle specific errors from service (e.g., not found, not system playlist)
+    if (error instanceof Error) {
+      if (error.message.includes("not found")) {
+        res.status(404).json({ success: false, message: error.message });
+        return;
+      }
+      if (
+        error.message.includes("not a system playlist") ||
+        error.message.includes("base system playlist template")
+      ) {
+        res.status(400).json({ success: false, message: error.message });
+        return;
+      }
+    }
+    // Forward other errors to global error handler
+    next(error);
   }
 };

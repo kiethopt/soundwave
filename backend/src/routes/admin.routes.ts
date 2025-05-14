@@ -38,12 +38,25 @@ import {
   fixAlbumTrackTypes,
   removeTrackFromSystemPlaylistHandler,
   deleteSystemPlaylistHandler,
+  updatePlaylistVisibilityHandler,
 } from "../controllers/admin.controller";
 import * as genreController from "../controllers/genre.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { Role } from "@prisma/client";
 import { cacheMiddleware } from "../middleware/cache.middleware";
 import upload, { handleUploadError } from "../middleware/upload.middleware";
+import {
+  getUserListeningStats,
+  generateSystemPlaylistForUser,
+  createBaseSystemPlaylist,
+  getAllBaseSystemPlaylists,
+  updateBaseSystemPlaylist,
+  deleteBaseSystemPlaylist,
+  updateAllSystemPlaylists,
+  getSystemPlaylists,
+  getUserSystemPlaylists,
+  getPlaylistDetails,
+} from "../controllers/playlist.controller";
 
 const router = express.Router();
 
@@ -220,48 +233,124 @@ router.post(
 // --- End Artist Claim Request Routes ---
 
 // --- User AI Playlist Management by Admin ---
+// This route seems to be for the old AI playlist generation,
+// we will use the new one: generateSystemPlaylistForUser
+// router.post(
+//   "/users/:userId/ai-playlists",
+//   authenticate,
+//   authorize([Role.ADMIN]),
+//   generateAndAssignAiPlaylistToUserHandler
+// );
+
+// New route for Admin to generate a system playlist for a specific user
 router.post(
-  "/users/:userId/ai-playlists",
+  "/users/:userId/system-playlists/generate", // Path matches frontend call /api/admin/users/:userId/system-playlists/generate
   authenticate,
   authorize([Role.ADMIN]),
-  generateAndAssignAiPlaylistToUserHandler
+  generateSystemPlaylistForUser // Controller from playlist.controller
 );
 
 router.put(
-  "/ai-playlists/:playlistId/visibility",
+  "/system-playlists/:playlistId/visibility",
   authenticate,
   authorize([Role.ADMIN]),
   updateAiPlaylistVisibilityHandler
 );
 
-router.get(
-  "/users/:userId/ai-playlists",
-  authenticate,
-  authorize([Role.ADMIN]),
-  getUserAiPlaylistsHandler
-);
-
-router.get(
-  "/users/:userId/history",
-  authenticate,
-  authorize([Role.ADMIN]),
-  getUserListeningHistoryHandler
-);
-
-// New route for removing a track from a system playlist
 router.delete(
-  "/ai-playlists/:playlistId/tracks/:trackId",
+  "/system-playlists/:playlistId",
+  authenticate,
+  authorize([Role.ADMIN]),
+  deleteSystemPlaylistHandler
+);
+
+// Route mới để xóa một track cụ thể khỏi system playlist
+router.delete(
+  "/system-playlists/:playlistId/tracks/:trackId",
   authenticate,
   authorize([Role.ADMIN]),
   removeTrackFromSystemPlaylistHandler
 );
 
-// Route để xóa toàn bộ System Playlist bởi Admin
-router.delete(
-  "/ai-playlists/:playlistId",
+// Route mới để cập nhật visibility của một playlist (SYSTEM type)
+router.put(
+  "/playlists/:playlistId/visibility",
   authenticate,
   authorize([Role.ADMIN]),
-  deleteSystemPlaylistHandler
+  updatePlaylistVisibilityHandler
+);
+
+// Thay thế route cũ "/users/:userId/ai-playlists" bằng route mới cho system playlists
+router.get(
+  "/users/:userId/system-playlists", // Path đã đúng
+  authenticate,
+  authorize([Role.ADMIN]),
+  getUserSystemPlaylists // Sử dụng controller đúng từ playlist.controller
+);
+
+// Route for user listening stats (Admin only) - Path matches frontend call
+router.get(
+  "/users/:userId/listening-stats", // Path matches /api/admin/users/:userId/listening-stats
+  authenticate,
+  authorize([Role.ADMIN]),
+  getUserListeningStats // Controller from playlist.controller
+);
+
+// Route for detailed user listening history (Admin only)
+router.get(
+  "/users/:userId/history", // Path matches the failing frontend call /api/admin/users/:userId/history
+  authenticate,
+  authorize([Role.ADMIN]),
+  getUserListeningHistoryHandler // Controller from admin.controller for raw history
+);
+
+// --- Base System Playlist Management (Admin Only) ---
+// Path adjusted: /api/admin/playlists/system/base
+router.post(
+  "/playlists/system/base",
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.single("cover"), // Assuming cover upload is still needed
+  createBaseSystemPlaylist
+);
+
+router.get(
+  "/playlists/system/base",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getAllBaseSystemPlaylists
+);
+
+router.put(
+  "/playlists/system/base/:id",
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.single("cover"), // Assuming cover upload
+  updateBaseSystemPlaylist
+);
+
+router.delete(
+  "/playlists/system/base/:id",
+  authenticate,
+  authorize([Role.ADMIN]),
+  deleteBaseSystemPlaylist
+);
+
+// --- Global System Playlist Operations (Admin Only) ---
+// Path adjusted: /api/admin/playlists/system/update-all
+router.post(
+  "/playlists/system/update-all",
+  authenticate,
+  authorize([Role.ADMIN]),
+  updateAllSystemPlaylists
+);
+
+// Path adjusted: /api/admin/playlists/system-all
+router.get(
+  "/playlists/system-all",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getSystemPlaylists // Controller from playlist.controller
 );
 
 // --- Track Re-analysis by Admin ---
@@ -325,6 +414,14 @@ router.post(
   authenticate,
   authorize([Role.ADMIN]),
   fixAlbumTrackTypes
+);
+
+// ROUTE FOR ADMIN TO GET FULL DETAILS OF A SPECIFIC PLAYLIST (including all tracks)
+router.get(
+  "/playlists/:playlistId/details",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getPlaylistDetails
 );
 
 export default router;

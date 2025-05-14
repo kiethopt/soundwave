@@ -429,7 +429,10 @@ export interface Notification {
   updatedAt: string;
   user?: User;
   artist?: ArtistProfile;
-  sender?: Partial<User> | Partial<ArtistProfile> | { name?: string, id?: string };
+  sender?:
+    | Partial<User>
+    | Partial<ArtistProfile>
+    | { name?: string; id?: string };
 }
 
 export interface Event {
@@ -559,14 +562,14 @@ export interface SearchSuggestion {
 }
 
 export enum ReportType {
-  COPYRIGHT_VIOLATION = 'COPYRIGHT_VIOLATION',
-  INAPPROPRIATE_CONTENT = 'INAPPROPRIATE_CONTENT',
-  AI_GENERATION_ISSUE = 'AI_GENERATION_ISSUE',
-  ACCOUNT_ISSUE = 'ACCOUNT_ISSUE',
-  BUG_REPORT = 'BUG_REPORT',
-  GENERAL_FEEDBACK = 'GENERAL_FEEDBACK',
-  UI_UX_ISSUE = 'UI_UX_ISSUE',
-  OTHER = 'OTHER',
+  COPYRIGHT_VIOLATION = "COPYRIGHT_VIOLATION",
+  INAPPROPRIATE_CONTENT = "INAPPROPRIATE_CONTENT",
+  AI_GENERATION_ISSUE = "AI_GENERATION_ISSUE",
+  ACCOUNT_ISSUE = "ACCOUNT_ISSUE",
+  BUG_REPORT = "BUG_REPORT",
+  GENERAL_FEEDBACK = "GENERAL_FEEDBACK",
+  UI_UX_ISSUE = "UI_UX_ISSUE",
+  OTHER = "OTHER",
 }
 
 export enum ReportStatus {
@@ -669,10 +672,10 @@ export interface LabelRegistrationRequest {
     id: string;
     artistName: string;
     avatar?: string | null;
-    user?: { 
+    user?: {
       email?: string | null;
       name?: string | null;
-    }
+    };
   };
   status: RequestStatus;
   submittedAt: string;
@@ -693,18 +696,18 @@ export interface LabelRegistrationRequest {
 
 export interface ArtistClaimRequest {
   id: string;
-  status: "PENDING" | "APPROVED" | "REJECTED"; 
+  status: "PENDING" | "APPROVED" | "REJECTED";
   submittedAt: string;
   reviewedAt?: string | null;
   rejectionReason?: string | null;
-  proof: string[]; 
-  claimingUser: User; 
+  proof: string[];
+  claimingUser: User;
   artistProfile: {
     id: string;
     artistName: string;
     avatar?: string | null;
-    userId?: string | null; 
-    isVerified: boolean; 
+    userId?: string | null;
+    isVerified: boolean;
   };
   reviewedByAdmin?: {
     id: string;
@@ -712,3 +715,30 @@ export interface ArtistClaimRequest {
     username?: string | null;
   } | null;
 }
+
+// Listening History Statistics Types (Added)
+export interface AudioFeatureStat {
+  name: string;
+  count: number;
+  percentage?: number; // Optional for display
+}
+
+export interface NumericFeatureStat {
+  average: number | null;
+  min: number | null;
+  max: number | null;
+  count: number;
+}
+
+export interface UserListeningStats {
+  topMoods: AudioFeatureStat[];
+  topGenres: AudioFeatureStat[];
+  topArtists: AudioFeatureStat[];
+  topKeys: AudioFeatureStat[];
+  tempo: NumericFeatureStat;
+  energy: NumericFeatureStat;
+  danceability: NumericFeatureStat;
+  totalHistoryItemsAnalyzed: number;
+  message?: string;
+}
+// End of Listening History Statistics Types

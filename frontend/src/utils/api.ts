@@ -28,8 +28,10 @@ const fetchWithAuth = async (
     let errorMessage = `HTTP error! status: ${response.status}`;
     let errorCode = "";
     let errorData: any = null;
+    const clonedResponse = response.clone(); // Clone the response before reading
+
     try {
-      const errorBody = await response.json();
+      const errorBody = await response.json(); // Attempt to read the original response
       errorMessage = errorBody.message || errorMessage;
       errorCode = errorBody.code || "";
       errorData = errorBody.data || null;
@@ -54,10 +56,10 @@ const fetchWithAuth = async (
         // For now, just ensure the message is passed
       }
     } catch (jsonError) {
-      // If JSON parsing fails, try to get the raw text
+      // If JSON parsing fails, try to get the raw text from the CLONED response
       try {
-        const errorText = await response.text();
-        errorMessage = errorText || errorMessage; // Use text if available
+        const errorText = await clonedResponse.text(); // Use the cloned response here
+        errorMessage = errorText || errorMessage;
       } catch (textError) {
         // Keep the original HTTP status error if text fails
         console.error("Failed to read error response text:", textError);
@@ -495,7 +497,7 @@ export const api = {
 
     deleteSystemPlaylist: async (playlistId: string, token: string) => {
       return fetchWithAuth(
-        `/api/admin/ai-playlists/${playlistId}`,
+        `/api/admin/system-playlists/${playlistId}`,
         {
           method: "DELETE",
         },
@@ -593,20 +595,24 @@ export const api = {
       ),
 
     // --- User AI Playlist Management by Admin ---
-    generateSystemPlaylist: async (
+    generateSystemPlaylistForUserByAdmin: async (
       userId: string,
-      params?: { requestedTrackCount?: number; customPromptKeywords?: string },
+      params: {
+        focusOnFeatures: string[];
+        requestedTrackCount: number;
+        playlistName?: string;
+        playlistDescription?: string;
+      },
       token?: string
     ) => {
       return fetchWithAuth(
-        `/api/admin/users/${userId}/ai-playlists`,
+        `/api/admin/users/${userId}/system-playlists/generate`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          // Send params in the body if they exist
-          body: params ? JSON.stringify(params) : undefined,
+          body: JSON.stringify(params),
         },
         token
       );
@@ -633,7 +639,7 @@ export const api = {
       token: string
     ) => {
       return fetchWithAuth(
-        `/api/admin/ai-playlists/${playlistId}/visibility`,
+        `/api/admin/system-playlists/${playlistId}/visibility`,
         {
           method: "PUT",
           body: JSON.stringify({ newVisibility }),
@@ -659,8 +665,8 @@ export const api = {
       queryParams?: string
     ) => {
       const url = queryParams
-        ? `/api/admin/users/${userId}/ai-playlists?${queryParams}`
-        : `/api/admin/users/${userId}/ai-playlists`;
+        ? `/api/admin/users/${userId}/system-playlists?${queryParams}`
+        : `/api/admin/users/${userId}/system-playlists`;
       return fetchWithAuth(url, { method: "GET" }, token);
     },
 
@@ -686,7 +692,7 @@ export const api = {
       token: string
     ) => {
       return fetchWithAuth(
-        `/api/admin/ai-playlists/${playlistId}/tracks/${trackId}`,
+        `/api/admin/system-playlists/${playlistId}/tracks/${trackId}`,
         { method: "DELETE" },
         token
       );
@@ -851,6 +857,40 @@ export const api = {
       }
 
       return response.blob();
+    },
+
+    // New function to get user listening stats
+    getUserListeningStats: async (userId: string, token: string) =>
+      fetchWithAuth(
+        `/api/admin/users/${userId}/listening-stats`,
+        { method: "GET" },
+        token
+      ),
+
+    getSystemPlaylistDetails: async (playlistId: string, token: string) => {
+      return fetchWithAuth(
+        `/api/admin/playlists/${playlistId}/details`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    getDashboardStats: async (token: string) =>
+      fetchWithAuth("/api/admin/dashboard/stats", { method: "GET" }, token),
+
+    updatePlaylistVisibility: async (
+      playlistId: string,
+      privacy: "PUBLIC" | "PRIVATE",
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/admin/playlists/${playlistId}/visibility`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ privacy }),
+        },
+        token
+      );
     },
   },
 

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.adminDeleteSystemPlaylist = exports.getPlaylistDetails = exports.deleteUserPlaylist = exports.generateSystemPlaylistForUser = exports.getUserListeningStats = exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
@@ -44,6 +44,7 @@ const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
+const prisma_selects_1 = require("../utils/prisma-selects");
 const createPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
@@ -202,6 +203,12 @@ const getPlaylistById = async (req, res, next) => {
         const isAuthenticated = !!userId;
         const playlistExists = await db_1.default.playlist.findUnique({
             where: { id },
+            select: {
+                id: true,
+                type: true,
+                privacy: true,
+                userId: true,
+            },
         });
         if (!playlistExists) {
             res.status(404).json({
@@ -211,168 +218,103 @@ const getPlaylistById = async (req, res, next) => {
             return;
         }
         const isSystemPlaylist = playlistExists.type === "SYSTEM";
-        const isFavoritePlaylist = playlistExists.type === "FAVORITE";
         const isPublicPlaylist = playlistExists.privacy === "PUBLIC";
-        if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
-            res.status(401).json({
+        const isOwnedByUser = playlistExists.userId === userId;
+        let canView = false;
+        if (isPublicPlaylist) {
+            canView = true;
+        }
+        else if (isAuthenticated) {
+            if (isOwnedByUser) {
+                canView = true;
+            }
+            else if (isSystemPlaylist && playlistExists.privacy === "PRIVATE") {
+                if (userRole === "ADMIN") {
+                    canView = true;
+                }
+                else {
+                    canView = false;
+                }
+            }
+            else if (userRole === "ADMIN") {
+                canView = true;
+            }
+        }
+        if (!canView) {
+            res.status(isAuthenticated ? 403 : 401).json({
                 success: false,
-                message: "Please log in to view this playlist",
+                message: isAuthenticated
+                    ? "You do not have permission to view this playlist"
+                    : "Please log in to view this playlist",
             });
             return;
         }
-        let playlist;
-        if (isSystemPlaylist || isPublicPlaylist) {
-            playlist = await db_1.default.playlist.findUnique({
-                where: { id },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            username: true,
-                            avatar: true,
-                        },
-                    },
-                    tracks: {
-                        include: {
-                            track: {
-                                include: {
-                                    artist: true,
-                                    album: true,
-                                    genres: {
-                                        include: {
-                                            genre: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        orderBy: {
-                            trackOrder: "asc",
-                        },
+        const playlist = await db_1.default.playlist.findUnique({
+            where: { id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        username: true,
+                        avatar: true,
                     },
                 },
-            });
-        }
-        else if (isFavoritePlaylist) {
-            if (!isAuthenticated || playlistExists.userId !== userId) {
-                res.status(403).json({
-                    success: false,
-                    message: "You don't have permission to view this playlist",
-                });
-                return;
-            }
-            playlist = await db_1.default.playlist.findUnique({
-                where: { id },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            username: true,
-                            avatar: true,
+                tracks: {
+                    where: {
+                        track: {
+                            isActive: true,
                         },
                     },
-                    tracks: {
-                        include: {
-                            track: {
-                                include: {
-                                    artist: true,
-                                    album: true,
-                                    genres: {
-                                        include: {
-                                            genre: true,
-                                        },
-                                    },
+                    select: {
+                        addedAt: true,
+                        trackOrder: true,
+                        track: {
+                            select: {
+                                ...prisma_selects_1.trackSelect,
+                                album: { select: { id: true, title: true, coverUrl: true } },
+                                artist: {
+                                    select: { id: true, artistName: true, avatar: true },
                                 },
+                                genres: { include: { genre: true } },
                             },
                         },
-                        orderBy: {
-                            trackOrder: "asc",
-                        },
+                    },
+                    orderBy: {
+                        trackOrder: "asc",
                     },
                 },
-            });
-        }
-        else {
-            if (!isAuthenticated) {
-                res.status(401).json({
-                    success: false,
-                    message: "Please log in to view this playlist",
-                });
-                return;
-            }
-            if (playlistExists.userId !== userId) {
-                res.status(403).json({
-                    success: false,
-                    message: "You don't have permission to view this playlist",
-                });
-                return;
-            }
-            playlist = await db_1.default.playlist.findUnique({
-                where: { id },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            username: true,
-                            avatar: true,
-                        },
-                    },
-                    tracks: {
-                        include: {
-                            track: {
-                                include: {
-                                    artist: true,
-                                    album: true,
-                                    genres: {
-                                        include: {
-                                            genre: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        orderBy: {
-                            trackOrder: "asc",
-                        },
-                    },
+                _count: {
+                    select: { tracks: true },
                 },
-            });
-        }
+            },
+        });
         if (!playlist) {
-            res.status(403).json({
+            res.status(404).json({
                 success: false,
-                message: "You don't have permission to view this playlist",
+                message: "Playlist details not found after permission check.",
             });
             return;
         }
-        const canEdit = isAuthenticated &&
-            ((isSystemPlaylist && userRole === "ADMIN") ||
-                (!isSystemPlaylist && playlist.userId === userId));
         const formattedTracks = playlist.tracks.map((pt) => ({
-            id: pt.track.id,
-            title: pt.track.title,
-            audioUrl: pt.track.audioUrl,
-            duration: pt.track.duration,
-            coverUrl: pt.track.coverUrl,
-            artist: pt.track.artist,
-            album: pt.track.album,
-            createdAt: pt.track.createdAt.toISOString(),
-            genres: pt.track.genres,
+            ...pt.track,
+            albumTitle: pt.track.album?.title,
+            artistName: pt.track.artist?.artistName,
+            addedAt: pt.addedAt,
+            trackOrder: pt.trackOrder,
         }));
         res.json({
             success: true,
             data: {
                 ...playlist,
                 tracks: formattedTracks,
-                canEdit,
+                totalTracks: playlist._count.tracks,
+                canEdit: playlist.userId === userId || userRole === "ADMIN",
+                _count: undefined,
             },
         });
     }
     catch (error) {
-        console.error("Error in getPlaylistById:", error);
         next(error);
     }
 };
@@ -745,11 +687,19 @@ const getSystemPlaylists = async (req, res, next) => {
 exports.getSystemPlaylists = getSystemPlaylists;
 const getUserSystemPlaylists = async (req, res, next) => {
     try {
-        const result = await playlistService.getUserSystemPlaylists(req);
-        res.json(result);
+        const { userId: targetUserId } = req.params;
+        if (!targetUserId) {
+            res.status(400).json({
+                success: false,
+                message: "User ID is required in route parameters.",
+            });
+            return;
+        }
+        const result = await playlistService.getUserSystemPlaylists(req, targetUserId);
+        res.json({ success: true, ...result });
     }
     catch (error) {
-        console.error("Error in getSystemPlaylists:", error);
+        console.error("[PlaylistController] Error in getUserSystemPlaylists:", error);
         next(error);
     }
 };
@@ -955,6 +905,7 @@ const getHomePageData = async (req, res, next) => {
                         where: {
                             userId,
                             type: "SYSTEM",
+                            privacy: "PUBLIC",
                         },
                         include: {
                             _count: {
@@ -1084,4 +1035,153 @@ const reorderPlaylistTracks = async (req, res, next) => {
     }
 };
 exports.reorderPlaylistTracks = reorderPlaylistTracks;
+const getUserListeningStats = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const stats = await playlistService.getUserListeningStats(userId);
+        res.json({ success: true, data: stats });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getUserListeningStats = getUserListeningStats;
+const generateSystemPlaylistForUser = async (req, res, next) => {
+    try {
+        const adminUserId = req.user?.id;
+        const { userId } = req.params;
+        const { name, description, focusOnFeatures, requestedTrackCount = 20, } = req.body;
+        if (!adminUserId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized: Admin access required",
+            });
+            return;
+        }
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                message: "User ID is required to generate a system playlist.",
+            });
+            return;
+        }
+        if (!name) {
+            res.status(400).json({
+                success: false,
+                message: "Playlist name is required.",
+            });
+            return;
+        }
+        if (name.length > 50) {
+            res.status(400).json({
+                success: false,
+                message: "Playlist name cannot exceed 50 characters.",
+            });
+            return;
+        }
+        if (description && description.trim().length > 150) {
+            res.status(400).json({
+                success: false,
+                message: "Playlist description cannot exceed 150 characters.",
+            });
+            return;
+        }
+        if (!focusOnFeatures ||
+            !Array.isArray(focusOnFeatures) ||
+            focusOnFeatures.length === 0) {
+            res.status(400).json({
+                success: false,
+                message: "focusOnFeatures must be a non-empty array of strings.",
+            });
+            return;
+        }
+        if (typeof requestedTrackCount !== "number" ||
+            requestedTrackCount < 10 ||
+            requestedTrackCount > 50) {
+            res.status(400).json({
+                success: false,
+                message: "Requested track count must be a number between 10 and 50.",
+            });
+            return;
+        }
+        const playlist = await playlistService.generateSystemPlaylistFromHistoryFeatures(userId, focusOnFeatures, requestedTrackCount, name, description);
+        res.status(201).json({
+            success: true,
+            message: "System playlist generated successfully for user.",
+            data: playlist,
+        });
+    }
+    catch (error) {
+        if (error instanceof Error &&
+            error.message.includes("No listening history found")) {
+            res.status(404).json({
+                success: false,
+                message: error.message,
+            });
+        }
+        else if (error instanceof Error &&
+            error.message.includes("Insufficient data for features")) {
+            res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+        }
+        else {
+            next(error);
+        }
+    }
+};
+exports.generateSystemPlaylistForUser = generateSystemPlaylistForUser;
+const deleteUserPlaylist = async (req, res, next) => {
+};
+exports.deleteUserPlaylist = deleteUserPlaylist;
+const getPlaylistDetails = async (req, res, next) => {
+    try {
+        const { playlistId } = req.params;
+        if (!playlistId) {
+            res
+                .status(400)
+                .json({ success: false, message: "Playlist ID is required" });
+            return;
+        }
+        const playlistDetails = await playlistService.getPlaylistDetailsById(playlistId);
+        res.json({ success: true, data: playlistDetails });
+    }
+    catch (error) {
+        console.error("[PlaylistController] Error in getPlaylistDetails:", error);
+        next(error);
+    }
+};
+exports.getPlaylistDetails = getPlaylistDetails;
+const adminDeleteSystemPlaylist = async (req, res, next) => {
+    try {
+        const { playlistId } = req.params;
+        if (!playlistId) {
+            res
+                .status(400)
+                .json({ success: false, message: "Playlist ID is required" });
+            return;
+        }
+        await playlistService.deleteUserSpecificSystemPlaylist(playlistId);
+        res.status(200).json({
+            success: true,
+            message: "System playlist deleted successfully.",
+        });
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            if (error.message.includes("not found")) {
+                res.status(404).json({ success: false, message: error.message });
+                return;
+            }
+            if (error.message.includes("not a system playlist") ||
+                error.message.includes("base system playlist template")) {
+                res.status(400).json({ success: false, message: error.message });
+                return;
+            }
+        }
+        next(error);
+    }
+};
+exports.adminDeleteSystemPlaylist = adminDeleteSystemPlaylist;
 //# sourceMappingURL=playlist.controller.js.map

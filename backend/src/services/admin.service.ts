@@ -2998,7 +2998,7 @@ export const generateAndAssignAiPlaylistToUser = async (
     requestedTrackCount: customParams?.requestedTrackCount || 20,
     type: PlaylistType.SYSTEM, // Ensure correct type from DB schema
     customPromptKeywords: customParams?.customPromptKeywords,
-    requestedPrivacy: PlaylistPrivacy.PUBLIC, 
+    requestedPrivacy: PlaylistPrivacy.PUBLIC,
   };
 
   // Log the input being sent to AI service
@@ -3116,7 +3116,7 @@ export const getUserAiPlaylists = async (
   // 3. Query AI Playlists with pagination
   const where: Prisma.PlaylistWhereInput = {
     userId: targetUserId,
-    type: PlaylistType.SYSTEM,  
+    type: PlaylistType.SYSTEM,
     isAIGenerated: true,
   };
 
@@ -4200,17 +4200,16 @@ export const removeTrackFromSystemPlaylist = async (
     throw new HttpError(403, "Forbidden: Insufficient privileges");
   }
 
-  // 2. Find the playlist to ensure it exists and is an AI-generated playlist
+  // 2. Find the playlist to ensure it exists and is a SYSTEM playlist
   const playlistDetails = await prisma.playlist.findUnique({
     where: { id: playlistId },
     select: {
       id: true,
-      isAIGenerated: true,
-      // Select 'tracks' relation to find the PlaylistTrack entry ID
+      type: true, // Fetch the type of the playlist
       tracks: {
         where: { trackId: trackToRemoveId },
         select: {
-          id: true, // This is the ID of the PlaylistTrack (join table) entry
+          id: true,
         },
       },
     },
@@ -4220,10 +4219,11 @@ export const removeTrackFromSystemPlaylist = async (
     throw new HttpError(404, "Playlist not found");
   }
 
-  if (!playlistDetails.isAIGenerated) {
+  // Check if the playlist is of type SYSTEM
+  if (playlistDetails.type !== PlaylistType.SYSTEM) {
     throw new HttpError(
       403,
-      "Forbidden: Can only remove tracks from AI-generated system playlists using this method."
+      "Forbidden: Can only remove tracks from playlists of type SYSTEM using this method."
     );
   }
 
@@ -4373,6 +4373,95 @@ export const deleteSystemPlaylist = async (
   console.log(
     `[Admin Service] System Playlist ${playlistId} deleted by admin ${adminUserId}`
   );
+};
+
+export const updatePlaylistVisibility = async (
+  adminExecutingId: string,
+  playlistId: string,
+  newVisibility: PlaylistPrivacy
+): Promise<PrismaPlaylist> => {
+  // 1. Verify Admin Privileges
+  const adminUser = await prisma.user.findUnique({
+    where: { id: adminExecutingId },
+  });
+
+  if (!adminUser) {
+    throw new HttpError(404, "Admin user not found");
+  }
+  if (adminUser.role !== Role.ADMIN) {
+    throw new HttpError(403, "Forbidden: Insufficient privileges");
+  }
+
+  // 2. Validate newVisibility value
+  if (
+    newVisibility !== PlaylistPrivacy.PUBLIC &&
+    newVisibility !== PlaylistPrivacy.PRIVATE
+  ) {
+    throw new HttpError(
+      400,
+      "Invalid visibility value. Must be PUBLIC or PRIVATE."
+    );
+  }
+
+  // 3. Find and Validate Playlist
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+  });
+
+  if (!playlist) {
+    throw new HttpError(404, "Playlist not found");
+  }
+
+  // Allow updating visibility for SYSTEM playlists
+  // You can expand this to other types if needed, e.g., if (playlist.type !== PlaylistType.SYSTEM && playlist.type !== PlaylistType.USER_CREATED)
+  if (playlist.type !== PlaylistType.SYSTEM) {
+    throw new HttpError(
+      403,
+      `Forbidden: Cannot change visibility for playlists of type '${playlist.type}'. Only SYSTEM playlists are allowed.`
+    );
+  }
+
+  // 4. Update Playlist Privacy
+  const updatedPlaylist = await prisma.playlist.update({
+    where: { id: playlistId },
+    data: { privacy: newVisibility, updatedAt: new Date() },
+    // Select relevant fields that the frontend might need after update
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      coverUrl: true,
+      privacy: true,
+      type: true,
+      isAIGenerated: true,
+      totalTracks: true,
+      totalDuration: true,
+      createdAt: true,
+      updatedAt: true,
+      userId: true,
+      lastGeneratedAt: true,
+      tracks: {
+        // Include some track previews if needed by the frontend row update
+        take: 3,
+        orderBy: { trackOrder: "asc" as const },
+        select: {
+          track: {
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+              artist: { select: { artistName: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  console.log(
+    `[AdminService] Updated playlist ${playlistId} visibility to ${newVisibility} by admin ${adminExecutingId}`
+  );
+  return updatedPlaylist;
 };
 
 // --- Utility Functions (if any) or End of File ---

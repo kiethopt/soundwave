@@ -233,6 +233,33 @@ export const deleteBaseSystemPlaylist = async (playlistId: string) => {
   });
 };
 
+// NEW FUNCTION to delete a user-specific system playlist (Admin only)
+export const deleteUserSpecificSystemPlaylist = async (playlistId: string) => {
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    select: { type: true, userId: true }, // Select only necessary fields
+  });
+
+  if (!playlist) {
+    throw new Error("Playlist not found.");
+  }
+
+  if (playlist.type !== PlaylistType.SYSTEM) {
+    throw new Error("Playlist is not a system playlist.");
+  }
+
+  if (!playlist.userId) {
+    throw new Error(
+      "This is a base system playlist template. Use deleteBaseSystemPlaylist to delete it."
+    );
+  }
+
+  // If all checks pass, delete the playlist
+  return prisma.playlist.delete({
+    where: { id: playlistId },
+  });
+};
+
 // Get all base system playlists (Admin only, with pagination)
 export const getAllBaseSystemPlaylists = async (req: Request) => {
   const { search } = req.query;
@@ -399,13 +426,16 @@ export const getSystemPlaylists = async (req: Request) => {
 };
 
 // Lấy các system playlist của người dùng
-export const getUserSystemPlaylists = async (req: Request) => {
-  const { search, sortBy, sortOrder } = req.query;
+export const getUserSystemPlaylists = async (
+  req: Request, // Giữ lại req để lấy query params cho pagination/sort/search
+  targetUserId: string // Thêm tham số targetUserId
+) => {
+  const { search, sortBy, sortOrder, page, limit } = req.query;
 
-  // Dựa vào type là SYSTEM và userId
+  // Dựa vào type là SYSTEM và targetUserId
   const whereClause: Prisma.PlaylistWhereInput = {
     type: "SYSTEM",
-    userId: req.user?.id,
+    userId: targetUserId, // Sửa ở đây: sử dụng targetUserId
   };
 
   // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
@@ -416,53 +446,137 @@ export const getUserSystemPlaylists = async (req: Request) => {
     ];
   }
 
-  const result = await paginate<any>(prisma.playlist, req, {
+  const validSortKeys: (keyof Prisma.PlaylistOrderByWithRelationInput)[] = [
+    "name",
+    "createdAt",
+    "updatedAt",
+    "totalTracks",
+    "privacy",
+  ];
+  const orderBy: Prisma.PlaylistOrderByWithRelationInput = {};
+  if (
+    typeof sortBy === "string" &&
+    validSortKeys.includes(
+      sortBy as keyof Prisma.PlaylistOrderByWithRelationInput
+    ) &&
+    (sortOrder === "asc" || sortOrder === "desc")
+  ) {
+    orderBy[sortBy as keyof Prisma.PlaylistOrderByWithRelationInput] =
+      sortOrder;
+  } else {
+    orderBy.createdAt = "desc"; // Mặc định
+  }
+
+  // Sử dụng paginate utility
+  const result = await paginate<
+    Prisma.PlaylistGetPayload<{
+      include: {
+        tracks: {
+          select: {
+            track: {
+              select: {
+                id: true;
+                title: true;
+                coverUrl: true;
+                artist: { select: { artistName: true } };
+              };
+            };
+            trackOrder: true;
+          };
+          orderBy: { trackOrder: "asc" };
+          take: 3;
+        };
+        // user: { select: { id: true, name: true, email: true } }, // Có thể bỏ user nếu không dùng
+        _count: { select: { tracks: true } };
+      };
+    }>
+  >(prisma.playlist, req, {
     where: whereClause,
     include: {
       tracks: {
-        include: {
+        select: {
           track: {
-            include: {
-              artist: true,
-              album: { select: { title: true } },
-              genres: { select: { genre: { select: { name: true } } } },
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+              artist: { select: { artistName: true } },
             },
           },
+          trackOrder: true,
         },
         orderBy: {
           trackOrder: "asc",
         },
+        take: 3, // Lấy 3 track đầu làm preview
       },
-      user: {
-        select: { id: true, name: true, email: true },
+      // user: {
+      //   select: { id: true, name: true, email: true },
+      // },
+      _count: {
+        // Để lấy tổng số track thực tế
+        select: { tracks: true },
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: orderBy, // Sử dụng orderBy đã định nghĩa
   });
 
   // Chuyển đổi dữ liệu để định dạng nhất quán
-  const formattedPlaylists = result.data.map((playlist: any) => {
-    const formattedTracks = playlist.tracks.map((pt: any) => ({
-      id: pt.track.id,
-      title: pt.track.title,
-      audioUrl: pt.track.audioUrl,
-      duration: pt.track.duration,
-      coverUrl: pt.track.coverUrl,
-      artist: pt.track.artist,
-      album: pt.track.album,
-      genres: pt.track.genres,
-      createdAt: pt.track.createdAt.toISOString(),
-    }));
-
-    return {
-      ...playlist,
-      tracks: formattedTracks,
+  type PlaylistFromService = Prisma.PlaylistGetPayload<{
+    include: {
+      tracks: {
+        select: {
+          track: {
+            select: {
+              id: true;
+              title: true;
+              coverUrl: true;
+              artist: { select: { artistName: true } };
+            };
+          };
+          trackOrder: true;
+        };
+      };
+      _count: { select: { tracks: true } };
     };
-  });
+  }>;
 
-  return formattedPlaylists;
+  const formattedPlaylists = result.data.map(
+    (playlist: PlaylistFromService) => {
+      const previewTracks = playlist.tracks.map((pt) => {
+        // pt sẽ có kiểu được suy luận đúng
+        return {
+          id: pt.track.id,
+          title: pt.track.title,
+          coverUrl: pt.track.coverUrl,
+          artistName: pt.track.artist?.artistName || "Unknown Artist",
+        };
+      });
+
+      return {
+        // Lấy các trường cần thiết từ playlist, tránh spread ...playlist nếu nó chứa nhiều dữ liệu không cần
+        id: playlist.id,
+        name: playlist.name,
+        description: playlist.description,
+        coverUrl: playlist.coverUrl,
+        privacy: playlist.privacy,
+        type: playlist.type,
+        isAIGenerated: playlist.isAIGenerated,
+        createdAt: playlist.createdAt,
+        updatedAt: playlist.updatedAt,
+        userId: playlist.userId, // Giữ lại userId của playlist
+        lastGeneratedAt: (playlist as any).lastGeneratedAt, // Giữ lại nếu có, ép kiểu nếu cần
+        totalTracks: playlist._count?.tracks ?? 0,
+        tracks: previewTracks,
+      };
+    }
+  );
+
+  // Trả về đối tượng bao gồm cả data đã format và thông tin pagination
+  return {
+    data: formattedPlaylists,
+    pagination: result.pagination,
+  };
 };
 
 // Helper function to convert old aiOptions to a string of keywords
@@ -481,72 +595,215 @@ const convertAiOptionsToKeywords = (aiOptions: any): string => {
   return keywords.join(", ");
 };
 
-// Generating AI playlists
-export const generateAIPlaylist = async (
+// Generating AI playlists -> Now: Generating System Playlists based on History Features
+export const generateSystemPlaylistFromHistoryFeatures = async (
   userId: string,
-  options: AIGeneratedPlaylistInput
+  focusOnFeatures: string[],
+  requestedTrackCount: number,
+  customName?: string,
+  customDescription?: string
 ) => {
-  console.log(
-    `[PlaylistService] Generating AI playlist for user ${userId} with options:`,
-    options
-  );
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error("User not found");
+  }
 
-  try {
-    // Create playlist using AI service
-    const playlist = await createAIGeneratedPlaylistFromAIService(options);
-
-    // Get additional playlist details for the response
-    const playlistWithTracks = await prisma.playlist.findUnique({
-      where: { id: playlist.id },
-      include: {
-        tracks: {
-          include: {
-            track: {
-              include: {
-                artist: {
-                  select: {
-                    id: true,
-                    artistName: true,
-                    avatar: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            trackOrder: "asc",
-          },
+  // 1. Fetch recent listening history with necessary track details
+  const historyItems = await prisma.history.findMany({
+    where: {
+      userId: userId,
+      trackId: { not: null },
+      createdAt: {
+        gte: new Date(new Date().setDate(new Date().getDate() - 90)), // Last 90 days
+      },
+    },
+    include: {
+      track: {
+        select: {
+          id: true,
+          title: true,
+          mood: true,
+          key: true,
+          scale: true,
+          tempo: true,
+          energy: true,
+          danceability: true,
+          genres: { include: { genre: { select: { name: true } } } },
+          artist: { select: { artistName: true } },
+          album: { select: { title: true } },
+          duration: true,
+          audioUrl: true,
+          coverUrl: true,
         },
       },
-    });
+    },
+    take: 200, // Analyze up to 200 recent tracks
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-    if (!playlistWithTracks) {
-      throw new Error("Failed to retrieve created playlist details");
-    }
-
-    // Count artists in the playlist
-    const artistsInPlaylist = new Set();
-    playlistWithTracks.tracks.forEach((pt) => {
-      if (pt.track.artist) {
-        artistsInPlaylist.add(pt.track.artist.artistName);
-      }
-    });
-
-    return {
-      ...playlist,
-      artistCount: artistsInPlaylist.size,
-      previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
-        id: pt.track.id,
-        title: pt.track.title,
-        artist: pt.track.artist?.artistName,
-      })),
-      totalTracks: playlistWithTracks.tracks.length, // Ensure totalTracks is accurate
-    };
-  } catch (error) {
-    console.error(`[PlaylistService] Error in generateAIPlaylist:`, error);
-    // Re-throw the error to be handled by the controller
-    throw error;
+  if (historyItems.length === 0) {
+    throw new Error("No listening history found to generate playlist.");
   }
+
+  // --- Feature Analysis from History ---
+  let filterCriteria: any = { isActive: true }; // Base filter for active tracks
+  const dominantFeatures: Record<string, any> = {};
+
+  // Helper to get top N items from a count map
+  const getTopN = (counts: Record<string, number>, n: number = 1) =>
+    Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, n)
+      .map(([name]) => name);
+
+  if (focusOnFeatures.includes("mood")) {
+    const moodCounts: Record<string, number> = {};
+    historyItems.forEach((item) => {
+      const mood = (item.track as any)?.mood;
+      if (mood && typeof mood === "string")
+        moodCounts[mood] = (moodCounts[mood] || 0) + 1;
+    });
+    if (Object.keys(moodCounts).length > 0) {
+      dominantFeatures.moods = getTopN(moodCounts, 2); // Top 2 moods
+      // @ts-ignore - Prisma type for mood filter
+      filterCriteria.mood = { in: dominantFeatures.moods };
+    }
+  }
+
+  if (focusOnFeatures.includes("genres")) {
+    const genreCounts: Record<string, number> = {};
+    historyItems.forEach((item) =>
+      item.track?.genres?.forEach((g) => {
+        if (g.genre?.name)
+          genreCounts[g.genre.name] = (genreCounts[g.genre.name] || 0) + 1;
+      })
+    );
+    if (Object.keys(genreCounts).length > 0) {
+      dominantFeatures.genres = getTopN(genreCounts, 3); // Top 3 genres
+      filterCriteria.genres = {
+        some: { genre: { name: { in: dominantFeatures.genres } } },
+      };
+    }
+  }
+
+  if (focusOnFeatures.includes("artist")) {
+    const artistCounts: Record<string, number> = {};
+    historyItems.forEach((item) => {
+      const artistName = (item.track as any)?.artist?.artistName;
+      if (artistName && typeof artistName === "string")
+        artistCounts[artistName] = (artistCounts[artistName] || 0) + 1;
+    });
+    if (Object.keys(artistCounts).length > 0) {
+      dominantFeatures.artists = getTopN(artistCounts, 3); // Top 3 artists
+      // This requires knowing how artist is linked. If direct:
+      // filterCriteria.artist = { name: { in: dominantFeatures.artists } };
+      // If through artistId on track:
+      // const artistIds = await prisma.artistProfile.findMany({ where: { artistName: { in: dominantFeatures.artists } }, select: { id: true }});
+      // filterCriteria.artistId = { in: artistIds.map(a => a.id) };
+      // For simplicity, assuming a direct name filter or that artistName is unique enough for a general search
+      // This part may need refinement based on schema for precise filtering
+    }
+  }
+
+  // TODO: Add filtering logic for key, tempo, energy, danceability if selected in focusOnFeatures
+  // This would involve calculating averages/ranges from history and applying them as Prisma where clauses.
+  // Example for tempo (conceptual):
+  // if (focusOnFeatures.includes("tempo")) {
+  //   const tempos = historyItems.map(item => (item.track as any)?.tempo).filter(t => typeof t === 'number');
+  //   if (tempos.length > 0) {
+  //     const avgTempo = tempos.reduce((s, t) => s + t, 0) / tempos.length;
+  //     filterCriteria.tempo = { gte: avgTempo - 10, lte: avgTempo + 10 }; // Example range
+  //   }
+  // }
+
+  // --- Track Selection ---
+  // Fetch all tracks from user's history that match any of the dominant features found.
+  // This initial fetch might be broad, then we filter down or re-query with combined criteria.
+
+  // Refined query with actual filterCriteria built above
+  const candidateTracks = await prisma.track.findMany({
+    where: {
+      AND: [
+        filterCriteria, // existing filters like isActive, mood, genres
+        { id: { notIn: historyItems.map((h) => h.track!.id) } }, // Exclude tracks already in recent history for discovery
+      ],
+    },
+    take: requestedTrackCount * 3, // Fetch more candidates to allow for shuffling/diversity
+    orderBy: { playCount: "desc" }, // Or some other metric like releaseDate
+    // Ensure the select here is compatible with playlist track creation
+    select: {
+      id: true,
+      title: true,
+      duration: true,
+      coverUrl: true,
+      audioUrl: true,
+      artist: { select: { id: true, artistName: true, avatar: true } },
+      album: { select: { id: true, title: true } },
+      // Add other fields that PlaylistTrack might need e.g. albumId
+    },
+  });
+
+  // Simple shuffle and take requested count
+  const selectedTracks = candidateTracks
+    .sort(() => 0.5 - Math.random())
+    .slice(0, requestedTrackCount);
+
+  if (
+    selectedTracks.length < Math.min(requestedTrackCount, 5) &&
+    selectedTracks.length === 0
+  ) {
+    // Check if not enough tracks found, or even none
+    throw new Error(
+      `Could not find enough tracks matching the criteria (found ${selectedTracks.length}). Try broader features or check user history diversity.`
+    );
+  }
+
+  // --- Playlist Creation ---
+  const playlistName = customName
+    ? customName.substring(0, 50) // Áp dụng giới hạn ký tự
+    : `System Mix for ${userId.substring(0, 8)} - Focus: ${
+        focusOnFeatures.join(" & ") || "General"
+      }`;
+
+  const playlistDescription = customDescription
+    ? customDescription.substring(0, 150) // Áp dụng giới hạn ký tự
+    : `A system-generated playlist for user ${userId} focusing on ${focusOnFeatures.join(
+        ", "
+      )}. Tracks based on listening history analysis.`;
+
+  const newPlaylist = await prisma.playlist.create({
+    data: {
+      name: playlistName,
+      description: playlistDescription,
+      userId: userId,
+      type: PlaylistType.SYSTEM,
+      privacy: PlaylistPrivacy.PRIVATE,
+      isAIGenerated: false,
+      tracks: {
+        create: selectedTracks.map((track, index) => ({
+          trackId: track.id,
+          trackOrder: index,
+        })),
+      },
+      totalTracks: selectedTracks.length,
+      totalDuration: selectedTracks.reduce(
+        (sum, track) => sum + (track.duration || 0),
+        0
+      ),
+    },
+    include: {
+      tracks: { include: { track: { include: { artist: true } } } },
+      user: { select: { id: true, name: true } },
+    },
+  });
+
+  console.log(
+    "[PlaylistService] Successfully generated system playlist:",
+    newPlaylist
+  );
+  return newPlaylist;
 };
 
 // Cập nhật tất cả system playlists cho tất cả user
@@ -714,15 +971,11 @@ export const updateAllSystemPlaylists = async (): Promise<{
             "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
 
           // Tạo hoặc cập nhật playlist hệ thống được cá nhân hóa cho người dùng
-          await createAIGeneratedPlaylistFromAIService({
-            targetUserId: user.id,
-            generationMode: "userHistory", // Default, adjust if needed
-            requestedTrackCount: aiOptions.trackCount || 20, // Use from aiOptions or default
-            type: PlaylistType.SYSTEM, // Assuming SYSTEM type for these
-            customPromptKeywords: convertAiOptionsToKeywords(aiOptions),
-            // playlistName, playlistDescription are generated by ai.service now
-            // coverUrl is also handled by ai.service if needed, or not at all
-          });
+          await generateSystemPlaylistFromHistoryFeatures(
+            user.id,
+            ["mood", "genres"],
+            aiOptions.trackCount || 20
+          );
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
@@ -1104,3 +1357,230 @@ export const reorderPlaylistTracks = async (
 export function updateVibeRewindPlaylist(userId: string) {
   throw new Error("Function not implemented.");
 }
+
+export const getUserListeningStats = async (userId: string) => {
+  const historyItems = await prisma.history.findMany({
+    where: {
+      userId: userId,
+      trackId: { not: null },
+    },
+    include: {
+      track: {
+        select: {
+          id: true,
+          title: true,
+          mood: true,
+          key: true,
+          scale: true,
+          tempo: true,
+          energy: true,
+          danceability: true,
+          artist: { select: { artistName: true } },
+          genres: { include: { genre: { select: { name: true } } } },
+        },
+      },
+    },
+    take: 200,
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (historyItems.length === 0) {
+    return {
+      message: "No listening history found to generate stats.",
+      topMoods: [],
+      topGenres: [],
+      topArtists: [],
+      topKeys: [],
+      tempo: { average: null, min: null, max: null, count: 0 },
+      energy: { average: null, min: null, max: null, count: 0 },
+      danceability: { average: null, min: null, max: null, count: 0 },
+      totalHistoryItemsAnalyzed: 0,
+    };
+  }
+
+  const moodCounts: Record<string, number> = {};
+  const genreCounts: Record<string, number> = {};
+  const artistCounts: Record<string, number> = {};
+  const keyCounts: Record<string, number> = {};
+
+  const tempos: number[] = [];
+  const energies: number[] = [];
+  const danceabilities: number[] = [];
+
+  for (const item of historyItems) {
+    if (!item.track) continue;
+    // Use 'as any' for fields whose existence/type isn't certain without the exact schema
+    const track = item.track as any;
+
+    // Mood
+    if (
+      track.mood &&
+      typeof track.mood === "string" &&
+      track.mood.trim() !== ""
+    ) {
+      moodCounts[track.mood.trim()] = (moodCounts[track.mood.trim()] || 0) + 1;
+    }
+
+    // Genres
+    // Assuming track.genres is an array of { genre: { name: string } }
+    if (Array.isArray(track.genres)) {
+      track.genres.forEach((g: any) => {
+        if (g.genre?.name && typeof g.genre.name === "string") {
+          genreCounts[g.genre.name] = (genreCounts[g.genre.name] || 0) + 1;
+        }
+      });
+    }
+
+    // Artist
+    if (
+      track.artist?.artistName &&
+      typeof track.artist.artistName === "string"
+    ) {
+      artistCounts[track.artist.artistName] =
+        (artistCounts[track.artist.artistName] || 0) + 1;
+    }
+
+    // Key & Scale
+    if (track.key && typeof track.key === "string" && track.key.trim() !== "") {
+      const keyText = track.key.trim();
+      const scaleText =
+        track.scale && typeof track.scale === "string"
+          ? track.scale.trim()
+          : "";
+      const fullKey = scaleText ? `${keyText} ${scaleText}` : keyText;
+      keyCounts[fullKey] = (keyCounts[fullKey] || 0) + 1;
+    }
+
+    // Numerical features
+    if (typeof track.tempo === "number") tempos.push(track.tempo);
+    if (typeof track.energy === "number") energies.push(track.energy);
+    if (typeof track.danceability === "number")
+      danceabilities.push(track.danceability);
+  }
+
+  const calculateTopN = (counts: Record<string, number>, n: number = 5) => {
+    return Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, n)
+      .map(([name, count]) => ({ name, count }));
+  };
+
+  const calculateNumericStats = (arr: number[]) => {
+    if (arr.length === 0)
+      return { average: null, min: null, max: null, count: 0 };
+    const sum = arr.reduce((acc, val) => acc + val, 0);
+    const average = sum / arr.length;
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    return {
+      average: parseFloat(average.toFixed(2)),
+      min,
+      max,
+      count: arr.length,
+    };
+  };
+
+  return {
+    topMoods: calculateTopN(moodCounts),
+    topGenres: calculateTopN(genreCounts),
+    topArtists: calculateTopN(artistCounts),
+    topKeys: calculateTopN(keyCounts),
+    tempo: calculateNumericStats(tempos),
+    energy: calculateNumericStats(energies),
+    danceability: calculateNumericStats(danceabilities),
+    totalHistoryItemsAnalyzed: historyItems.length,
+  };
+};
+
+// NEW FUNCTION TO GET FULL PLAYLIST DETAILS
+export const getPlaylistDetailsById = async (playlistId: string) => {
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    include: {
+      tracks: {
+        orderBy: { trackOrder: "asc" },
+        select: {
+          id: true, // PlaylistTrack ID
+          addedAt: true,
+          trackOrder: true,
+          track: {
+            // The actual Track object
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+              duration: true,
+              artist: {
+                select: {
+                  id: true,
+                  artistName: true,
+                },
+              },
+              album: {
+                select: {
+                  id: true,
+                  title: true,
+                },
+              },
+              genres: {
+                select: {
+                  genre: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+              // Include other track fields if needed by the modal
+            },
+          },
+        },
+      },
+      user: {
+        // Include user details if you want to display who the playlist belongs to
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      _count: {
+        // Keep total track count
+        select: { tracks: true },
+      },
+    },
+  });
+
+  if (!playlist) {
+    throw new Error("Playlist not found"); // Or handle as a 404 in controller
+  }
+
+  // Transform genres to a simpler array of strings for each track, if desired
+  // This matches the PreviewTrack interface in the modal more closely if it expects simple genre names
+  const transformedPlaylist = {
+    ...playlist,
+    tracks: playlist.tracks.map((pt) => ({
+      ...pt,
+      track: {
+        ...pt.track,
+        genres:
+          pt.track.genres?.map((g) => g.genre.name).filter((name) => !!name) ||
+          [],
+        albumTitle: pt.track.album?.title, // Flatten album title
+        artistName: pt.track.artist?.artistName, // Flatten artist name
+      },
+    })),
+  };
+
+  return transformedPlaylist;
+};
+
+// Helper function (should be after the export)
+const calculateTopN = (counts: Record<string, number>, n: number = 5) => {
+  return Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, n)
+    .map(([name, count]) => ({ name, count }));
+};

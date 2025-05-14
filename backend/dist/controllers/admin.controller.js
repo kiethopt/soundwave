@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteSystemPlaylistHandler = exports.removeTrackFromSystemPlaylistHandler = exports.fixAlbumTrackTypes = exports.exportTrackAndArtistData = exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateAndAssignAiPlaylistToUserHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.updatePlaylistVisibilityHandler = exports.deleteSystemPlaylistHandler = exports.removeTrackFromSystemPlaylistHandler = exports.fixAlbumTrackTypes = exports.exportTrackAndArtistData = exports.getArtistRoleRequestsHandler = exports.rejectLabelRegistration = exports.approveLabelRegistration = exports.getLabelRegistrationById = exports.getAllLabelRegistrations = exports.reanalyzeTrackHandler = exports.getUserListeningHistoryHandler = exports.getUserAiPlaylistsHandler = exports.updateAiPlaylistVisibilityHandler = exports.generateAndAssignAiPlaylistToUserHandler = exports.bulkUploadTracks = exports.rejectArtistClaimRequest = exports.approveArtistClaimRequest = exports.getArtistClaimRequestDetail = exports.getAllArtistClaimRequests = exports.getSystemStatus = exports.handleAIModelStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const client_1 = require("@prisma/client");
@@ -928,4 +928,32 @@ const deleteSystemPlaylistHandler = async (req, res) => {
     }
 };
 exports.deleteSystemPlaylistHandler = deleteSystemPlaylistHandler;
+const updatePlaylistVisibilityHandler = async (req, res) => {
+    try {
+        const { playlistId } = req.params;
+        const { privacy } = req.body;
+        const adminUserId = req.user?.id;
+        if (!adminUserId) {
+            res.status(401).json({ message: "Unauthorized: Admin user ID missing." });
+            return;
+        }
+        if (!privacy ||
+            (privacy !== client_1.PlaylistPrivacy.PUBLIC &&
+                privacy !== client_1.PlaylistPrivacy.PRIVATE)) {
+            res
+                .status(400)
+                .json({ message: "Invalid privacy value. Must be PUBLIC or PRIVATE." });
+            return;
+        }
+        const updatedPlaylist = await adminService.updatePlaylistVisibility(adminUserId, playlistId, privacy);
+        res.json({
+            message: "Playlist visibility updated successfully.",
+            playlist: updatedPlaylist,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, "Update playlist visibility by admin");
+    }
+};
+exports.updatePlaylistVisibilityHandler = updatePlaylistVisibilityHandler;
 //# sourceMappingURL=admin.controller.js.map

@@ -19,10 +19,12 @@ const paginate = async (model, req, options = {}) => {
     return {
         data,
         pagination: {
-            total,
-            page: pageNumber,
-            limit: limitNumber,
+            totalItems: total,
+            currentPage: pageNumber,
+            itemsPerPage: limitNumber,
             totalPages: Math.ceil(total / limitNumber),
+            hasNextPage: pageNumber < Math.ceil(total / limitNumber),
+            hasPrevPage: pageNumber > 1,
         },
     };
 };
@@ -32,7 +34,7 @@ const validateField = (value, fieldName, options = {}) => {
         return `${fieldName} is required`;
     }
     if (value) {
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
             if (options.minLength && value.length < options.minLength) {
                 return `${fieldName} must be at least ${options.minLength} characters long`;
             }
@@ -57,13 +59,13 @@ exports.runValidations = runValidations;
 const toBooleanValue = (value) => {
     if (value === undefined || value === null)
         return undefined;
-    if (typeof value === 'boolean')
+    if (typeof value === "boolean")
         return value;
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
         const lowercaseValue = value.toLowerCase();
-        if (lowercaseValue === 'true')
+        if (lowercaseValue === "true")
             return true;
-        if (lowercaseValue === 'false')
+        if (lowercaseValue === "false")
             return false;
         const num = Number(value);
         if (!isNaN(num))
@@ -74,35 +76,38 @@ const toBooleanValue = (value) => {
 exports.toBooleanValue = toBooleanValue;
 const handleError = (res, error, operation) => {
     let statusCode = 500;
-    let message = 'Internal server error';
+    let message = "Internal server error";
     console.error(`Error in ${operation}:`, error);
     if (error instanceof Error) {
-        if (error.message.startsWith('INVALID_PROMPT:')) {
+        if (error.message.startsWith("INVALID_PROMPT:")) {
             statusCode = 400;
-            message = error.message.replace('INVALID_PROMPT:', '').trim();
+            message = error.message.replace("INVALID_PROMPT:", "").trim();
             console.log(`[AI Error] Invalid prompt detected: ${message}`);
         }
-        else if (error.message.includes('Not Found') || error.name === 'NotFoundError') {
+        else if (error.message.includes("Not Found") ||
+            error.name === "NotFoundError") {
             statusCode = 404;
-            message = error.message || 'Resource not found';
+            message = error.message || "Resource not found";
         }
-        else if (error.message.includes('Forbidden') || error.message.includes('Not authorized')) {
+        else if (error.message.includes("Forbidden") ||
+            error.message.includes("Not authorized")) {
             statusCode = 403;
             message = error.message;
         }
-        else if (error.message.includes('Unauthorized') || error.message.includes('authentication failed')) {
+        else if (error.message.includes("Unauthorized") ||
+            error.message.includes("authentication failed")) {
             statusCode = 401;
             message = error.message;
         }
-        else if (error.message.includes('Invalid') ||
-            error.message.includes('already exists') ||
-            error.message.includes('validation failed') ||
-            error.name === 'ValidationError') {
+        else if (error.message.includes("Invalid") ||
+            error.message.includes("already exists") ||
+            error.message.includes("validation failed") ||
+            error.name === "ValidationError") {
             statusCode = 400;
             message = error.message;
         }
         if (statusCode === 500) {
-            message = error.message || 'Internal server error';
+            message = error.message || "Internal server error";
         }
     }
     res.status(statusCode).json({

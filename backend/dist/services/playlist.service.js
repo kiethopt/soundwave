@@ -3,12 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.getPlaylistDetailsById = exports.getUserListeningStats = exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateSystemPlaylistFromHistoryFeatures = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.getAllBaseSystemPlaylists = exports.deleteUserSpecificSystemPlaylist = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
-const ai_service_1 = require("./ai.service");
 const upload_service_1 = require("./upload.service");
 const baseSystemPlaylistSelect = {
     id: true,
@@ -155,6 +154,25 @@ const deleteBaseSystemPlaylist = async (playlistId) => {
     });
 };
 exports.deleteBaseSystemPlaylist = deleteBaseSystemPlaylist;
+const deleteUserSpecificSystemPlaylist = async (playlistId) => {
+    const playlist = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        select: { type: true, userId: true },
+    });
+    if (!playlist) {
+        throw new Error("Playlist not found.");
+    }
+    if (playlist.type !== client_1.PlaylistType.SYSTEM) {
+        throw new Error("Playlist is not a system playlist.");
+    }
+    if (!playlist.userId) {
+        throw new Error("This is a base system playlist template. Use deleteBaseSystemPlaylist to delete it.");
+    }
+    return db_1.default.playlist.delete({
+        where: { id: playlistId },
+    });
+};
+exports.deleteUserSpecificSystemPlaylist = deleteUserSpecificSystemPlaylist;
 const getAllBaseSystemPlaylists = async (req) => {
     const { search } = req.query;
     const whereClause = {
@@ -289,11 +307,11 @@ const getSystemPlaylists = async (req) => {
     };
 };
 exports.getSystemPlaylists = getSystemPlaylists;
-const getUserSystemPlaylists = async (req) => {
-    const { search, sortBy, sortOrder } = req.query;
+const getUserSystemPlaylists = async (req, targetUserId) => {
+    const { search, sortBy, sortOrder, page, limit } = req.query;
     const whereClause = {
         type: "SYSTEM",
-        userId: req.user?.id,
+        userId: targetUserId,
     };
     if (search && typeof search === "string") {
         whereClause.OR = [
@@ -301,49 +319,78 @@ const getUserSystemPlaylists = async (req) => {
             { description: { contains: search, mode: "insensitive" } },
         ];
     }
+    const validSortKeys = [
+        "name",
+        "createdAt",
+        "updatedAt",
+        "totalTracks",
+        "privacy",
+    ];
+    const orderBy = {};
+    if (typeof sortBy === "string" &&
+        validSortKeys.includes(sortBy) &&
+        (sortOrder === "asc" || sortOrder === "desc")) {
+        orderBy[sortBy] =
+            sortOrder;
+    }
+    else {
+        orderBy.createdAt = "desc";
+    }
     const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
         where: whereClause,
         include: {
             tracks: {
-                include: {
+                select: {
                     track: {
-                        include: {
-                            artist: true,
-                            album: { select: { title: true } },
-                            genres: { select: { genre: { select: { name: true } } } },
+                        select: {
+                            id: true,
+                            title: true,
+                            coverUrl: true,
+                            artist: { select: { artistName: true } },
                         },
                     },
+                    trackOrder: true,
                 },
                 orderBy: {
                     trackOrder: "asc",
                 },
+                take: 3,
             },
-            user: {
-                select: { id: true, name: true, email: true },
+            _count: {
+                select: { tracks: true },
             },
         },
-        orderBy: {
-            createdAt: "desc",
-        },
+        orderBy: orderBy,
     });
     const formattedPlaylists = result.data.map((playlist) => {
-        const formattedTracks = playlist.tracks.map((pt) => ({
-            id: pt.track.id,
-            title: pt.track.title,
-            audioUrl: pt.track.audioUrl,
-            duration: pt.track.duration,
-            coverUrl: pt.track.coverUrl,
-            artist: pt.track.artist,
-            album: pt.track.album,
-            genres: pt.track.genres,
-            createdAt: pt.track.createdAt.toISOString(),
-        }));
+        const previewTracks = playlist.tracks.map((pt) => {
+            return {
+                id: pt.track.id,
+                title: pt.track.title,
+                coverUrl: pt.track.coverUrl,
+                artistName: pt.track.artist?.artistName || "Unknown Artist",
+            };
+        });
         return {
-            ...playlist,
-            tracks: formattedTracks,
+            id: playlist.id,
+            name: playlist.name,
+            description: playlist.description,
+            coverUrl: playlist.coverUrl,
+            privacy: playlist.privacy,
+            type: playlist.type,
+            isAIGenerated: playlist.isAIGenerated,
+            createdAt: playlist.createdAt,
+            updatedAt: playlist.updatedAt,
+            userId: playlist.userId,
+            lastGeneratedAt: playlist.lastGeneratedAt,
+            totalTracks: playlist._count?.tracks ?? 0,
+            tracks: previewTracks,
         };
     });
-    return formattedPlaylists;
+    return {
+        data: formattedPlaylists,
+        pagination: result.pagination,
+    };
 };
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
 const convertAiOptionsToKeywords = (aiOptions) => {
@@ -362,59 +409,147 @@ const convertAiOptionsToKeywords = (aiOptions) => {
         keywords.push(`release time: ${aiOptions.basedOnReleaseTime}`);
     return keywords.join(", ");
 };
-const generateAIPlaylist = async (userId, options) => {
-    console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
-    try {
-        const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(options);
-        const playlistWithTracks = await db_1.default.playlist.findUnique({
-            where: { id: playlist.id },
-            include: {
-                tracks: {
-                    include: {
-                        track: {
-                            include: {
-                                artist: {
-                                    select: {
-                                        id: true,
-                                        artistName: true,
-                                        avatar: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    orderBy: {
-                        trackOrder: "asc",
-                    },
+const generateSystemPlaylistFromHistoryFeatures = async (userId, focusOnFeatures, requestedTrackCount, customName, customDescription) => {
+    const user = await db_1.default.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        throw new Error("User not found");
+    }
+    const historyItems = await db_1.default.history.findMany({
+        where: {
+            userId: userId,
+            trackId: { not: null },
+            createdAt: {
+                gte: new Date(new Date().setDate(new Date().getDate() - 90)),
+            },
+        },
+        include: {
+            track: {
+                select: {
+                    id: true,
+                    title: true,
+                    mood: true,
+                    key: true,
+                    scale: true,
+                    tempo: true,
+                    energy: true,
+                    danceability: true,
+                    genres: { include: { genre: { select: { name: true } } } },
+                    artist: { select: { artistName: true } },
+                    album: { select: { title: true } },
+                    duration: true,
+                    audioUrl: true,
+                    coverUrl: true,
                 },
             },
+        },
+        take: 200,
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+    if (historyItems.length === 0) {
+        throw new Error("No listening history found to generate playlist.");
+    }
+    let filterCriteria = { isActive: true };
+    const dominantFeatures = {};
+    const getTopN = (counts, n = 1) => Object.entries(counts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, n)
+        .map(([name]) => name);
+    if (focusOnFeatures.includes("mood")) {
+        const moodCounts = {};
+        historyItems.forEach((item) => {
+            const mood = item.track?.mood;
+            if (mood && typeof mood === "string")
+                moodCounts[mood] = (moodCounts[mood] || 0) + 1;
         });
-        if (!playlistWithTracks) {
-            throw new Error("Failed to retrieve created playlist details");
+        if (Object.keys(moodCounts).length > 0) {
+            dominantFeatures.moods = getTopN(moodCounts, 2);
+            filterCriteria.mood = { in: dominantFeatures.moods };
         }
-        const artistsInPlaylist = new Set();
-        playlistWithTracks.tracks.forEach((pt) => {
-            if (pt.track.artist) {
-                artistsInPlaylist.add(pt.track.artist.artistName);
-            }
+    }
+    if (focusOnFeatures.includes("genres")) {
+        const genreCounts = {};
+        historyItems.forEach((item) => item.track?.genres?.forEach((g) => {
+            if (g.genre?.name)
+                genreCounts[g.genre.name] = (genreCounts[g.genre.name] || 0) + 1;
+        }));
+        if (Object.keys(genreCounts).length > 0) {
+            dominantFeatures.genres = getTopN(genreCounts, 3);
+            filterCriteria.genres = {
+                some: { genre: { name: { in: dominantFeatures.genres } } },
+            };
+        }
+    }
+    if (focusOnFeatures.includes("artist")) {
+        const artistCounts = {};
+        historyItems.forEach((item) => {
+            const artistName = item.track?.artist?.artistName;
+            if (artistName && typeof artistName === "string")
+                artistCounts[artistName] = (artistCounts[artistName] || 0) + 1;
         });
-        return {
-            ...playlist,
-            artistCount: artistsInPlaylist.size,
-            previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
-                id: pt.track.id,
-                title: pt.track.title,
-                artist: pt.track.artist?.artistName,
-            })),
-            totalTracks: playlistWithTracks.tracks.length,
-        };
+        if (Object.keys(artistCounts).length > 0) {
+            dominantFeatures.artists = getTopN(artistCounts, 3);
+        }
     }
-    catch (error) {
-        console.error(`[PlaylistService] Error in generateAIPlaylist:`, error);
-        throw error;
+    const candidateTracks = await db_1.default.track.findMany({
+        where: {
+            AND: [
+                filterCriteria,
+                { id: { notIn: historyItems.map((h) => h.track.id) } },
+            ],
+        },
+        take: requestedTrackCount * 3,
+        orderBy: { playCount: "desc" },
+        select: {
+            id: true,
+            title: true,
+            duration: true,
+            coverUrl: true,
+            audioUrl: true,
+            artist: { select: { id: true, artistName: true, avatar: true } },
+            album: { select: { id: true, title: true } },
+        },
+    });
+    const selectedTracks = candidateTracks
+        .sort(() => 0.5 - Math.random())
+        .slice(0, requestedTrackCount);
+    if (selectedTracks.length < Math.min(requestedTrackCount, 5) &&
+        selectedTracks.length === 0) {
+        throw new Error(`Could not find enough tracks matching the criteria (found ${selectedTracks.length}). Try broader features or check user history diversity.`);
     }
+    const playlistName = customName
+        ? customName.substring(0, 50)
+        : `System Mix for ${userId.substring(0, 8)} - Focus: ${focusOnFeatures.join(" & ") || "General"}`;
+    const playlistDescription = customDescription
+        ? customDescription.substring(0, 150)
+        : `A system-generated playlist for user ${userId} focusing on ${focusOnFeatures.join(", ")}. Tracks based on listening history analysis.`;
+    const newPlaylist = await db_1.default.playlist.create({
+        data: {
+            name: playlistName,
+            description: playlistDescription,
+            userId: userId,
+            type: client_1.PlaylistType.SYSTEM,
+            privacy: client_1.PlaylistPrivacy.PRIVATE,
+            isAIGenerated: false,
+            tracks: {
+                create: selectedTracks.map((track, index) => ({
+                    trackId: track.id,
+                    trackOrder: index,
+                })),
+            },
+            totalTracks: selectedTracks.length,
+            totalDuration: selectedTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+        },
+        include: {
+            tracks: { include: { track: { include: { artist: true } } } },
+            user: { select: { id: true, name: true } },
+        },
+    });
+    console.log("[PlaylistService] Successfully generated system playlist:", newPlaylist);
+    return newPlaylist;
 };
-exports.generateAIPlaylist = generateAIPlaylist;
+exports.generateSystemPlaylistFromHistoryFeatures = generateSystemPlaylistFromHistoryFeatures;
 const updateAllSystemPlaylists = async () => {
     try {
         const users = await db_1.default.user.findMany({
@@ -527,13 +662,7 @@ const updateAllSystemPlaylists = async () => {
                 }
                 const coverUrl = templatePlaylist.coverUrl ||
                     "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
-                await (0, ai_service_1.createAIGeneratedPlaylist)({
-                    targetUserId: user.id,
-                    generationMode: "userHistory",
-                    requestedTrackCount: aiOptions.trackCount || 20,
-                    type: client_1.PlaylistType.SYSTEM,
-                    customPromptKeywords: convertAiOptionsToKeywords(aiOptions),
-                });
+                await (0, exports.generateSystemPlaylistFromHistoryFeatures)(user.id, ["mood", "genres"], aiOptions.trackCount || 20);
             }
             catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -824,4 +953,197 @@ exports.reorderPlaylistTracks = reorderPlaylistTracks;
 function updateVibeRewindPlaylist(userId) {
     throw new Error("Function not implemented.");
 }
+const getUserListeningStats = async (userId) => {
+    const historyItems = await db_1.default.history.findMany({
+        where: {
+            userId: userId,
+            trackId: { not: null },
+        },
+        include: {
+            track: {
+                select: {
+                    id: true,
+                    title: true,
+                    mood: true,
+                    key: true,
+                    scale: true,
+                    tempo: true,
+                    energy: true,
+                    danceability: true,
+                    artist: { select: { artistName: true } },
+                    genres: { include: { genre: { select: { name: true } } } },
+                },
+            },
+        },
+        take: 200,
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+    if (historyItems.length === 0) {
+        return {
+            message: "No listening history found to generate stats.",
+            topMoods: [],
+            topGenres: [],
+            topArtists: [],
+            topKeys: [],
+            tempo: { average: null, min: null, max: null, count: 0 },
+            energy: { average: null, min: null, max: null, count: 0 },
+            danceability: { average: null, min: null, max: null, count: 0 },
+            totalHistoryItemsAnalyzed: 0,
+        };
+    }
+    const moodCounts = {};
+    const genreCounts = {};
+    const artistCounts = {};
+    const keyCounts = {};
+    const tempos = [];
+    const energies = [];
+    const danceabilities = [];
+    for (const item of historyItems) {
+        if (!item.track)
+            continue;
+        const track = item.track;
+        if (track.mood &&
+            typeof track.mood === "string" &&
+            track.mood.trim() !== "") {
+            moodCounts[track.mood.trim()] = (moodCounts[track.mood.trim()] || 0) + 1;
+        }
+        if (Array.isArray(track.genres)) {
+            track.genres.forEach((g) => {
+                if (g.genre?.name && typeof g.genre.name === "string") {
+                    genreCounts[g.genre.name] = (genreCounts[g.genre.name] || 0) + 1;
+                }
+            });
+        }
+        if (track.artist?.artistName &&
+            typeof track.artist.artistName === "string") {
+            artistCounts[track.artist.artistName] =
+                (artistCounts[track.artist.artistName] || 0) + 1;
+        }
+        if (track.key && typeof track.key === "string" && track.key.trim() !== "") {
+            const keyText = track.key.trim();
+            const scaleText = track.scale && typeof track.scale === "string"
+                ? track.scale.trim()
+                : "";
+            const fullKey = scaleText ? `${keyText} ${scaleText}` : keyText;
+            keyCounts[fullKey] = (keyCounts[fullKey] || 0) + 1;
+        }
+        if (typeof track.tempo === "number")
+            tempos.push(track.tempo);
+        if (typeof track.energy === "number")
+            energies.push(track.energy);
+        if (typeof track.danceability === "number")
+            danceabilities.push(track.danceability);
+    }
+    const calculateTopN = (counts, n = 5) => {
+        return Object.entries(counts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, n)
+            .map(([name, count]) => ({ name, count }));
+    };
+    const calculateNumericStats = (arr) => {
+        if (arr.length === 0)
+            return { average: null, min: null, max: null, count: 0 };
+        const sum = arr.reduce((acc, val) => acc + val, 0);
+        const average = sum / arr.length;
+        const min = Math.min(...arr);
+        const max = Math.max(...arr);
+        return {
+            average: parseFloat(average.toFixed(2)),
+            min,
+            max,
+            count: arr.length,
+        };
+    };
+    return {
+        topMoods: calculateTopN(moodCounts),
+        topGenres: calculateTopN(genreCounts),
+        topArtists: calculateTopN(artistCounts),
+        topKeys: calculateTopN(keyCounts),
+        tempo: calculateNumericStats(tempos),
+        energy: calculateNumericStats(energies),
+        danceability: calculateNumericStats(danceabilities),
+        totalHistoryItemsAnalyzed: historyItems.length,
+    };
+};
+exports.getUserListeningStats = getUserListeningStats;
+const getPlaylistDetailsById = async (playlistId) => {
+    const playlist = await db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        include: {
+            tracks: {
+                orderBy: { trackOrder: "asc" },
+                select: {
+                    id: true,
+                    addedAt: true,
+                    trackOrder: true,
+                    track: {
+                        select: {
+                            id: true,
+                            title: true,
+                            coverUrl: true,
+                            duration: true,
+                            artist: {
+                                select: {
+                                    id: true,
+                                    artistName: true,
+                                },
+                            },
+                            album: {
+                                select: {
+                                    id: true,
+                                    title: true,
+                                },
+                            },
+                            genres: {
+                                select: {
+                                    genre: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            _count: {
+                select: { tracks: true },
+            },
+        },
+    });
+    if (!playlist) {
+        throw new Error("Playlist not found");
+    }
+    const transformedPlaylist = {
+        ...playlist,
+        tracks: playlist.tracks.map((pt) => ({
+            ...pt,
+            track: {
+                ...pt.track,
+                genres: pt.track.genres?.map((g) => g.genre.name).filter((name) => !!name) ||
+                    [],
+                albumTitle: pt.track.album?.title,
+                artistName: pt.track.artist?.artistName,
+            },
+        })),
+    };
+    return transformedPlaylist;
+};
+exports.getPlaylistDetailsById = getPlaylistDetailsById;
+const calculateTopN = (counts, n = 5) => {
+    return Object.entries(counts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, n)
+        .map(([name, count]) => ({ name, count }));
+};
 //# sourceMappingURL=playlist.service.js.map

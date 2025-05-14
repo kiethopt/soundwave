@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
 
 // Xử lý phân trang
 export const paginate = async <T>(
@@ -33,10 +33,12 @@ export const paginate = async <T>(
   return {
     data,
     pagination: {
-      total,
-      page: pageNumber,
-      limit: limitNumber,
+      totalItems: total,
+      currentPage: pageNumber,
+      itemsPerPage: limitNumber,
       totalPages: Math.ceil(total / limitNumber),
+      hasNextPage: pageNumber < Math.ceil(total / limitNumber),
+      hasPrevPage: pageNumber > 1,
     },
   };
 };
@@ -59,7 +61,7 @@ export const validateField = (
   }
 
   if (value) {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       if (options.minLength && value.length < options.minLength) {
         return `${fieldName} must be at least ${options.minLength} characters long`;
       }
@@ -91,13 +93,13 @@ export const toBooleanValue = (value: any): boolean | undefined => {
   if (value === undefined || value === null) return undefined;
 
   // If it's already a boolean, return it directly
-  if (typeof value === 'boolean') return value;
+  if (typeof value === "boolean") return value;
 
   // Convert strings to boolean
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const lowercaseValue = value.toLowerCase();
-    if (lowercaseValue === 'true') return true;
-    if (lowercaseValue === 'false') return false;
+    if (lowercaseValue === "true") return true;
+    if (lowercaseValue === "false") return false;
     // Try to convert to number first, then to boolean
     const num = Number(value);
     if (!isNaN(num)) return Boolean(num);
@@ -115,38 +117,47 @@ export const handleError = (
 ): void => {
   // Format error message
   let statusCode = 500;
-  let message = 'Internal server error';
+  let message = "Internal server error";
   console.error(`Error in ${operation}:`, error);
 
   if (error instanceof Error) {
     // Check for specific error types and patterns
-    if (error.message.startsWith('INVALID_PROMPT:')) {
+    if (error.message.startsWith("INVALID_PROMPT:")) {
       // This should be handled by specific controllers before reaching here
       statusCode = 400;
-      message = error.message.replace('INVALID_PROMPT:', '').trim();
+      message = error.message.replace("INVALID_PROMPT:", "").trim();
       console.log(`[AI Error] Invalid prompt detected: ${message}`);
-    } else if (error.message.includes('Not Found') || error.name === 'NotFoundError') {
+    } else if (
+      error.message.includes("Not Found") ||
+      error.name === "NotFoundError"
+    ) {
       statusCode = 404;
-      message = error.message || 'Resource not found';
-    } else if (error.message.includes('Forbidden') || error.message.includes('Not authorized')) {
+      message = error.message || "Resource not found";
+    } else if (
+      error.message.includes("Forbidden") ||
+      error.message.includes("Not authorized")
+    ) {
       statusCode = 403;
       message = error.message;
-    } else if (error.message.includes('Unauthorized') || error.message.includes('authentication failed')) {
+    } else if (
+      error.message.includes("Unauthorized") ||
+      error.message.includes("authentication failed")
+    ) {
       statusCode = 401;
       message = error.message;
     } else if (
-      error.message.includes('Invalid') ||
-      error.message.includes('already exists') ||
-      error.message.includes('validation failed') ||
-      error.name === 'ValidationError'
+      error.message.includes("Invalid") ||
+      error.message.includes("already exists") ||
+      error.message.includes("validation failed") ||
+      error.name === "ValidationError"
     ) {
       statusCode = 400;
       message = error.message;
     }
-    
+
     // Default fallback if not a specific pattern
     if (statusCode === 500) {
-      message = error.message || 'Internal server error';
+      message = error.message || "Internal server error";
     }
   }
 

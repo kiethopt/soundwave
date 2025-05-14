@@ -61,8 +61,7 @@ export const GeneratePlaylistConfirmModal: React.FC<
             <strong>User ID:</strong> {userId || "N/A"}
             <div className="mt-2">
               The system will analyze this user's listening history to create a
-              personalized playlist using AI. This process may take a few
-              moments.
+              personalized playlist. This process may take a few moments.
             </div>
             <div className="mt-3 font-medium">
               Are you sure you want to proceed?
