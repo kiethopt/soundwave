@@ -644,11 +644,54 @@ export const generateSystemPlaylistFromHistoryFeatures = async (
   });
 
   if (historyItems.length === 0) {
-    // Nếu không có lịch sử, lấy top tracks phổ biến
+    // Nếu không có lịch sử, lấy top tracks phổ biến với yếu tố random
+    const randomOffset = Math.floor(Math.random() * 20); // Random offset để tránh trùng lặp
+    const randomGenreFilter = Math.random() > 0.5; // Đôi khi lọc theo thể loại
+
+    let genreFilter = {};
+    if (randomGenreFilter) {
+      // Lấy ngẫu nhiên một số thể loại phổ biến để filter
+      const popularGenres = await prisma.genre.findMany({
+        take: 5,
+        orderBy: {
+          tracks: { _count: "desc" }
+        },
+        select: { id: true }
+      });
+      
+      if (popularGenres.length > 0) {
+        // Chọn ngẫu nhiên 1-3 thể loại
+        const selectedGenres = popularGenres
+          .sort(() => 0.5 - Math.random())
+          .slice(0, Math.ceil(Math.random() * 3));
+        
+        if (selectedGenres.length > 0) {
+          genreFilter = {
+            genres: {
+              some: {
+                genreId: { in: selectedGenres.map(g => g.id) }
+              }
+            }
+          };
+        }
+      }
+    }
+
+    // Áp dụng nhiều tiêu chí sắp xếp khác nhau
+    const orderCriteria = Math.random() > 0.3
+      ? [{ playCount: "desc" as const }, { createdAt: "desc" as const }]
+      : Math.random() > 0.5
+        ? [{ createdAt: "desc" as const }, { playCount: "desc" as const }]
+        : [{ playCount: "desc" as const }, { releaseDate: "desc" as const }];
+
     const topTracks = await prisma.track.findMany({
-      where: { isActive: true },
-      orderBy: { playCount: "desc" },
-      take: requestedTrackCount,
+      where: { 
+        isActive: true,
+        ...genreFilter
+      },
+      orderBy: orderCriteria,
+      skip: randomOffset,
+      take: requestedTrackCount + 5, // Lấy nhiều hơn để có thể shuffle
       select: {
         id: true,
         title: true,
@@ -659,9 +702,16 @@ export const generateSystemPlaylistFromHistoryFeatures = async (
         album: { select: { id: true, title: true } },
       },
     });
-    if (topTracks.length === 0) {
+    
+    // Shuffle kết quả để đa dạng hóa
+    const shuffledTracks = topTracks
+      .sort(() => 0.5 - Math.random())
+      .slice(0, requestedTrackCount);
+      
+    if (shuffledTracks.length === 0) {
       throw new Error("No tracks available to generate playlist.");
     }
+    
     const playlistName = customName
       ? customName.substring(0, 50)
       : `Popular Mix for ${userId.substring(0, 8)}`;
@@ -677,13 +727,13 @@ export const generateSystemPlaylistFromHistoryFeatures = async (
         privacy: PlaylistPrivacy.PUBLIC,
         isAIGenerated: false,
         tracks: {
-          create: topTracks.map((track, index) => ({
+          create: shuffledTracks.map((track, index) => ({
             trackId: track.id,
             trackOrder: index,
           })),
         },
-        totalTracks: topTracks.length,
-        totalDuration: topTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+        totalTracks: shuffledTracks.length,
+        totalDuration: shuffledTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
       },
       include: {
         tracks: { include: { track: { include: { artist: true } } } },

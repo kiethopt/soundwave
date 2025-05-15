@@ -203,7 +203,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           name: "Welcome Mix",
           description:
             "A selection of popular tracks to start your journey on Soundwave.",
-          privacy: "PRIVATE",
+          privacy: "PUBLIC",
           type: "SYSTEM",
           isAIGenerated: false,
           userId: user.id,
@@ -459,7 +459,7 @@ export const googleLogin = async (
               name: "Welcome Mix",
               description:
                 "A selection of popular tracks to start your journey on Soundwave.",
-              privacy: "PRIVATE",
+              privacy: "PUBLIC",
               type: "SYSTEM",
               isAIGenerated: false,
               userId: user.id,

@@ -25,6 +25,11 @@ import {
   Loader2,
   ArrowLeft,
   PlusCircle,
+  Music,
+  ListMusic,
+  Disc,
+  Radio,
+  PlayCircle,
 } from "lucide-react";
 import { UserInfoModal } from "@/components/ui/data-table/data-table-modals";
 import {
@@ -529,7 +534,7 @@ export default function AiUserManagementPage() {
     >
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold flex items-center">
-          <Bot className="mr-3 h-8 w-8 text-primary" /> System Playlist Management
+          <Disc className="mr-3 h-8 w-8 text-primary" /> System Playlist Management
         </h1>
         <div className="flex items-center gap-2">
           <Button
