@@ -154,6 +154,7 @@ Mentor: **Mrs. Nguyen Thi Thanh**
 ![Group03_Defense](https://github.com/user-attachments/assets/aa0dd67b-d22d-4ddb-9069-79daf676cdbb)
 ![z6595328132989_d8e3360dbda917ec161c7e8114922a10](https://github.com/user-attachments/assets/d4c35f44-6b83-4a31-bf43-97df5c6f90a4)
 ![z6595331920246_35435786bbc802fd204070e83abd26c0](https://github.com/user-attachments/assets/c21a1e74-2873-419b-a337-d835cc28aa4f)
+![z6602827482504_7704f05a1bc0997ede34e66a5b460011](https://github.com/user-attachments/assets/b21d2809-2e9f-4043-b148-4caefea30232)
 
 
 ---
