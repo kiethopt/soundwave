@@ -75,13 +75,13 @@ export default function DiscoveryGenrePage({
     // Fetch genre top albums, tracks, and artists, and newest tracks
     const fetchGenreData = async () => {
       try {
-        const [albums, tracks, artists, newest, systemPlaylists] =
+        const [albums, tracks, artists, newest] =
           await Promise.all([
             api.user.getGenreTopAlbums(id, storedToken),
             api.user.getGenreTopTracks(id, storedToken),
             api.user.getGenreTopArtists(id, storedToken),
             api.user.getGenreNewestTracks(id, storedToken),
-            api.playlists.getUserSystemPlaylist(),
+            // api.playlists.getUserSystemPlaylist(),
           ]);
 
         setTopAlbums(albums);
@@ -89,14 +89,14 @@ export default function DiscoveryGenrePage({
         setTopArtists(artists);
         setNewestTracks(newest);
 
-        const sortedGenreSystemPlaylists = sortSystemPlaylists(
-          systemPlaylists,
-          id
-        );
-        console.log(
-          "Sorted Genre System Playlists:",
-          sortedGenreSystemPlaylists
-        );
+        // const sortedGenreSystemPlaylists = sortSystemPlaylists(
+        //   systemPlaylists,
+        //   id
+        // );
+        // console.log(
+        //   "Sorted Genre System Playlists:",
+        //   sortedGenreSystemPlaylists
+        // );
       } catch (error) {
         console.error("Error fetching genre data:", error);
         toast.error("Failed to load genre data");

@@ -197,7 +197,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Tạo playlist mặc định cho người dùng mới
     try {
-      // Create Welcome Mix playlist first
+      // Create Welcome Mix playlist first (this is quick)
       const welcomeMixPlaylist = await prisma.playlist.create({
         data: {
           name: "Welcome Mix",
@@ -212,47 +212,54 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         },
       });
 
-      // Then try to get default tracks
-      const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(
-        user.id
-      );
+      // Generate default tracks in the background (don't await)
+      aiService.generateDefaultPlaylistForNewUser(user.id)
+        .then(async (defaultTrackIds) => {
+          if (defaultTrackIds.length > 0) {
+            const tracksInfo = await prisma.track.findMany({
+              where: { id: { in: defaultTrackIds } },
+              select: { id: true, duration: true },
+            });
 
-      if (defaultTrackIds.length > 0) {
-        const tracksInfo = await prisma.track.findMany({
-          where: { id: { in: defaultTrackIds } },
-          select: { id: true, duration: true },
-        });
+            const totalDuration = tracksInfo.reduce(
+              (sum, track) => sum + track.duration,
+              0
+            );
+            const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
+            const orderedTrackIds = defaultTrackIds.filter((id) =>
+              trackIdMap.has(id)
+            );
 
-        const totalDuration = tracksInfo.reduce(
-          (sum, track) => sum + track.duration,
-          0
-        );
-        const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
-        const orderedTrackIds = defaultTrackIds.filter((id) =>
-          trackIdMap.has(id)
-        );
-
-        // Update Welcome Mix with tracks
-        await prisma.playlist.update({
-          where: { id: welcomeMixPlaylist.id },
-          data: {
-            totalTracks: orderedTrackIds.length,
-            totalDuration,
-            tracks: {
-              createMany: {
-                data: orderedTrackIds.map((trackId, index) => ({
-                  trackId,
-                  trackOrder: index,
-                })),
+            // Update Welcome Mix with tracks
+            await prisma.playlist.update({
+              where: { id: welcomeMixPlaylist.id },
+              data: {
+                totalTracks: orderedTrackIds.length,
+                totalDuration,
+                tracks: {
+                  createMany: {
+                    data: orderedTrackIds.map((trackId, index) => ({
+                      trackId,
+                      trackOrder: index,
+                    })),
+                  },
+                },
               },
-            },
-          },
+            });
+            console.log(`[Register] Successfully populated Welcome Mix for user ${user.id}`);
+          }
+        })
+        .catch(playlistError => {
+          console.error(
+            `[Register - Background] Error populating Welcome Mix for user ${user.id}:`,
+            playlistError
+          );
         });
-      }
-    } catch (playlistError) {
+
+    } catch (playlistCreationError) { // Catch errors from the initial empty playlist creation
       console.error(
-        `Error creating Welcome Mix playlist for user ${user.id}:`,
-        playlistError
+        `[Register] Error creating initial empty Welcome Mix for user ${user.id}:`,
+        playlistCreationError
       );
       // Continue registration process even if playlist creation fails
     }

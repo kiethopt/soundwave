@@ -598,10 +598,8 @@ export class TrackService {
             track: existingTrackByFingerprint,
           };
         } else {
-          // Fingerprint matches a track by a DIFFERENT artist - this is a conflict
-          // This should ideally be caught by checkTrackCopyrightOnly, but as a safeguard:
           const error: any = new Error(
-            `Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackByFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackByFingerprint.title}).`
+            `This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackByFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackByFingerprint.title}).`
           );
           error.isCopyrightConflict = true;
           error.isLocalFingerprintConflict = true;
@@ -887,7 +885,7 @@ export class TrackService {
 
     // <<< Check dấu vân tay cục bộ >>>
     const audioBufferForFingerprint = audioFile.buffer;
-    const hash = crypto.createHash('sha256');
+      const hash = crypto.createHash('sha256');
     hash.update(audioBufferForFingerprint);
     const calculatedLocalFingerprint = hash.digest('hex');
 
@@ -899,7 +897,7 @@ export class TrackService {
     if (existingTrackWithFingerprint) {
       if (existingTrackWithFingerprint.artistId !== artistProfileId) {
         const error: any = new Error(
-          `Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`
+          `This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackWithFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackWithFingerprint.title}).`
         );
         error.isCopyrightConflict = true; 
         error.isLocalFingerprintConflict = true; 

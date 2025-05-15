@@ -526,5 +526,4 @@ ${availableTracksContext}`;
         throw new Error('Failed to get AI track suggestions. Please try again later.');
     }
 }
-console.log("generate.service.ts logic loaded");
 //# sourceMappingURL=generate.service.js.map

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus, Tag, Check, X } from 'lucide-react';
+import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus, Tag } from 'lucide-react';
 import { AddLabelModal, EditLabelModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';

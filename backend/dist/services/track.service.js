@@ -448,7 +448,7 @@ class TrackService {
                     };
                 }
                 else {
-                    const error = new Error(`Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackByFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackByFingerprint.title}).`);
+                    const error = new Error(`This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackByFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackByFingerprint.title}).`);
                     error.isCopyrightConflict = true;
                     error.isLocalFingerprintConflict = true;
                     error.copyrightDetails = {
@@ -656,7 +656,7 @@ class TrackService {
         });
         if (existingTrackWithFingerprint) {
             if (existingTrackWithFingerprint.artistId !== artistProfileId) {
-                const error = new Error(`Nội dung bài hát này (dấu vân tay cục bộ) đã tồn tại trên hệ thống và thuộc về nghệ sĩ ${existingTrackWithFingerprint.artist?.artistName || 'khác'} (Track: ${existingTrackWithFingerprint.title}).`);
+                const error = new Error(`This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackWithFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackWithFingerprint.title}).`);
                 error.isCopyrightConflict = true;
                 error.isLocalFingerprintConflict = true;
                 error.copyrightDetails = {

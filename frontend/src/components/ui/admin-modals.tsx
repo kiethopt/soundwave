@@ -5346,40 +5346,8 @@ export function ReportDetailModal({
             {renderEntityDetails()}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3
-                className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Date Submitted
-              </h3>
-              <p
-                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
-              >
-                {new Date(report.createdAt).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <h3
-                className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Date Resolved
-              </h3>
-              <p
-                className={
-                  theme === "dark" ? "text-gray-200" : "text-gray-800"
-                }
-              >
-                {report.resolvedAt
-                  ? new Date(report.resolvedAt).toLocaleString()
-                  : "N/A"}
-              </p>
-            </div>
-          </div>
+          {/* The duplicate "Date Submitted" and "Date Resolved" section has been removed here */}
+
         </div>
 
         <DialogFooter className="flex justify-end gap-2">

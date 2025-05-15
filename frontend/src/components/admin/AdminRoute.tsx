@@ -41,7 +41,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
     };
 
     verifyAdmin();
-  }, [router, pathname]);
+  }, [router]);
 
   if (!isVerified) {
     return null;

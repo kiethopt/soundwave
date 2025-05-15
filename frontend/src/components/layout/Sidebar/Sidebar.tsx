@@ -246,7 +246,7 @@ export default function Sidebar({
         socket.off("favorites-updated");
       }
     };
-  }, [isAuthenticated, socket, userId, pathname]);
+  }, [isAuthenticated, socket, userId]);
 
   const handleCreateInstantPlaylist = async () => {
     if (isCreatingPlaylist) return;
@@ -1133,7 +1133,7 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  <Link
+                  {/* <Link
                     href="/admin/bulk-upload"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
                       isActiveIncludingSubpaths("/admin/bulk-upload")
@@ -1153,7 +1153,7 @@ export default function Sidebar({
                         <span className="ml-3 font-medium text-sm">Upload</span>
                       </>
                     )}
-                  </Link>
+                  </Link> */}
 
                   <Link
                     href="/admin/artist-requests"
@@ -1350,13 +1350,13 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  {!isCollapsed && (
+                  {/* {!isCollapsed && (
                     <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
                       Configuration
                     </div>
-                  )}
+                  )} */}
 
-                  <Link
+                  {/* <Link
                     href="/admin/system"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
                       isActiveIncludingSubpaths("/admin/system")
@@ -1376,7 +1376,7 @@ export default function Sidebar({
                         <span className="ml-3 font-medium text-sm">System</span>
                       </>
                     )}
-                  </Link>
+                  </Link> */}
                 </div>
               )}
             </nav>
