@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getDiscoverGenres = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getDiscoverGenres = exports.getAllGenres = exports.getPendingUserActionsStatus = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 exports.removeVietnameseTones = removeVietnameseTones;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
@@ -554,6 +554,15 @@ const getUserFollowing = async (userId) => {
 exports.getUserFollowing = getUserFollowing;
 const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDocumentFileDirect) => {
     const { artistName, bio, socialMediaLinks: socialMediaLinksString, requestedLabelName, genres: genresString, } = data;
+    const existingPendingClaimRequest = await db_1.default.artistClaimRequest.findFirst({
+        where: {
+            claimingUserId: user.id,
+            status: client_1.ClaimStatus.PENDING,
+        },
+    });
+    if (existingPendingClaimRequest) {
+        throw { status: 400, message: 'You have a pending artist claim request. Please wait for it to be processed before requesting a new artist profile.' };
+    }
     if (!artistName?.trim()) {
         throw { status: 400, message: 'Artist name is required.' };
     }
@@ -693,6 +702,21 @@ const requestArtistRole = async (user, data, avatarFileDirect, idVerificationDoc
 };
 exports.requestArtistRole = requestArtistRole;
 const getArtistRequest = async (userId) => {
+    if (!userId) {
+        return { hasPendingRequest: false, isVerified: false, profileData: null };
+    }
+    const pendingArtistRoleRequest = await db_1.default.artistRequest.findFirst({
+        where: {
+            userId: userId,
+            status: client_1.RequestStatus.PENDING,
+        },
+        select: {
+            id: true,
+        },
+    });
+    if (pendingArtistRoleRequest) {
+        return { hasPendingRequest: true, isVerified: false, profileData: null };
+    }
     const artistProfile = await db_1.default.artistProfile.findUnique({
         where: { userId },
         select: {
@@ -714,16 +738,40 @@ const getArtistRequest = async (userId) => {
             },
         },
     });
-    if (!artistProfile) {
-        return { hasPendingRequest: false };
+    if (artistProfile) {
+        return {
+            hasPendingRequest: !!artistProfile.verificationRequestedAt && !artistProfile.isVerified,
+            isVerified: artistProfile.isVerified,
+            profileData: artistProfile,
+        };
     }
-    const { verificationRequestedAt, isVerified, ...profileData } = artistProfile;
-    return {
-        hasPendingRequest: !!verificationRequestedAt && !isVerified,
-        profileData,
-    };
+    return { hasPendingRequest: false, isVerified: false, profileData: null };
 };
 exports.getArtistRequest = getArtistRequest;
+const getPendingUserActionsStatus = async (userId) => {
+    if (!userId) {
+        throw { status: 400, message: "User ID is required." };
+    }
+    const pendingArtistRequest = await db_1.default.artistRequest.findFirst({
+        where: {
+            userId: userId,
+            status: client_1.RequestStatus.PENDING,
+        },
+        select: { id: true },
+    });
+    const pendingClaimRequest = await db_1.default.artistClaimRequest.findFirst({
+        where: {
+            claimingUserId: userId,
+            status: client_1.ClaimStatus.PENDING,
+        },
+        select: { id: true },
+    });
+    return {
+        hasPendingArtistRequest: !!pendingArtistRequest,
+        hasPendingClaimRequest: !!pendingClaimRequest,
+    };
+};
+exports.getPendingUserActionsStatus = getPendingUserActionsStatus;
 const getAllGenres = async () => {
     const genres = await db_1.default.genre.findMany({
         orderBy: {
@@ -1501,6 +1549,15 @@ exports.getPlayHistory = getPlayHistory;
 const submitArtistClaim = async (userId, artistProfileId, proof) => {
     if (!userId) {
         throw new Error('Unauthorized: User must be logged in to submit a claim.');
+    }
+    const existingPendingArtistRequest = await db_1.default.artistRequest.findFirst({
+        where: {
+            userId: userId,
+            status: client_1.RequestStatus.PENDING,
+        },
+    });
+    if (existingPendingArtistRequest) {
+        throw { status: 400, message: 'You have a pending request to become an artist. Please wait for it to be processed before claiming an existing profile.' };
     }
     if (!artistProfileId) {
         throw new Error('Artist profile ID is required.');

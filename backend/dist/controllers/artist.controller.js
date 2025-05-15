@@ -91,11 +91,16 @@ const getArtistAlbums = async (req, res) => {
     }
     catch (error) {
         console.error('Error fetching artist albums:', error);
+        const statusCode = error.status || error.statusCode || 500;
         if (error.message === 'Artist is not verified') {
             res.status(403).json({ message: 'Artist is not verified' });
-            return;
         }
-        res.status(500).json({ message: 'Internal server error' });
+        else if (error.message === 'Artist not found') {
+            res.status(404).json({ message: 'Artist not found' });
+        }
+        else {
+            res.status(statusCode).json({ message: error.message || 'Internal server error' });
+        }
     }
 };
 exports.getArtistAlbums = getArtistAlbums;
@@ -117,11 +122,16 @@ const getArtistTracks = async (req, res) => {
     }
     catch (error) {
         console.error('Error fetching artist tracks:', error);
+        const statusCode = error.status || error.statusCode || 500;
         if (error.message === 'Artist is not verified') {
             res.status(403).json({ message: 'Artist is not verified' });
-            return;
         }
-        res.status(500).json({ message: 'Internal server error' });
+        else if (error.message === 'Artist not found') {
+            res.status(404).json({ message: 'Artist not found' });
+        }
+        else {
+            res.status(statusCode).json({ message: error.message || 'Internal server error' });
+        }
     }
 };
 exports.getArtistTracks = getArtistTracks;

@@ -70,6 +70,7 @@ export default function RequestArtistPage() {
     { id: string; name: string }[]
   >([]);
   const [hasPendingRequest, setHasPendingRequest] = useState<boolean>(false);
+  const [hasPendingClaimRequest, setHasPendingClaimRequest] = useState<boolean>(false);
   const [genreError, setGenreError] = useState<string | null>(null);
   const [submissionTimestamp, setSubmissionTimestamp] = useState<number | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -110,7 +111,7 @@ export default function RequestArtistPage() {
   }, []);
 
   useEffect(() => {
-    const checkPendingRequest = async () => {
+    const checkUserStatusAndRequests = async () => {
       let user: UserType | null = null;
       try {
         const userDataStr = localStorage.getItem('userData');
@@ -118,7 +119,7 @@ export default function RequestArtistPage() {
           try {
             user = JSON.parse(userDataStr);
           } catch (parseError) {
-            console.error('Lỗi parse userData trong checkPendingRequest:', parseError);
+            console.error('Lỗi parse userData trong checkUserStatusAndRequests:', parseError);
             localStorage.removeItem('userData');
           }
         }
@@ -131,25 +132,28 @@ export default function RequestArtistPage() {
 
         const token = localStorage.getItem('userToken');
         if (!token) {
-          console.warn('Không tìm thấy token để kiểm tra artist request.');
+          console.warn('Không tìm thấy token để kiểm tra artist request và claim status.');
           return;
         }
 
-        const response = await api.user.checkArtistRequest(token);
-        console.log('Check pending request response:', response);
+        const statusResponse = await api.user.getPendingUserActionsStatus(token);
+        console.log('Pending actions status response:', statusResponse);
 
-        setHasPendingRequest(response.hasPendingRequest);
-        localStorage.setItem(
-          'hasPendingRequest',
-          JSON.stringify(response.hasPendingRequest)
-        );
+        if (statusResponse) {
+          setHasPendingRequest(statusResponse.hasPendingArtistRequest);
+          setHasPendingClaimRequest(statusResponse.hasPendingClaimRequest);
+          localStorage.setItem(
+            'hasPendingRequest',
+            JSON.stringify(statusResponse.hasPendingArtistRequest)
+          );
+        }
 
       } catch (err) {
-        console.error('Error checking pending request:', err);
+        console.error('Error checking user status or pending requests:', err);
       }
     };
 
-    checkPendingRequest();
+    checkUserStatusAndRequests();
   }, [router]);
 
   useEffect(() => {
@@ -296,6 +300,35 @@ export default function RequestArtistPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (hasPendingClaimRequest) {
+    return (
+      <div className={cn("min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8", theme === 'dark' ? "bg-neutral-900 text-white" : "bg-white text-black")}>
+        <div className={cn("w-full max-w-2xl p-6 sm:p-8 rounded-lg shadow-xl", theme === 'dark' ? "bg-neutral-800" : "bg-neutral-100")}>
+          <div className="flex flex-col items-center text-center">
+            <Clock className="w-16 h-16 text-yellow-500 mb-6" />
+            <h1 className={cn("text-2xl sm:text-3xl font-bold mb-4", theme === 'dark' ? "text-white" : "text-neutral-800")}>
+              Pending Artist Claim
+            </h1>
+            <p className={cn("text-base sm:text-lg mb-6", theme === 'dark' ? "text-neutral-300" : "text-neutral-600")}>
+              You currently have a pending request to claim an existing artist profile.
+              Please wait for this request to be processed before attempting to create a new artist profile.
+            </p>
+            <p className={cn("text-sm mb-8", theme === 'dark' ? "text-neutral-400" : "text-neutral-500")}>
+              We appreciate your patience. You will be notified once your claim request has been reviewed.
+            </p>
+            <Button
+              onClick={() => router.push('/')}
+              className={cn("w-full sm:w-auto", theme === 'dark' ? "bg-yellow-500 hover:bg-yellow-600" : "bg-yellow-500 hover:bg-yellow-600 text-white")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (hasPendingRequest) {
     return (

@@ -78,7 +78,11 @@ const handleError = (res, error, operation) => {
     let statusCode = 500;
     let message = "Internal server error";
     console.error(`Error in ${operation}:`, error);
-    if (error instanceof Error) {
+    if (typeof error === 'object' && error !== null && 'status' in error && 'message' in error) {
+        statusCode = typeof error.status === 'number' ? error.status : 500;
+        message = typeof error.message === 'string' ? error.message : "An unexpected error occurred";
+    }
+    else if (error instanceof Error) {
         if (error.message.startsWith("INVALID_PROMPT:")) {
             statusCode = 400;
             message = error.message.replace("INVALID_PROMPT:", "").trim();
@@ -106,8 +110,8 @@ const handleError = (res, error, operation) => {
             statusCode = 400;
             message = error.message;
         }
-        if (statusCode === 500) {
-            message = error.message || "Internal server error";
+        if (statusCode === 500 && !(typeof error === 'object' && error !== null && 'status' in error && 'message' in error)) {
+            message = (error instanceof Error ? error.message : String(error)) || "Internal server error";
         }
     }
     res.status(statusCode).json({

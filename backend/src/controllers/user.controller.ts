@@ -572,3 +572,19 @@ export const getDiscoverGenres = async (
     handleError(res, error, 'Get discover genres');
   }
 };
+
+export const getPendingUserActionsStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const status = await userService.getPendingUserActionsStatus(req.user.id);
+    res.json(status);
+  } catch (error) {
+    handleError(res, error, 'Get pending user actions status');
+  }
+};

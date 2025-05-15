@@ -33,50 +33,52 @@ export default function ClaimArtistPage() {
   const [userClaims, setUserClaims] = useState<ArtistClaimRequest[]>([]);
   const [hasPendingClaim, setHasPendingClaim] = useState(false);
   const [claimTimestamp, setClaimTimestamp] = useState<number | null>(null);
-  const [hasAnyClaim, setHasAnyClaim] = useState(false);
-  const [anyClaimTimestamp, setAnyClaimTimestamp] = useState<number | null>(null);
+  const [hasPendingArtistRequest, setHasPendingArtistRequest] = useState<boolean>(false);
+  const [hasOverallPendingClaimRequest, setHasOverallPendingClaimRequest] = useState<boolean>(false);
+  const [pendingArtistRequestTimestamp, setPendingArtistRequestTimestamp] = useState<number | null>(null);
 
   
   useEffect(() => {
-    async function fetchClaims() {
+    async function fetchData() {
+      setLoading(true);
       const token = localStorage.getItem("userToken") || "";
       try {
+        // Fetch pending actions status
+        const statusResponse = await api.user.getPendingUserActionsStatus(token);
+        if (statusResponse) {
+          setHasPendingArtistRequest(statusResponse.hasPendingArtistRequest);
+          setHasOverallPendingClaimRequest(statusResponse.hasPendingClaimRequest);
+        }
+
+        // Fetch existing claims for this user
         const claims = await api.user.getUserClaims(token);
         setUserClaims(claims);
-      } catch (e) {
-        // handle error if needed
-      }
-    }
-    
-    async function fetchArtists() {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem("userToken") || "";
 
-        // Fetch all artists
-        const result = await api.user.getClaimableArtists(token);
-        if (result && Array.isArray(result)) {
-          setArtists(
-            result
-              .filter((artist: any) => !artist.userId)
-              .map((artist: any) => ({
-                id: artist.id,
-                artistName: artist.artistName,
-                avatar: artist.avatar,
-                userId: artist.userId,
-              }))
-          );
-        } else {
-          toast.error("Failed to load artists");
+        // Fetch claimable artists (only if NO pending new artist request AND NO overall pending claim request)
+        if (!statusResponse?.hasPendingArtistRequest && !statusResponse?.hasPendingClaimRequest) {
+          const result = await api.user.getClaimableArtists(token);
+          if (result && Array.isArray(result)) {
+            setArtists(
+              result
+                .filter((artist: any) => !artist.userId) // Only unclaimed artists
+                .map((artist: any) => ({
+                  id: artist.id,
+                  artistName: artist.artistName,
+                  avatar: artist.avatar,
+                  userId: artist.userId,
+                }))
+            );
+          } else {
+            toast.error("Failed to load artists for claiming.");
+          }
         }
       } catch (e: any) {
-        toast.error(e.message || "Failed to load artists");
+        toast.error(e.message || "Failed to load page data.");
       } finally {
         setLoading(false);
       }
     }
-    fetchClaims();
-    fetchArtists();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -93,19 +95,6 @@ export default function ClaimArtistPage() {
       setClaimTimestamp(null);
     }
   }, [selectedArtist, userClaims]);
-
-  useEffect(() => {
-    if (userClaims.length > 0) {
-      const anyClaim = userClaims.find(
-        claim => claim.status === "PENDING" || claim.status === "APPROVED"
-      );
-      setHasAnyClaim(!!anyClaim);
-      setAnyClaimTimestamp(anyClaim ? new Date(anyClaim.submittedAt).getTime() : null);
-    } else {
-      setHasAnyClaim(false);
-      setAnyClaimTimestamp(null);
-    }
-  }, [userClaims]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -180,26 +169,58 @@ export default function ClaimArtistPage() {
     }
   };
 
-  if (hasAnyClaim) {
+  if (hasOverallPendingClaimRequest) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-slate-900 to-neutral-900 text-white">
-        <div className="bg-black/40 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-lg p-10 w-full max-w-xl flex flex-col items-center">
-          <Clock className="w-16 h-16 text-white/50 mb-4" />
-          <h1 className="text-4xl md:text-5xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 drop-shadow-lg mb-2">
-            You already have a claim for an artist profile.
-          </h1>
-          <p className="text-md md:text-lg text-gray-300 text-center mb-2">You cannot claim another artist profile until your previous claim is resolved.</p>
-          {anyClaimTimestamp && (
-            <span className="text-base text-white/60 mt-2">
-              Submitted on: {new Date(anyClaimTimestamp).toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          )}
+      <div className={cn("min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8", theme === 'dark' ? "bg-neutral-900 text-white" : "bg-white text-black")}>
+        <div className={cn("w-full max-w-2xl p-6 sm:p-8 rounded-lg shadow-xl", theme === 'dark' ? "bg-neutral-800" : "bg-neutral-100")}>
+          <div className="flex flex-col items-center text-center">
+            <Clock className="w-16 h-16 text-yellow-500 mb-6" />
+            <h1 className={cn("text-2xl sm:text-3xl font-bold mb-4", theme === 'dark' ? "text-white" : "text-neutral-800")}>
+              Pending Artist Claim Submitted
+            </h1>
+            <p className={cn("text-base sm:text-lg mb-6", theme === 'dark' ? "text-neutral-300" : "text-neutral-600")}>
+              You already have a pending artist claim request. Please wait for it to be processed by our administrators.
+            </p>
+            <p className={cn("text-sm mb-8", theme === 'dark' ? "text-neutral-400" : "text-neutral-500")}>
+              We appreciate your patience. You will be notified once your claim request has been reviewed.
+            </p>
+            <Button
+              onClick={() => router.push('/')}
+              className={cn("w-full sm:w-auto", theme === 'dark' ? "bg-yellow-500 hover:bg-yellow-600" : "bg-yellow-500 hover:bg-yellow-600 text-white")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasPendingArtistRequest) {
+    return (
+      <div className={cn("min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8", theme === 'dark' ? "bg-neutral-900 text-white" : "bg-white text-black")}>
+        <div className={cn("w-full max-w-2xl p-6 sm:p-8 rounded-lg shadow-xl", theme === 'dark' ? "bg-neutral-800" : "bg-neutral-100")}>
+          <div className="flex flex-col items-center text-center">
+            <Clock className="w-16 h-16 text-yellow-500 mb-6" />
+            <h1 className={cn("text-2xl sm:text-3xl font-bold mb-4", theme === 'dark' ? "text-white" : "text-neutral-800")}>
+              Pending Artist Profile Request
+            </h1>
+            <p className={cn("text-base sm:text-lg mb-6", theme === 'dark' ? "text-neutral-300" : "text-neutral-600")}>
+              You currently have a pending request to create a new artist profile.
+              Please wait for this request to be processed before attempting to claim an existing artist profile.
+            </p>
+            <p className={cn("text-sm mb-8", theme === 'dark' ? "text-neutral-400" : "text-neutral-500")}>
+              We appreciate your patience. You will be notified once your request has been reviewed.
+            </p>
+            <Button
+              onClick={() => router.push('/')}
+              className={cn("w-full sm:w-auto", theme === 'dark' ? "bg-yellow-500 hover:bg-yellow-600" : "bg-yellow-500 hover:bg-yellow-600 text-white")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
         </div>
       </div>
     );

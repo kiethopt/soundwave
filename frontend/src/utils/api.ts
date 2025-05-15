@@ -1071,6 +1071,18 @@ export const api = {
         token
       );
     },
+
+    getPendingUserActionsStatus: async (token: string) => {
+      return fetchWithAuth(
+        `/api/user/pending-actions-status`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    requestToBecomeArtist: async (formData: FormData, token: string) => {
+      // ... existing code ...
+    },
   },
 
   artists: {

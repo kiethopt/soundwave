@@ -29,6 +29,7 @@ import {
   getUserClaims,
   getAllArtistsProfile,
   getDiscoverGenres,
+  getPendingUserActionsStatus,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -109,6 +110,14 @@ router.get('/claimable-artists', authenticate, getAllArtistsProfile);
 
 // Discover Genres Route
 router.get('/discover-genres', authenticate, getDiscoverGenres);
+
+// Route to check pending artist and claim requests status
+router.get(
+  '/pending-actions-status',
+  authenticate,
+  authorize([Role.USER]),
+  getPendingUserActionsStatus
+);
 
 // User profile stats routes (assuming they need authentication)
 router.get('/topAlbums/:id', authenticate, getUserTopAlbums);

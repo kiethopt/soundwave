@@ -65,6 +65,7 @@ router.post('/artist-claims', auth_middleware_1.authenticate, upload_middleware_
 router.get('/artist-claims', auth_middleware_1.authenticate, user_controller_1.getUserClaims);
 router.get('/claimable-artists', auth_middleware_1.authenticate, user_controller_1.getAllArtistsProfile);
 router.get('/discover-genres', auth_middleware_1.authenticate, user_controller_1.getDiscoverGenres);
+router.get('/pending-actions-status', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.USER]), user_controller_1.getPendingUserActionsStatus);
 router.get('/topAlbums/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopAlbums);
 router.get('/topTracks/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopTracks);
 router.get('/topArtists/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopArtists);

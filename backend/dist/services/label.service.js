@@ -239,9 +239,22 @@ const requestNewLabelRegistration = async (userId, data, logoFile) => {
     }
     const artistProfile = await db_1.default.artistProfile.findUnique({
         where: { userId },
+        select: {
+            id: true,
+            artistName: true,
+            labelId: true,
+            label: {
+                select: {
+                    name: true,
+                }
+            }
+        }
     });
     if (!artistProfile) {
         throw { status: 403, message: 'User does not have an artist profile or is not an artist.' };
+    }
+    if (artistProfile.labelId && artistProfile.label?.name && artistProfile.label.name.toLowerCase() === data.name.toLowerCase()) {
+        throw { status: 400, message: `You are already associated with the label "${artistProfile.label.name}".` };
     }
     const existingPendingRequest = await db_1.default.labelRegistrationRequest.findFirst({
         where: {

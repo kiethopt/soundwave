@@ -642,6 +642,18 @@ export const requestArtistRole = async (
     genres: genresString,
   } = data;
 
+  // Check if user already has a PENDING ArtistClaimRequest
+  const existingPendingClaimRequest = await prisma.artistClaimRequest.findFirst({
+    where: {
+      claimingUserId: user.id,
+      status: ClaimStatus.PENDING,
+    },
+  });
+
+  if (existingPendingClaimRequest) {
+    throw { status: 400, message: 'You have a pending artist claim request. Please wait for it to be processed before requesting a new artist profile.' };
+  }
+
   // Basic validation
   if (!artistName?.trim()) {
     throw { status: 400, message: 'Artist name is required.' };
@@ -862,6 +874,35 @@ export const getArtistRequest = async (userId: string) => {
 
   // If no PENDING ArtistRequest AND no existing ArtistProfile for the user.
   return { hasPendingRequest: false, isVerified: false, profileData: null };
+};
+
+// Get status of user's pending artist and claim requests
+export const getPendingUserActionsStatus = async (userId: string) => {
+  if (!userId) {
+    // Should ideally be caught by authentication/controller before reaching here
+    throw { status: 400, message: "User ID is required." };
+  }
+
+  const pendingArtistRequest = await prisma.artistRequest.findFirst({
+    where: {
+      userId: userId,
+      status: RequestStatus.PENDING,
+    },
+    select: { id: true }, // Only need to check for existence
+  });
+
+  const pendingClaimRequest = await prisma.artistClaimRequest.findFirst({
+    where: {
+      claimingUserId: userId,
+      status: ClaimStatus.PENDING,
+    },
+    select: { id: true }, // Only need to check for existence
+  });
+
+  return {
+    hasPendingArtistRequest: !!pendingArtistRequest,
+    hasPendingClaimRequest: !!pendingClaimRequest,
+  };
 };
 
 // Lấy tất cả thể loại nhạc
@@ -1770,6 +1811,19 @@ export const submitArtistClaim = async (userId: string, artistProfileId: string,
   if (!userId) {
     throw new Error('Unauthorized: User must be logged in to submit a claim.');
   }
+
+  // Check if the user has a PENDING ArtistRequest (to become a new artist)
+  const existingPendingArtistRequest = await prisma.artistRequest.findFirst({
+    where: {
+      userId: userId,
+      status: RequestStatus.PENDING,
+    },
+  });
+
+  if (existingPendingArtistRequest) {
+    throw { status: 400, message: 'You have a pending request to become an artist. Please wait for it to be processed before claiming an existing profile.' };
+  }
+
   if (!artistProfileId) {
     throw new Error('Artist profile ID is required.');
   }
