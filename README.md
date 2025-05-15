@@ -70,10 +70,11 @@ Develop a music streaming platform that supports Vietnamese artists in publishin
 1. Artist uploads audio via dashboard.  
 2. System checks copyright instantly.  
 3. Admin reviews if flagged, otherwise content is published directly.
-4. 
+4. Creat system playlist
 ![Group03_Defense (1)](https://github.com/user-attachments/assets/d9b6267b-30ef-4deb-be1a-9c9d98a67b5d)
 ![Group03_Defense (2)](https://github.com/user-attachments/assets/a8327603-0ad5-4d60-851e-73ebb562c72d)
 ![Group03_Defense (3)](https://github.com/user-attachments/assets/69d1e8db-6568-4fff-8ba1-4d93c409e7c1)
+![Group03_Defense (4)](https://github.com/user-attachments/assets/76b35fdb-d4cf-4826-b57f-e7150fb8fae3)
 
 ---
 
