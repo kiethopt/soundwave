@@ -278,7 +278,6 @@ export const checkTrackCopyright = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Extract featured artist information
     const featuredArtistIds = (req.body.featuredArtistIds || []) as string[];
     const featuredArtistNames = (req.body.featuredArtistNames || []) as string[];
 
@@ -289,14 +288,37 @@ export const checkTrackCopyright = async (req: Request, res: Response): Promise<
       declaredFeaturedArtistNames: Array.isArray(featuredArtistNames) ? featuredArtistNames : [],
     };
 
-    const result = await TrackService.checkTrackCopyrightOnly(
+    const result: any = await TrackService.checkTrackCopyrightOnly(
       user.artistProfile.id,
       checkData,
       audioFile,
       user
     );
 
-    res.status(200).json(result);
+    if (result.copyrightDetails && result.copyrightDetails.isDuplicateBySameArtist) {
+      res.status(409).json({
+        message: result.message,
+        isCopyrightConflict: true, 
+        copyrightDetails: result.copyrightDetails,
+        isSafeToUpload: false,
+      });
+    } else if (result.copyrightDetails && result.copyrightDetails.serviceError) {
+      const serviceErrorDetails = result.copyrightDetails.details;
+      const serviceMessage = serviceErrorDetails?.message || result.message || 'Copyright check service error.';
+      const serviceCode = serviceErrorDetails?.code;
+      const httpStatus = (typeof serviceCode === 'number' && serviceCode >= 400 && serviceCode < 600) ? serviceCode : 500;
+
+      res.status(httpStatus).json({
+        message: serviceMessage,
+        isCopyrightConflict: false,
+        isSafeToUpload: false,
+        serviceError: true,
+        copyrightDetails: result.copyrightDetails,
+        errorCode: serviceCode,
+      });
+    } else {
+      res.status(200).json(result);
+    }
 
   } catch (error: any) {
     if (error.isCopyrightConflict && error.copyrightDetails) {

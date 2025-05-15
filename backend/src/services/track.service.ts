@@ -579,6 +579,28 @@ export class TrackService {
         console.warn(`[CreateTrack] localFingerprint was not provided, calculated new one: ${localFingerprintToSave}. This might indicate an outdated client or flow.`);
     }
 
+    // <<< Check for existing track by title AND same artist BEFORE creating >>>
+    const existingTrackByTitle = await prisma.track.findFirst({
+      where: {
+        title: {
+          equals: title.trim(),
+          mode: 'insensitive', // Case-insensitive comparison
+        },
+        artistId: artistProfileId,
+      },
+      select: { id: true, title: true },
+    });
+
+    if (existingTrackByTitle) {
+      const error: any = new Error(
+        `You already have a track titled "${existingTrackByTitle.title}". Please choose a different title.`
+      );
+      error.status = 'duplicate_title_by_same_artist';
+      error.track = existingTrackByTitle;
+      throw error;
+    }
+    // <<< End of title check >>>
+
     // <<< Check for existing track by fingerprint AND same artist BEFORE creating >>>
     if (localFingerprintToSave) {
       const existingTrackByFingerprint = await prisma.track.findUnique({
@@ -589,14 +611,12 @@ export class TrackService {
       if (existingTrackByFingerprint) {
         if (existingTrackByFingerprint.artistId === artistProfileId) {
           // Track with same fingerprint by the same artist already exists
-          console.log(`[CreateTrack] Track with fingerprint ${localFingerprintToSave} by artist ${artistProfileId} already exists (ID: ${existingTrackByFingerprint.id}). Returning existing track info.`);
-          // Optionally, consider if metadata (title, genres etc.) should be updated on the existing track here.
-          // For now, just return info about the existing track.
-          return {
-            status: 'duplicate_by_same_artist',
-            message: `This audio content already exists as track "${existingTrackByFingerprint.title}" by you.`,
-            track: existingTrackByFingerprint,
-          };
+          const error: any = new Error(
+            `This audio content already exists as track "${existingTrackByFingerprint.title}" by you. You cannot upload the same audio file multiple times as a new track.`
+          );
+          error.status = 'duplicate_by_same_artist_fingerprint';
+          error.track = existingTrackByFingerprint; // Keep existing track info for context if needed
+          throw error;
         } else {
           const error: any = new Error(
             `This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackByFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackByFingerprint.title}).`
@@ -909,7 +929,19 @@ export class TrackService {
         };
         throw error;
       }
-      console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track by the same artist. Fingerprint will be passed.`);
+      // <<< If fingerprint matches a track by THE SAME artist >>>
+      console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track "${existingTrackWithFingerprint.title}" by the same artist. Informing user.`);
+      return {
+        isSafeToUpload: false, // Or true with a strong warning, depending on desired UX flow
+        message: `You have already uploaded this audio content as track "${existingTrackWithFingerprint.title}".`, 
+        copyrightDetails: {
+          isDuplicateBySameArtist: true,
+          existingTrackTitle: existingTrackWithFingerprint.title,
+          existingTrackId: existingTrackWithFingerprint.id,
+          localFingerprint: calculatedLocalFingerprint,
+          // No ACRCloud match details are relevant here if it's a self-duplicate
+        },
+      };
     }
 
     if (copyrightCheckResult.error) {

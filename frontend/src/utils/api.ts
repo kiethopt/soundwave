@@ -28,10 +28,13 @@ const fetchWithAuth = async (
     let errorMessage = `HTTP error! status: ${response.status}`;
     let errorCode = "";
     let errorData: any = null;
+    let errorBodyToAttach: any = null; // Variable to store the parsed error body
+
     const clonedResponse = response.clone(); // Clone the response before reading
 
     try {
       const errorBody = await response.json(); // Attempt to read the original response
+      errorBodyToAttach = errorBody; // Store the parsed body
       errorMessage = errorBody.message || errorMessage;
       errorCode = errorBody.code || "";
       errorData = errorBody.data || null;
@@ -71,6 +74,9 @@ const fetchWithAuth = async (
     // Optional: Attach code/data if needed elsewhere, but rely on message for display
     (errorToThrow as any).code = errorCode;
     (errorToThrow as any).data = errorData;
+    if (errorBodyToAttach) {
+      (errorToThrow as any).responseBody = errorBodyToAttach;
+    }
     throw errorToThrow;
   }
   // --- End Simplified Error Handling ---

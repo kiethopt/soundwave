@@ -12,7 +12,7 @@ import * as crypto from 'crypto';
 
 // Define a type for skipped track information
 interface SkippedTrackInfo {
-  status: 'skipped_duplicate_self_already_in_album' | 'skipped_duplicate_self_moved_album' | 'linked_existing_to_album' | 'error_processing' | 'skipped_generic_duplicate_self';
+  status: 'skipped_duplicate_self_already_in_album' | 'skipped_duplicate_self_moved_album' | 'skipped_duplicate_self_updated_metadata' | 'linked_existing_to_album' | 'error_processing' | 'skipped_generic_duplicate_self';
   fileName: string;
   track?: Prisma.TrackGetPayload<{ select: typeof trackSelect }>; // For linked/updated tracks
   existingTrackTitle?: string;
@@ -425,8 +425,23 @@ export const addTracksToAlbum = async (req: Request) => {
 
           const oldAlbumIdOfExistingTrack = existingTrackWithFingerprint.albumId;
 
+          // Check if the track is already in the current album
+          if (oldAlbumIdOfExistingTrack === albumId) {
+            const err: any = new Error(
+              `The audio content of the file "${file.originalname}" (local fingerprint) has already been used for the track "${existingTrackWithFingerprint.title}" (ID: ${existingTrackWithFingerprint.id}) which is already in this album. It cannot be added again.`
+            );
+            err.status = 'DUPLICATE_TRACK_ALREADY_IN_ALBUM';
+            err.conflictingTrack = {
+              id: existingTrackWithFingerprint.id,
+              title: existingTrackWithFingerprint.title,
+            };
+            err.uploadedFileName = file.originalname;
+            err.isDuplicateInAlbum = true; // Add a specific flag
+            throw err;
+          }
+
+          // If not in the current album, proceed to update and move/link it.
           // Prepare updates for the existing track to link it to the current album
-          // and update its metadata based on the current form submission for this file.
           const featuredArtistIdsForThisFile = new Set<string>();
           if (featuredArtistIdsForTrack.length > 0) {
             const existingArtists = await prisma.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
@@ -472,11 +487,15 @@ export const addTracksToAlbum = async (req: Request) => {
             select: trackSelect,
           });
           
-          let statusMsg: SkippedTrackInfo['status'] = 'linked_existing_to_album';
+          let statusMsg: SkippedTrackInfo['status'];
+          // oldAlbumIdOfExistingTrack === albumId case is now handled by throwing an error above.
+          // This logic now only applies if the track was moved or updated from a different context.
           if (oldAlbumIdOfExistingTrack && oldAlbumIdOfExistingTrack !== albumId) {
-             statusMsg = 'skipped_duplicate_self_moved_album';
-          } else if (oldAlbumIdOfExistingTrack === albumId) {
-             statusMsg = 'skipped_duplicate_self_already_in_album';
+            statusMsg = 'skipped_duplicate_self_moved_album';
+          } else {
+            // Default case: existing track by same artist, fingerprint matched, metadata updated, and linked to this album.
+            // This covers cases where the track was not in any album, or its metadata (title, genres etc. from form) is being updated.
+            statusMsg = 'skipped_duplicate_self_updated_metadata';
           }
 
 

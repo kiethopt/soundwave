@@ -18,8 +18,22 @@ export const addTracksToAlbum = async (req: Request, res: Response): Promise<voi
     res.status(201).json(result);
   } catch (error: unknown) {
     console.error('Add tracks to album error:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    res.status(400).json({ message });
+    if (error instanceof Error) {
+      const errorWithDetails = error as any;
+      if (errorWithDetails.status) {
+        res.status(400).json({
+          message: errorWithDetails.message,
+          status: errorWithDetails.status,
+          conflictingTrack: errorWithDetails.conflictingTrack,
+          uploadedFileName: errorWithDetails.uploadedFileName,
+          isDuplicateInAlbum: errorWithDetails.isDuplicateInAlbum,
+        });
+      } else {
+        res.status(400).json({ message: errorWithDetails.message });
+      }
+    } else {
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
 };
 

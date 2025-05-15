@@ -317,21 +317,38 @@ export default function AlbumDetailPage() {
       fetchAlbumDetails();
     } catch (err) {
       console.error('Upload error:', err);
-      let errorMessage = 'Failed to upload tracks';
+      const typedError = err as any;
 
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        const errorObj = err as any;
-        if (errorObj.response?.data?.message) {
-          errorMessage = errorObj.response.data.message;
-        }
+      // --- BEGIN DIAGNOSTIC LOGS ---
+      console.log("[Upload Error Debug] Caught error in handleUpload:", typedError);
+      if (typedError.responseBody) {
+        console.log("[Upload Error Debug] typedError.responseBody exists:", typedError.responseBody);
+        console.log("[Upload Error Debug] typedError.responseBody.status:", typedError.responseBody.status);
+        console.log("[Upload Error Debug] typedError.responseBody.message:", typedError.responseBody.message);
+      } else {
+        console.log("[Upload Error Debug] typedError.responseBody does NOT exist.");
+      }
+      // --- END DIAGNOSTIC LOGS ---
+
+      let displayMessage = 'Failed to upload tracks'; // Default message
+
+      // Prefer message from responseBody if available
+      if (typedError.responseBody && typedError.responseBody.message) {
+        displayMessage = typedError.responseBody.message;
+      } else if (typedError.message) { // Fallback to error's direct message
+        displayMessage = typedError.message;
       }
 
-      setMessage({
-        type: 'error',
-        text: errorMessage,
-      });
+      // Check for the specific duplicate track in album error
+      if (typedError.responseBody && typedError.responseBody.status === 'DUPLICATE_TRACK_ALREADY_IN_ALBUM') {
+        toast.error(displayMessage); // Show toast notification for this specific error
+      } else {
+        // For all other errors, use the existing setMessage to display error at the bottom
+        setMessage({
+          type: 'error',
+          text: displayMessage,
+        });
+      }
     } finally {
       setIsUploading(false);
     }
