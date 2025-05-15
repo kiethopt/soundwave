@@ -1014,15 +1014,30 @@ const updateTrack = async (req, id) => {
                 });
             }
         }
-        const featuredArtistIdsFromBody = req.body.featuredArtistIds;
-        const featuredArtistNamesFromBody = req.body.featuredArtistNames;
-        if (featuredArtistIdsFromBody !== undefined ||
-            featuredArtistNamesFromBody !== undefined) {
+        const rawFeaturedArtistIds = req.body.featuredArtistIds;
+        const rawFeaturedArtistNames = req.body.featuredArtistNames;
+        const parseJsonStringArray = (jsonString) => {
+            if (!jsonString)
+                return [];
+            try {
+                const parsed = JSON.parse(jsonString);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((item) => typeof item === 'string');
+                }
+                return [];
+            }
+            catch (e) {
+                console.warn(`[updateTrack] Failed to parse JSON string for featured artists: ${jsonString}`, e);
+                return [];
+            }
+        };
+        const intentToUpdateFeaturedArtists = rawFeaturedArtistIds !== undefined || rawFeaturedArtistNames !== undefined;
+        if (intentToUpdateFeaturedArtists) {
             await tx.trackArtist.deleteMany({ where: { trackId: id } });
+            const featuredArtistIdsFromBody = parseJsonStringArray(rawFeaturedArtistIds);
+            const featuredArtistNamesFromBody = parseJsonStringArray(rawFeaturedArtistNames);
             const resolvedFeaturedArtistIds = new Set();
-            if (featuredArtistIdsFromBody &&
-                Array.isArray(featuredArtistIdsFromBody) &&
-                featuredArtistIdsFromBody.length > 0) {
+            if (featuredArtistIdsFromBody.length > 0) {
                 const existingArtists = await tx.artistProfile.findMany({
                     where: { id: { in: featuredArtistIdsFromBody } },
                     select: { id: true },
@@ -1041,9 +1056,7 @@ const updateTrack = async (req, id) => {
                     }
                 });
             }
-            if (featuredArtistNamesFromBody &&
-                Array.isArray(featuredArtistNamesFromBody) &&
-                featuredArtistNamesFromBody.length > 0) {
+            if (featuredArtistNamesFromBody.length > 0) {
                 for (const name of featuredArtistNamesFromBody) {
                     if (typeof name === "string" && name.trim() !== "") {
                         try {

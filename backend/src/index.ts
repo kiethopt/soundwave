@@ -18,7 +18,6 @@ import reportRoutes from './routes/report.routes';
 import generateRoutes from './routes/generate.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
-import { registerPlaylistCronJobs } from './prisma/extensions/playlist.extension';
 import { initializeSocket } from './config/socket'; // Import the socket initializer
 
 dotenv.config();
@@ -70,9 +69,6 @@ const initializeApp = async () => {
     await prisma.$queryRaw`SELECT 1`;
     console.log('✅ Database connection established');
 
-    // Register cron jobs
-    registerPlaylistCronJobs();
-    console.log('✅ Cron jobs registered via extension system');
   } catch (error) {
     console.error('❌ Database connection error:', error);
     process.exit(1);

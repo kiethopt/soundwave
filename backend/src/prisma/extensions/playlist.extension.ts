@@ -170,9 +170,9 @@ cron.schedule('0 0 * * *', async () => {
 });
 
 // Also export the cron job registration function for manual use
-export const registerPlaylistCronJobs = () => {
-  console.log(
-    '[Cron] System playlist update job has been registered for midnight (00:00)'
-  );
-  // The job is already scheduled when the module is imported
-};
+// export const registerPlaylistCronJobs = () => {
+//   console.log(
+//     '[Cron] System playlist update job has been registered for midnight (00:00)'
+//   );
+//   // The job is already scheduled when the module is imported
+// };
