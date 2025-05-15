@@ -448,7 +448,90 @@ const generateSystemPlaylistFromHistoryFeatures = async (userId, focusOnFeatures
         },
     });
     if (historyItems.length === 0) {
-        throw new Error("No listening history found to generate playlist.");
+        const randomOffset = Math.floor(Math.random() * 20);
+        const randomGenreFilter = Math.random() > 0.5;
+        let genreFilter = {};
+        if (randomGenreFilter) {
+            const popularGenres = await db_1.default.genre.findMany({
+                take: 5,
+                orderBy: {
+                    tracks: { _count: "desc" }
+                },
+                select: { id: true }
+            });
+            if (popularGenres.length > 0) {
+                const selectedGenres = popularGenres
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, Math.ceil(Math.random() * 3));
+                if (selectedGenres.length > 0) {
+                    genreFilter = {
+                        genres: {
+                            some: {
+                                genreId: { in: selectedGenres.map(g => g.id) }
+                            }
+                        }
+                    };
+                }
+            }
+        }
+        const orderCriteria = Math.random() > 0.3
+            ? [{ playCount: "desc" }, { createdAt: "desc" }]
+            : Math.random() > 0.5
+                ? [{ createdAt: "desc" }, { playCount: "desc" }]
+                : [{ playCount: "desc" }, { releaseDate: "desc" }];
+        const topTracks = await db_1.default.track.findMany({
+            where: {
+                isActive: true,
+                ...genreFilter
+            },
+            orderBy: orderCriteria,
+            skip: randomOffset,
+            take: requestedTrackCount + 5,
+            select: {
+                id: true,
+                title: true,
+                duration: true,
+                coverUrl: true,
+                audioUrl: true,
+                artist: { select: { id: true, artistName: true, avatar: true } },
+                album: { select: { id: true, title: true } },
+            },
+        });
+        const shuffledTracks = topTracks
+            .sort(() => 0.5 - Math.random())
+            .slice(0, requestedTrackCount);
+        if (shuffledTracks.length === 0) {
+            throw new Error("No tracks available to generate playlist.");
+        }
+        const playlistName = customName
+            ? customName.substring(0, 50)
+            : `Popular Mix for ${userId.substring(0, 8)}`;
+        const playlistDescription = customDescription
+            ? customDescription.substring(0, 150)
+            : `A playlist of popular tracks for user ${userId}.`;
+        const newPlaylist = await db_1.default.playlist.create({
+            data: {
+                name: playlistName,
+                description: playlistDescription,
+                userId: userId,
+                type: client_1.PlaylistType.SYSTEM,
+                privacy: client_1.PlaylistPrivacy.PUBLIC,
+                isAIGenerated: false,
+                tracks: {
+                    create: shuffledTracks.map((track, index) => ({
+                        trackId: track.id,
+                        trackOrder: index,
+                    })),
+                },
+                totalTracks: shuffledTracks.length,
+                totalDuration: shuffledTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+            },
+            include: {
+                tracks: { include: { track: { include: { artist: true } } } },
+                user: { select: { id: true, name: true } },
+            },
+        });
+        return newPlaylist;
     }
     let filterCriteria = { isActive: true };
     const dominantFeatures = {};
@@ -530,7 +613,7 @@ const generateSystemPlaylistFromHistoryFeatures = async (userId, focusOnFeatures
             description: playlistDescription,
             userId: userId,
             type: client_1.PlaylistType.SYSTEM,
-            privacy: client_1.PlaylistPrivacy.PRIVATE,
+            privacy: client_1.PlaylistPrivacy.PUBLIC,
             isAIGenerated: false,
             tracks: {
                 create: selectedTracks.map((track, index) => ({

@@ -120,7 +120,11 @@ export const handleError = (
   let message = "Internal server error";
   console.error(`Error in ${operation}:`, error);
 
-  if (error instanceof Error) {
+  // Prioritize custom error objects with status and message
+  if (typeof error === 'object' && error !== null && 'status' in error && 'message' in error) {
+    statusCode = typeof error.status === 'number' ? error.status : 500;
+    message = typeof error.message === 'string' ? error.message : "An unexpected error occurred";
+  } else if (error instanceof Error) {
     // Check for specific error types and patterns
     if (error.message.startsWith("INVALID_PROMPT:")) {
       // This should be handled by specific controllers before reaching here
@@ -156,8 +160,8 @@ export const handleError = (
     }
 
     // Default fallback if not a specific pattern
-    if (statusCode === 500) {
-      message = error.message || "Internal server error";
+    if (statusCode === 500 && !(typeof error === 'object' && error !== null && 'status' in error && 'message' in error) ) {
+      message = (error instanceof Error ? error.message : String(error)) || "Internal server error";
     }
   }
 

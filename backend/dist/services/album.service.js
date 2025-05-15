@@ -368,6 +368,17 @@ const addTracksToAlbum = async (req) => {
             else {
                 console.log(`[addTracksToAlbum] File ${file.originalname} (fingerprint ${calculatedLocalFingerprint}) matches existing track (ID: ${existingTrackWithFingerprint.id}, Title: "${existingTrackWithFingerprint.title}") by the same artist (ID: ${mainArtistId}).`);
                 const oldAlbumIdOfExistingTrack = existingTrackWithFingerprint.albumId;
+                if (oldAlbumIdOfExistingTrack === albumId) {
+                    const err = new Error(`The audio content of the file "${file.originalname}" (local fingerprint) has already been used for the track "${existingTrackWithFingerprint.title}" (ID: ${existingTrackWithFingerprint.id}) which is already in this album. It cannot be added again.`);
+                    err.status = 'DUPLICATE_TRACK_ALREADY_IN_ALBUM';
+                    err.conflictingTrack = {
+                        id: existingTrackWithFingerprint.id,
+                        title: existingTrackWithFingerprint.title,
+                    };
+                    err.uploadedFileName = file.originalname;
+                    err.isDuplicateInAlbum = true;
+                    throw err;
+                }
                 const featuredArtistIdsForThisFile = new Set();
                 if (featuredArtistIdsForTrack.length > 0) {
                     const existingArtists = await db_1.default.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
@@ -411,12 +422,12 @@ const addTracksToAlbum = async (req) => {
                     data: updatesForExistingTrack,
                     select: prisma_selects_1.trackSelect,
                 });
-                let statusMsg = 'linked_existing_to_album';
+                let statusMsg;
                 if (oldAlbumIdOfExistingTrack && oldAlbumIdOfExistingTrack !== albumId) {
                     statusMsg = 'skipped_duplicate_self_moved_album';
                 }
-                else if (oldAlbumIdOfExistingTrack === albumId) {
-                    statusMsg = 'skipped_duplicate_self_already_in_album';
+                else {
+                    statusMsg = 'skipped_duplicate_self_updated_metadata';
                 }
                 return {
                     status: statusMsg,

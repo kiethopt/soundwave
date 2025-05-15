@@ -308,7 +308,31 @@ const checkTrackCopyright = async (req, res) => {
             declaredFeaturedArtistNames: Array.isArray(featuredArtistNames) ? featuredArtistNames : [],
         };
         const result = await track_service_1.TrackService.checkTrackCopyrightOnly(user.artistProfile.id, checkData, audioFile, user);
-        res.status(200).json(result);
+        if (result.copyrightDetails && result.copyrightDetails.isDuplicateBySameArtist) {
+            res.status(409).json({
+                message: result.message,
+                isCopyrightConflict: true,
+                copyrightDetails: result.copyrightDetails,
+                isSafeToUpload: false,
+            });
+        }
+        else if (result.copyrightDetails && result.copyrightDetails.serviceError) {
+            const serviceErrorDetails = result.copyrightDetails.details;
+            const serviceMessage = serviceErrorDetails?.message || result.message || 'Copyright check service error.';
+            const serviceCode = serviceErrorDetails?.code;
+            const httpStatus = (typeof serviceCode === 'number' && serviceCode >= 400 && serviceCode < 600) ? serviceCode : 500;
+            res.status(httpStatus).json({
+                message: serviceMessage,
+                isCopyrightConflict: false,
+                isSafeToUpload: false,
+                serviceError: true,
+                copyrightDetails: result.copyrightDetails,
+                errorCode: serviceCode,
+            });
+        }
+        else {
+            res.status(200).json(result);
+        }
     }
     catch (error) {
         if (error.isCopyrightConflict && error.copyrightDetails) {

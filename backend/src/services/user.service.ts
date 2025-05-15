@@ -801,6 +801,32 @@ export const requestArtistRole = async (
 
 // Lấy thông tin yêu cầu trở thành nghệ sĩ của người dùng
 export const getArtistRequest = async (userId: string) => {
+  if (!userId) {
+    // Consistent with how other parts of the code might handle this,
+    // but a controller should ideally ensure userId is present.
+    return { hasPendingRequest: false, isVerified: false, profileData: null };
+  }
+
+  // 1. Check for an ArtistRequest with PENDING status for this user.
+  // This addresses the primary scenario for the "Request Artist" page.
+  const pendingArtistRoleRequest = await prisma.artistRequest.findFirst({
+    where: {
+      userId: userId,
+      status: RequestStatus.PENDING, // Ensure RequestStatus is imported from @prisma/client
+    },
+    select: {
+      id: true, // We only need to know if it exists
+    },
+  });
+
+  if (pendingArtistRoleRequest) {
+    // If a PENDING request to become an artist exists, this is the most relevant "pending" state.
+    return { hasPendingRequest: true, isVerified: false, profileData: null };
+  }
+
+  // 2. If no PENDING ArtistRequest, then check if the user already HAS an artist profile.
+  // This part handles scenarios where a user might already have an artist profile,
+  // and checks its verification status.
   const artistProfile = await prisma.artistProfile.findUnique({
     where: { userId },
     select: {
@@ -809,7 +835,7 @@ export const getArtistRequest = async (userId: string) => {
       avatar: true,
       bio: true,
       isVerified: true,
-      verificationRequestedAt: true,
+      verificationRequestedAt: true, // Used to determine if profile verification is pending
       genres: {
         select: {
           genre: {
@@ -823,16 +849,19 @@ export const getArtistRequest = async (userId: string) => {
     },
   });
 
-  if (!artistProfile) {
-    return { hasPendingRequest: false };
+  if (artistProfile) {
+    // The user has an ArtistProfile.
+    // `hasPendingRequest` in this context means "is this existing profile pending verification?"
+    // This maintains the original behavior for this part of the logic.
+    return {
+      hasPendingRequest: !!artistProfile.verificationRequestedAt && !artistProfile.isVerified,
+      isVerified: artistProfile.isVerified,
+      profileData: artistProfile,
+    };
   }
 
-  const { verificationRequestedAt, isVerified, ...profileData } = artistProfile;
-
-  return {
-    hasPendingRequest: !!verificationRequestedAt && !isVerified,
-    profileData,
-  };
+  // If no PENDING ArtistRequest AND no existing ArtistProfile for the user.
+  return { hasPendingRequest: false, isVerified: false, profileData: null };
 };
 
 // Lấy tất cả thể loại nhạc

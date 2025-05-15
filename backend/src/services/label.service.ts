@@ -272,10 +272,25 @@ export const requestNewLabelRegistration = async (
   // 1. Check if the user has an artist profile
   const artistProfile = await prisma.artistProfile.findUnique({
     where: { userId },
+    select: { // Select only necessary fields
+      id: true,
+      artistName: true,
+      labelId: true,
+      label: {
+        select: {
+          name: true,
+        }
+      }
+    }
   });
-
+  
   if (!artistProfile) {
     throw { status: 403, message: 'User does not have an artist profile or is not an artist.' };
+  }
+
+  // New check: If artist already has this label
+  if (artistProfile.labelId && artistProfile.label?.name && artistProfile.label.name.toLowerCase() === data.name.toLowerCase()) {
+    throw { status: 400, message: `You are already associated with the label "${artistProfile.label.name}".` };
   }
 
   // 2. Check if this artist already has a PENDING request for the SAME label name

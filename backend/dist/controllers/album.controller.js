@@ -54,8 +54,24 @@ const addTracksToAlbum = async (req, res) => {
     }
     catch (error) {
         console.error('Add tracks to album error:', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        res.status(400).json({ message });
+        if (error instanceof Error) {
+            const errorWithDetails = error;
+            if (errorWithDetails.status) {
+                res.status(400).json({
+                    message: errorWithDetails.message,
+                    status: errorWithDetails.status,
+                    conflictingTrack: errorWithDetails.conflictingTrack,
+                    uploadedFileName: errorWithDetails.uploadedFileName,
+                    isDuplicateInAlbum: errorWithDetails.isDuplicateInAlbum,
+                });
+            }
+            else {
+                res.status(400).json({ message: errorWithDetails.message });
+            }
+        }
+        else {
+            res.status(500).json({ message: 'Internal server error' });
+        }
     }
 };
 exports.addTracksToAlbum = addTracksToAlbum;

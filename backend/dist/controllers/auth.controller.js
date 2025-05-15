@@ -193,7 +193,7 @@ const register = async (req, res) => {
                 data: {
                     name: "Welcome Mix",
                     description: "A selection of popular tracks to start your journey on Soundwave.",
-                    privacy: "PRIVATE",
+                    privacy: "PUBLIC",
                     type: "SYSTEM",
                     isAIGenerated: false,
                     userId: user.id,
@@ -383,7 +383,7 @@ const googleLogin = async (req, res) => {
                         data: {
                             name: "Welcome Mix",
                             description: "A selection of popular tracks to start your journey on Soundwave.",
-                            privacy: "PRIVATE",
+                            privacy: "PUBLIC",
                             type: "SYSTEM",
                             isAIGenerated: false,
                             userId: user.id,

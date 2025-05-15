@@ -1086,14 +1086,17 @@ const generateSystemPlaylistForUser = async (req, res, next) => {
             });
             return;
         }
-        if (!focusOnFeatures ||
-            !Array.isArray(focusOnFeatures) ||
-            focusOnFeatures.length === 0) {
-            res.status(400).json({
-                success: false,
-                message: "focusOnFeatures must be a non-empty array of strings.",
-            });
-            return;
+        const isGenerateAll = !focusOnFeatures || !Array.isArray(focusOnFeatures) || focusOnFeatures.length === 0;
+        if (!isGenerateAll) {
+            if (!focusOnFeatures ||
+                !Array.isArray(focusOnFeatures) ||
+                focusOnFeatures.length === 0) {
+                res.status(400).json({
+                    success: false,
+                    message: "focusOnFeatures must be a non-empty array of strings.",
+                });
+                return;
+            }
         }
         if (typeof requestedTrackCount !== "number" ||
             requestedTrackCount < 10 ||
@@ -1104,7 +1107,7 @@ const generateSystemPlaylistForUser = async (req, res, next) => {
             });
             return;
         }
-        const playlist = await playlistService.generateSystemPlaylistFromHistoryFeatures(userId, focusOnFeatures, requestedTrackCount, name, description);
+        const playlist = await playlistService.generateSystemPlaylistFromHistoryFeatures(userId, focusOnFeatures || [], requestedTrackCount, name, description);
         res.status(201).json({
             success: true,
             message: "System playlist generated successfully for user.",

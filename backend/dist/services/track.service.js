@@ -433,6 +433,22 @@ class TrackService {
             localFingerprintToSave = hash.digest('hex');
             console.warn(`[CreateTrack] localFingerprint was not provided, calculated new one: ${localFingerprintToSave}. This might indicate an outdated client or flow.`);
         }
+        const existingTrackByTitle = await db_1.default.track.findFirst({
+            where: {
+                title: {
+                    equals: title.trim(),
+                    mode: 'insensitive',
+                },
+                artistId: artistProfileId,
+            },
+            select: { id: true, title: true },
+        });
+        if (existingTrackByTitle) {
+            const error = new Error(`You already have a track titled "${existingTrackByTitle.title}". Please choose a different title.`);
+            error.status = 'duplicate_title_by_same_artist';
+            error.track = existingTrackByTitle;
+            throw error;
+        }
         if (localFingerprintToSave) {
             const existingTrackByFingerprint = await db_1.default.track.findUnique({
                 where: { localFingerprint: localFingerprintToSave },
@@ -440,12 +456,10 @@ class TrackService {
             });
             if (existingTrackByFingerprint) {
                 if (existingTrackByFingerprint.artistId === artistProfileId) {
-                    console.log(`[CreateTrack] Track with fingerprint ${localFingerprintToSave} by artist ${artistProfileId} already exists (ID: ${existingTrackByFingerprint.id}). Returning existing track info.`);
-                    return {
-                        status: 'duplicate_by_same_artist',
-                        message: `This audio content already exists as track "${existingTrackByFingerprint.title}" by you.`,
-                        track: existingTrackByFingerprint,
-                    };
+                    const error = new Error(`This audio content already exists as track "${existingTrackByFingerprint.title}" by you. You cannot upload the same audio file multiple times as a new track.`);
+                    error.status = 'duplicate_by_same_artist_fingerprint';
+                    error.track = existingTrackByFingerprint;
+                    throw error;
                 }
                 else {
                     const error = new Error(`This song content (local fingerprint) already exists on the system and belongs to artist ${existingTrackByFingerprint.artist?.artistName || 'other'} (Track: ${existingTrackByFingerprint.title}).`);
@@ -667,7 +681,17 @@ class TrackService {
                 };
                 throw error;
             }
-            console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track by the same artist. Fingerprint will be passed.`);
+            console.log(`[CheckCopyrightOnly] Local fingerprint ${calculatedLocalFingerprint} matches an existing track "${existingTrackWithFingerprint.title}" by the same artist. Informing user.`);
+            return {
+                isSafeToUpload: false,
+                message: `You have already uploaded this audio content as track "${existingTrackWithFingerprint.title}".`,
+                copyrightDetails: {
+                    isDuplicateBySameArtist: true,
+                    existingTrackTitle: existingTrackWithFingerprint.title,
+                    existingTrackId: existingTrackWithFingerprint.id,
+                    localFingerprint: calculatedLocalFingerprint,
+                },
+            };
         }
         if (copyrightCheckResult.error) {
             console.warn(`[CopyrightCheckOnly] Copyright check with ACRCloud failed for track "${title}". Error: ${copyrightCheckResult.errorMessage} (Code: ${copyrightCheckResult.errorCode})`);
