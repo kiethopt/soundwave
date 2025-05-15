@@ -429,8 +429,8 @@ export default function SimpleTrackManagement() {
             </table>
           </div>
 
-          <div className="flex justify-between items-center mt-4">
-            <div className="flex justify-end">
+          <div className="flex justify-end items-center mt-4">
+            <div className="min-w-[200px]">
               {totalPages > 1 && (
                 <div className="flex items-center space-x-2">
                   <Button

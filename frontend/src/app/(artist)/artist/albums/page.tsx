@@ -426,7 +426,7 @@ export default function SimpleAlbumManagement() {
             </table>
           </div>
 
-          <div className="flex justify-between items-center mt-4">
+          <div className="flex justify-end items-center mt-4">
             <div className="min-w-[200px]">
             </div>
             <div className="flex justify-end">
