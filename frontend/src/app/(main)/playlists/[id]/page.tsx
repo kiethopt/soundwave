@@ -175,29 +175,9 @@ export default function PlaylistPage() {
     }
   }, [id]);
 
-  // useEffect to fetch user playlists for the dropdown menu
+  // Updated useEffect to fetch user playlists AND favorite track IDs
   useEffect(() => {
-    const fetchUserPlaylists = async () => {
-      const token = localStorage.getItem("userToken");
-      if (!token) return; // Need token to fetch user-specific playlists
-      try {
-        // Assuming an API endpoint exists to get minimal playlist info (id, name, coverUrl)
-        const response = await api.playlists.getUserPlaylists(token);
-        if (response.success && Array.isArray(response.data)) {
-          setUserPlaylists(response.data);
-        } else {
-          console.error("Failed to fetch user playlists:", response.message);
-        }
-      } catch (error) {
-        console.error("Error fetching user playlists:", error);
-      }
-    };
-    fetchUserPlaylists();
-  }, []);
-
-  // Updated useEffect to fetch favorite track IDs via user playlists
-  useEffect(() => {
-    const fetchFavoriteIds = async () => {
+    const fetchUserPlaylistsAndFavoriteIds = async () => {
       const token = localStorage.getItem("userToken");
       if (!token) return;
       try {
@@ -208,6 +188,8 @@ export default function PlaylistPage() {
           playlistsResponse.success &&
           Array.isArray(playlistsResponse.data)
         ) {
+          setUserPlaylists(playlistsResponse.data); // Set user playlists
+
           // 2. Find the favorite playlist
           const favoritePlaylistInfo = playlistsResponse.data.find(
             (p: Playlist) => p.type === "FAVORITE"
@@ -234,7 +216,7 @@ export default function PlaylistPage() {
                 "Failed to fetch favorite playlist details:",
                 favoriteDetailsResponse.message
               );
-              setFavoriteTrackIds(new Set()); // Reset if fetch fails
+              setFavoriteTrackIds(new Set()); 
             }
           } else {
             // No favorite playlist found for the user
@@ -242,18 +224,20 @@ export default function PlaylistPage() {
           }
         } else {
           console.error(
-            "Failed to fetch user playlists:",
+            "Failed to fetch user playlists for favorites logic:", // Clarified message
             playlistsResponse.message
           );
+          setUserPlaylists([]); // Reset user playlists if fetch fails
           setFavoriteTrackIds(new Set()); // Reset if fetch fails
         }
       } catch (error) {
-        console.error("Error fetching favorite track IDs:", error);
+        console.error("Error fetching user playlists or favorite track IDs:", error); // Updated error message
+        setUserPlaylists([]); // Reset user playlists on error
         setFavoriteTrackIds(new Set()); // Reset on error
       }
     };
 
-    fetchFavoriteIds();
+    fetchUserPlaylistsAndFavoriteIds();
 
     // Listener for favorite changes (remains the same)
     const handleFavoritesChanged = (event: Event) => {
@@ -281,6 +265,14 @@ export default function PlaylistPage() {
   // Function to refresh the playlist data
   const refreshPlaylistData = useCallback(async () => {
     if (!id) return;
+    
+    // Check if this playlist is being deleted
+    const deletingPlaylistId = window.localStorage.getItem("deletingPlaylist");
+    if (deletingPlaylistId === id) {
+      // Skip refreshing - this playlist is being deleted
+      window.localStorage.removeItem("deletingPlaylist"); // Clean up
+      return;
+    }
 
     try {
       setLoading(true);
@@ -427,6 +419,11 @@ export default function PlaylistPage() {
         }
 
         setIsDeleteOpen(false); // Close the dialog first
+        
+        // Set a flag to indicate this playlist is being deleted
+        // This will prevent refresh attempts during unmounting
+        const playlistId = id;
+        window.localStorage.setItem("deletingPlaylist", playlistId as string);
 
         // Delete the playlist
         await api.playlists.delete(id as string, token);
@@ -434,14 +431,20 @@ export default function PlaylistPage() {
         // Show success message
         toast.success("Playlist deleted successfully");
 
-        // Navigate to home page instead of reloading
+        // Dispatch event to update Sidebar only
+        window.dispatchEvent(new CustomEvent("playlist-updated"));
+
+        // Navigate to home page
         router.push("/");
+        
       } catch (error: any) {
         console.error("Error deleting playlist:", error);
         const errorMessage =
           error.message || "Could not delete playlist. Please try again.";
         toast.error(errorMessage);
         setIsDeleteOpen(false);
+        // Clear the deleting flag on error
+        window.localStorage.removeItem("deletingPlaylist");
       }
     });
   };

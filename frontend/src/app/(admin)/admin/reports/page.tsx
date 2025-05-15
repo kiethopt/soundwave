@@ -64,6 +64,7 @@ export default function ReportsPage() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
+  const [isBulkDeleteConfirm, setIsBulkDeleteConfirm] = useState(false);
 
   const limit = 10;
 
@@ -167,13 +168,24 @@ export default function ReportsPage() {
 
   const handleOpenDeleteModal = (report: Report) => {
     setReportToDelete(report);
+    setIsBulkDeleteConfirm(false);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!reportToDelete) return;
+    if (!isBulkDeleteConfirm && reportToDelete) {
+      await handleSingleDelete(reportToDelete.id);
+    } else if (isBulkDeleteConfirm) {
+      await handleBulkDeleteConfirm(Array.from(selectedReportIds));
+    }
+    
+    setIsDeleteModalOpen(false);
+    setReportToDelete(null);
+    setIsBulkDeleteConfirm(false);
+  };
 
-    setActionLoading(reportToDelete.id);
+  const handleSingleDelete = async (reportId: string) => {
+    setActionLoading(reportId);
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
@@ -181,14 +193,60 @@ export default function ReportsPage() {
         setActionLoading(null);
         return;
       }
-      await api.reports.deleteReport(reportToDelete.id, token);
+      await api.reports.deleteReport(reportId, token);
       toast.success('Report deleted successfully');
-      setIsDeleteModalOpen(false);
-      setReportToDelete(null);
       refreshTable();
     } catch (error: any) {
       console.error('Error deleting report:', error);
       toast.error(error.message || 'Failed to delete report');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (selectedReportIds.size === 0) {
+      toast('No reports selected.', { icon: '⚠️' });
+      return;
+    }
+    setReportToDelete(null);
+    setIsBulkDeleteConfirm(true);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = async (reportIds: string[]) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    setActionLoading('bulk-delete');
+    try {
+      await Promise.all(reportIds.map(id => api.reports.deleteReport(id, token)));
+      toast.success(`Successfully deleted ${reportIds.length} report(s).`);
+      
+      // Handle pagination if needed
+      const response = await api.reports.getAllReports(token, 1, limit, {});
+      const newTotalReports = response.pagination?.totalItems || 0;
+      const newTotalPages = Math.ceil(newTotalReports / limit) || 1;
+
+      let targetPage = currentPage;
+      if (currentPage > newTotalPages) {
+        targetPage = newTotalPages;
+      } else if (reports.length === reportIds.length && currentPage > 1) {
+        targetPage = currentPage - 1;
+      }
+
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
+      } else {
+        refreshTable();
+      }
+
+      setSelectedReportIds(new Set());
+    } catch (error: any) {
+      console.error('Error deleting reports:', error);
+      toast.error(error.message || 'Failed to delete reports');
     } finally {
       setActionLoading(null);
     }
@@ -594,9 +652,15 @@ export default function ReportsPage() {
           <div className="flex justify-between items-center mt-4">
             <div className="min-w-[200px]">
               {selectedReportIds.size > 0 && (
-                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {selectedReportIds.size} report(s) selected
-                </span>
+                <Button
+                  onClick={handleBulkDeleteClick}
+                  variant="destructive"
+                  size="default"
+                  disabled={loading || actionLoading !== null}
+                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedReportIds.size})
+                </Button>
               )}
             </div>
             <div className="flex justify-end">
@@ -648,9 +712,11 @@ export default function ReportsPage() {
         onClose={() => {
           setIsDeleteModalOpen(false);
           setReportToDelete(null);
+          setIsBulkDeleteConfirm(false);
         }}
         onConfirm={handleConfirmDelete}
-        item={reportToDelete ? { id: reportToDelete.id, name: `Report ID: ${reportToDelete.id}`, email: '' } : null} // Adapt item structure as needed by ConfirmDeleteModal
+        item={reportToDelete && !isBulkDeleteConfirm ? { id: reportToDelete.id, name: `Report ID: ${reportToDelete.id}`, email: '' } : null}
+        count={isBulkDeleteConfirm ? selectedReportIds.size : undefined}
         entityType="report"
         theme={theme}
       />

@@ -103,7 +103,10 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const userData = { ...req.body };
+        const userData = {
+            ...req.body,
+            avatarFile: req.file
+        };
         const requestingUser = req.user;
         if (!requestingUser) {
             res

@@ -201,34 +201,40 @@ const register = async (req, res) => {
                     totalDuration: 0,
                 },
             });
-            const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(user.id);
-            if (defaultTrackIds.length > 0) {
-                const tracksInfo = await db_1.default.track.findMany({
-                    where: { id: { in: defaultTrackIds } },
-                    select: { id: true, duration: true },
-                });
-                const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
-                const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
-                const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
-                await db_1.default.playlist.update({
-                    where: { id: welcomeMixPlaylist.id },
-                    data: {
-                        totalTracks: orderedTrackIds.length,
-                        totalDuration,
-                        tracks: {
-                            createMany: {
-                                data: orderedTrackIds.map((trackId, index) => ({
-                                    trackId,
-                                    trackOrder: index,
-                                })),
+            aiService.generateDefaultPlaylistForNewUser(user.id)
+                .then(async (defaultTrackIds) => {
+                if (defaultTrackIds.length > 0) {
+                    const tracksInfo = await db_1.default.track.findMany({
+                        where: { id: { in: defaultTrackIds } },
+                        select: { id: true, duration: true },
+                    });
+                    const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
+                    const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
+                    const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
+                    await db_1.default.playlist.update({
+                        where: { id: welcomeMixPlaylist.id },
+                        data: {
+                            totalTracks: orderedTrackIds.length,
+                            totalDuration,
+                            tracks: {
+                                createMany: {
+                                    data: orderedTrackIds.map((trackId, index) => ({
+                                        trackId,
+                                        trackOrder: index,
+                                    })),
+                                },
                             },
                         },
-                    },
-                });
-            }
+                    });
+                    console.log(`[Register] Successfully populated Welcome Mix for user ${user.id}`);
+                }
+            })
+                .catch(playlistError => {
+                console.error(`[Register - Background] Error populating Welcome Mix for user ${user.id}:`, playlistError);
+            });
         }
-        catch (playlistError) {
-            console.error(`Error creating Welcome Mix playlist for user ${user.id}:`, playlistError);
+        catch (playlistCreationError) {
+            console.error(`[Register] Error creating initial empty Welcome Mix for user ${user.id}:`, playlistCreationError);
         }
         try {
             const emailOptions = emailService.createWelcomeEmail(user.email, user.name || user.username || "there");

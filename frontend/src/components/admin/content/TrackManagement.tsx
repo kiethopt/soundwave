@@ -9,6 +9,13 @@ import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, Arrow
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Track } from '@/types';
 import { TrackDetailModal, EditTrackModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -36,9 +43,10 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [trackToDelete, setTrackToDelete] = useState<Track | null>(null);
   const [tracksToDeleteCount, setTracksToDeleteCount] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const limit = 10;
 
-  const fetchTracks = useCallback(async (page: number, search: string, sort: SortConfig) => {
+  const fetchTracks = useCallback(async (page: number, search: string, status: 'ALL' | 'ACTIVE' | 'INACTIVE', sort: SortConfig) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('userToken');
@@ -51,6 +59,9 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       params.append('limit', limit.toString());
       if (search) {
         params.append('search', search);
+      }
+      if (status !== 'ALL') {
+        params.append('status', status === 'ACTIVE' ? 'true' : 'false');
       }
       if (sort.key) {
         params.append('sortBy', sort.key);
@@ -71,12 +82,12 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   }, []);
 
   useEffect(() => {
-    fetchTracks(currentPage, activeSearchTerm, sortConfig);
-  }, [fetchTracks, currentPage, activeSearchTerm, sortConfig]);
+    fetchTracks(currentPage, activeSearchTerm, statusFilter, sortConfig);
+  }, [fetchTracks, currentPage, activeSearchTerm, statusFilter, sortConfig]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeSearchTerm, sortConfig]);
+  }, [activeSearchTerm, statusFilter, sortConfig]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
@@ -125,7 +136,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       await Promise.all(deletePromises);
 
       toast.success(`Successfully deleted ${idsToDelete.length} track(s)`);
-      fetchTracks(currentPage, activeSearchTerm, sortConfig); // Refresh list
+      fetchTracks(currentPage, activeSearchTerm, statusFilter, sortConfig); // Refresh list
       setSelectedTrackIds(prev => {
         const newSet = new Set(prev);
         idsToDelete.forEach(id => newSet.delete(id));
@@ -238,7 +249,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       await api.tracks.update(trackId, formData, token);
       toast.success('Track updated successfully');
       closeEditModal();
-      fetchTracks(currentPage, activeSearchTerm, sortConfig);
+      fetchTracks(currentPage, activeSearchTerm, statusFilter, sortConfig);
     } catch (err: any) {
       console.error('Error updating track:', err);
       toast.error(err.message || 'Failed to update track');
@@ -249,7 +260,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <form onSubmit={handleSearchSubmit} className="relative flex-grow">
           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
           <Input
@@ -261,6 +272,18 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
           />
           <button type="submit" className="hidden">Search</button>
         </form>
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={(value: 'ALL' | 'ACTIVE' | 'INACTIVE') => setStatusFilter(value)}>
+            <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="INACTIVE">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {loading ? (
@@ -329,6 +352,22 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                       )}
                     </div>
                   </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isActive')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {sortConfig.key === 'isActive' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
                   <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -356,6 +395,21 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                       <td className="py-4 px-6">{track.artist?.artistName || 'Unknown'}</td>
                       <td className="py-4 px-6">{track.album?.title || 'Single'}</td>
                       <td className="py-4 px-6">{formatDuration(track.duration)}</td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center">
+                          {track.isActive ? (
+                            <span className="flex items-center text-green-500">
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="flex items-center text-red-500">
+                              <XCircle className="mr-1 h-4 w-4" />
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
@@ -387,7 +441,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-4 px-6 text-center">No tracks found {activeSearchTerm ? 'matching your search' : ''}.</td>
+                    <td colSpan={8} className="py-4 px-6 text-center">No tracks found {activeSearchTerm || statusFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
                   </tr>
                 )}
               </tbody>

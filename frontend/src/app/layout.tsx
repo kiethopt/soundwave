@@ -37,8 +37,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user && pathname) {
-      const isUserPage = (
+    if (user && pathname && router) {
+      const isAdminPage = pathname.startsWith('/admin');
+      const isArtistPage = pathname.startsWith('/artist');
+
+      const isGenericUserPage = (
         pathname === '/' ||
         pathname.startsWith('/search') ||
         pathname.startsWith('/discover') ||
@@ -51,11 +54,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       const isAdmin = user.role === 'ADMIN';
       const isArtist = user.currentProfile === 'ARTIST';
 
-      if (isUserPage && isAdmin) {
+      if (isAdmin && !isAdminPage && isGenericUserPage) {
         console.log('Redirecting admin from user page:', pathname);
         router.push('/admin/dashboard');
-      }
-      else if (isUserPage && isArtist) {
+      } else if (isArtist && !isArtistPage && isGenericUserPage) {
         console.log('Redirecting artist from user page:', pathname);
         router.push('/artist/dashboard');
       }

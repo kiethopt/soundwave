@@ -21,13 +21,6 @@ export default function DiscoveryPage() {
   const [hoveredGenreColor, setHoveredGenreColor] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('userToken') || '';
-    if (!token) {
-      router.replace('/login');
-    }
-  }, []);
-
-  useEffect(() => {
     const token = localStorage.getItem('userToken');
     if (!token) {
       router.replace('/login'); 

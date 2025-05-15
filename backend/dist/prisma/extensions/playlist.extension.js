@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerPlaylistCronJobs = exports.playlistExtension = void 0;
+exports.playlistExtension = void 0;
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../../middleware/cache.middleware");
 const node_cron_1 = __importDefault(require("node-cron"));
@@ -136,8 +136,4 @@ node_cron_1.default.schedule('0 0 * * *', async () => {
         console.error('[Cron] Critical error updating system playlists:', error);
     }
 });
-const registerPlaylistCronJobs = () => {
-    console.log('[Cron] System playlist update job has been registered for midnight (00:00)');
-};
-exports.registerPlaylistCronJobs = registerPlaylistCronJobs;
 //# sourceMappingURL=playlist.extension.js.map

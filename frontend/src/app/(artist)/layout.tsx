@@ -3,6 +3,7 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEffect, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 export default function ArtistLayout({
   children,
@@ -11,6 +12,7 @@ export default function ArtistLayout({
 }) {
   const [isLoading, setIsLoading] = useState(true);
   const { theme } = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     const checkArtistAccess = () => {
@@ -19,7 +21,7 @@ export default function ArtistLayout({
         const token = localStorage.getItem('userToken');
 
         if (!userData || !token) {
-          window.location.href = '/login';
+          router.push('/login');
           return;
         }
 
@@ -28,19 +30,19 @@ export default function ArtistLayout({
           !user.artistProfile?.isVerified ||
           user.currentProfile !== 'ARTIST'
         ) {
-          window.location.href = '/';
+          router.push('/');
           return;
         }
 
         setIsLoading(false);
       } catch (error) {
         console.error('Error checking artist access:', error);
-        window.location.href = '/login';
+        router.push('/login');
       }
     };
 
     checkArtistAccess();
-  }, []);
+  }, [router]);
 
   if (isLoading) {
     return <div className="p-4">Loading...</div>;

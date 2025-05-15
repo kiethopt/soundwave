@@ -22,7 +22,6 @@ const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const report_routes_1 = __importDefault(require("./routes/report.routes"));
 const generate_routes_1 = __importDefault(require("./routes/generate.routes"));
 const db_1 = __importDefault(require("./config/db"));
-const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
 const socket_1 = require("./config/socket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -60,8 +59,6 @@ const initializeApp = async () => {
     try {
         await db_1.default.$queryRaw `SELECT 1`;
         console.log('✅ Database connection established');
-        (0, playlist_extension_1.registerPlaylistCronJobs)();
-        console.log('✅ Cron jobs registered via extension system');
     }
     catch (error) {
         console.error('❌ Database connection error:', error);

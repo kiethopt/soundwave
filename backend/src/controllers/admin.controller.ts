@@ -106,7 +106,10 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const userData = { ...req.body };
+    const userData = { 
+      ...req.body,
+      avatarFile: req.file
+    };
     const requestingUser = req.user as UserWithAdminLevel;
 
     if (!requestingUser) {

@@ -259,7 +259,6 @@ export const getArtistRequestDetail = async (id: string) => {
     throw new Error("Request not found");
   }
 
-  // If data came from ArtistProfile, add a source flag
   return { ...requestData, _sourceTable: "ArtistProfile" };
 };
 
@@ -270,6 +269,7 @@ interface UpdateUserData {
   newPassword?: string;
   isActive?: boolean;
   reason?: string;
+  avatarFile?: Express.Multer.File;
 }
 
 export const updateUserInfo = async (
@@ -277,7 +277,7 @@ export const updateUserInfo = async (
   data: UpdateUserData,
   requestingUser: User
 ) => {
-  const { name, username, email, newPassword, isActive, reason } = data;
+  const { name, username, email, newPassword, isActive, reason, avatarFile } = data;
 
   const existingUser = await prisma.user.findUnique({ where: { id } });
   if (!existingUser) {
@@ -339,6 +339,17 @@ export const updateUserInfo = async (
       throw new Error("Password must be at least 6 characters long.");
     }
     updateData.password = await bcrypt.hash(newPassword, 10);
+  }
+
+  // Process avatar file if provided
+  if (avatarFile) {
+    try {
+      const result = await uploadFile(avatarFile.buffer, "user-avatars", "image");
+      updateData.avatar = result.secure_url;
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      throw new Error("Failed to upload avatar");
+    }
   }
 
   if (Object.keys(updateData).length === 0) {

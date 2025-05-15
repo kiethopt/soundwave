@@ -3156,7 +3156,7 @@ export function MusicAuthDialog({ open, onOpenChange }: MusicAuthDialogProps) {
             <Link href="/login" className="w-full">
               <Button
                 variant="outline"
-                className="w-full border-white/10 hover:bg-white/5 text-white"
+                className="w-full border-neutral-500 bg-neutral-700 hover:bg-neutral-600 text-neutral-100"
               >
                 Log in
               </Button>

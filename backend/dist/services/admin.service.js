@@ -231,7 +231,7 @@ const getArtistRequestDetail = async (id) => {
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUserInfo = async (id, data, requestingUser) => {
-    const { name, username, email, newPassword, isActive, reason } = data;
+    const { name, username, email, newPassword, isActive, reason, avatarFile } = data;
     const existingUser = await db_1.default.user.findUnique({ where: { id } });
     if (!existingUser) {
         throw new Error("User not found");
@@ -279,6 +279,16 @@ const updateUserInfo = async (id, data, requestingUser) => {
             throw new Error("Password must be at least 6 characters long.");
         }
         updateData.password = await bcrypt_1.default.hash(newPassword, 10);
+    }
+    if (avatarFile) {
+        try {
+            const result = await (0, upload_service_1.uploadFile)(avatarFile.buffer, "user-avatars", "image");
+            updateData.avatar = result.secure_url;
+        }
+        catch (error) {
+            console.error("Error uploading avatar:", error);
+            throw new Error("Failed to upload avatar");
+        }
     }
     if (Object.keys(updateData).length === 0) {
         throw new Error("No valid data provided for update.");

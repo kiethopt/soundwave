@@ -5205,23 +5205,57 @@ export function ReportDetailModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="col-span-2">
               <h3
                 className={`text-sm font-medium mb-1 ${
                   theme === "dark" ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                Reported By
+                Reporter Information
               </h3>
-              <p
-                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
-              >
-                {report.reporter.name ||
-                  report.reporter.username ||
-                  report.reporter.email}
-              </p>
+              <div className={`p-3 rounded-md ${
+                theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+              }`}>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {/* Display name if available */}
+                  {report.reporter.name && (
+                    <>
+                      <div className={`text-xs ${
+                        theme === "dark" ? "text-gray-400" : "text-gray-600"
+                      }`}>Name:</div>
+                      <div className={`text-sm font-medium ${
+                        theme === "dark" ? "text-white" : "text-gray-900"
+                      }`}>{report.reporter.name}</div>
+                    </>
+                  )}
+                  
+                  {/* Always display username */}
+                  <div className={`text-xs ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}>Username:</div>
+                  <div className={`text-sm font-medium ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}>{report.reporter.username || 'Not set'}</div>
+                  
+                  {/* Always display email */}
+                  <div className={`text-xs ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}>Email:</div>
+                  <div className={`text-sm font-medium ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}>{report.reporter.email}</div>
+                  
+                  {/* Always display user ID for definitive identification */}
+                  <div className={`text-xs ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}>User ID:</div>
+                  <div className={`text-xs font-mono ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}>{report.reporter.id}</div>
+                </div>
+              </div>
             </div>
-            <div>
+            <div className="col-span-2">
               <h3
                 className={`text-sm font-medium mb-1 ${
                   theme === "dark" ? "text-gray-300" : "text-gray-700"
@@ -5312,40 +5346,8 @@ export function ReportDetailModal({
             {renderEntityDetails()}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3
-                className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Date Submitted
-              </h3>
-              <p
-                className={theme === "dark" ? "text-gray-200" : "text-gray-800"}
-              >
-                {new Date(report.createdAt).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <h3
-                className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Date Resolved
-              </h3>
-              <p
-                className={
-                  theme === "dark" ? "text-gray-200" : "text-gray-800"
-                }
-              >
-                {report.resolvedAt
-                  ? new Date(report.resolvedAt).toLocaleString()
-                  : "N/A"}
-              </p>
-            </div>
-          </div>
+          {/* The duplicate "Date Submitted" and "Date Resolved" section has been removed here */}
+
         </div>
 
         <DialogFooter className="flex justify-end gap-2">
