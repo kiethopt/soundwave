@@ -425,20 +425,19 @@ export default function AiUserManagementPage() {
     let failCount = 0;
     for (let i = 0; i < targetUsers.length; i++) {
       try {
-        const formData = new FormData();
-        formData.append("userId", targetUsers[i].id);
-        formData.append(
-          "focusOnFeatures",
-          JSON.stringify(params.focusOnFeatures)
+        await api.admin.generateSystemPlaylistForUserByAdmin(
+          targetUsers[i].id,
+          {
+            focusOnFeatures: [],
+            requestedTrackCount: 15,
+            name: params.playlistName || "Popular Mix",
+            description: params.playlistDescription || `A playlist of popular tracks for user ${targetUsers[i].id}.`
+          } as any,
+          token
         );
-        formData.append(
-          "requestedTrackCount",
-          params.requestedTrackCount.toString()
-        );
-
-        await api.admin.createSystemPlaylist(formData, token);
         successCount++;
       } catch (err) {
+        console.error("Error generating playlist for user:", targetUsers[i].id, err);
         failCount++;
       }
       setGenerateProgress({ current: i + 1, total: targetUsers.length });
@@ -811,6 +810,7 @@ export default function AiUserManagementPage() {
           onClose={handleCloseGenerateAllModal}
           onGenerate={handleGenerateAllUsers}
           isLoading={isGeneratingAll}
+          isGenerateAll={true}
         />
       )}
       {viewingUser && (

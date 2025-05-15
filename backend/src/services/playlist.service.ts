@@ -644,7 +644,53 @@ export const generateSystemPlaylistFromHistoryFeatures = async (
   });
 
   if (historyItems.length === 0) {
-    throw new Error("No listening history found to generate playlist.");
+    // Nếu không có lịch sử, lấy top tracks phổ biến
+    const topTracks = await prisma.track.findMany({
+      where: { isActive: true },
+      orderBy: { playCount: "desc" },
+      take: requestedTrackCount,
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        coverUrl: true,
+        audioUrl: true,
+        artist: { select: { id: true, artistName: true, avatar: true } },
+        album: { select: { id: true, title: true } },
+      },
+    });
+    if (topTracks.length === 0) {
+      throw new Error("No tracks available to generate playlist.");
+    }
+    const playlistName = customName
+      ? customName.substring(0, 50)
+      : `Popular Mix for ${userId.substring(0, 8)}`;
+    const playlistDescription = customDescription
+      ? customDescription.substring(0, 150)
+      : `A playlist of popular tracks for user ${userId}.`;
+    const newPlaylist = await prisma.playlist.create({
+      data: {
+        name: playlistName,
+        description: playlistDescription,
+        userId: userId,
+        type: PlaylistType.SYSTEM,
+        privacy: PlaylistPrivacy.PUBLIC,
+        isAIGenerated: false,
+        tracks: {
+          create: topTracks.map((track, index) => ({
+            trackId: track.id,
+            trackOrder: index,
+          })),
+        },
+        totalTracks: topTracks.length,
+        totalDuration: topTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+      },
+      include: {
+        tracks: { include: { track: { include: { artist: true } } } },
+        user: { select: { id: true, name: true } },
+      },
+    });
+    return newPlaylist;
   }
 
   // --- Feature Analysis from History ---
@@ -779,7 +825,7 @@ export const generateSystemPlaylistFromHistoryFeatures = async (
       description: playlistDescription,
       userId: userId,
       type: PlaylistType.SYSTEM,
-      privacy: PlaylistPrivacy.PRIVATE,
+      privacy: PlaylistPrivacy.PUBLIC,
       isAIGenerated: false,
       tracks: {
         create: selectedTracks.map((track, index) => ({

@@ -1546,16 +1546,22 @@ export const generateSystemPlaylistForUser = async (
       return;
     }
 
-    if (
-      !focusOnFeatures ||
-      !Array.isArray(focusOnFeatures) ||
-      focusOnFeatures.length === 0
-    ) {
-      res.status(400).json({
-        success: false,
-        message: "focusOnFeatures must be a non-empty array of strings.",
-      });
-      return;
+    // Nếu là Generate All User (focusOnFeatures rỗng), vẫn cho phép generate playlist phổ biến
+    // Chỉ validate focusOnFeatures nếu không phải là Generate All User
+    const isGenerateAll = !focusOnFeatures || !Array.isArray(focusOnFeatures) || focusOnFeatures.length === 0;
+
+    if (!isGenerateAll) {
+      if (
+        !focusOnFeatures ||
+        !Array.isArray(focusOnFeatures) ||
+        focusOnFeatures.length === 0
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "focusOnFeatures must be a non-empty array of strings.",
+        });
+        return;
+      }
     }
 
     if (
@@ -1573,7 +1579,7 @@ export const generateSystemPlaylistForUser = async (
     const playlist =
       await playlistService.generateSystemPlaylistFromHistoryFeatures(
         userId,
-        focusOnFeatures,
+        focusOnFeatures || [],
         requestedTrackCount,
         name, // customName
         description // customDescription
