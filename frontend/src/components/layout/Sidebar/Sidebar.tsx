@@ -43,6 +43,7 @@ import {
   Settings,
   ChevronLeft as Left,
   ChevronRight as Right,
+  Disc,
 } from "lucide-react";
 import { Genres } from "@/components/ui/Icons";
 
@@ -1220,12 +1221,12 @@ export default function Sidebar({
                   >
                     {isCollapsed ? (
                       <div className="w-full flex justify-center">
-                        <Bot className="w-6 h-6" />
+                        <Disc className="w-6 h-6" />
                       </div>
                     ) : (
                       <>
                         <div className="min-w-[32px] flex justify-center">
-                          <Bot className="w-5 h-5" />
+                          <Disc className="w-5 h-5" />
                         </div>
                         <span className="ml-3 font-medium text-sm">
                           System Playlists

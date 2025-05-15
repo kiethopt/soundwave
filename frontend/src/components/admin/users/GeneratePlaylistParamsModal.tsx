@@ -177,11 +177,14 @@ const GeneratePlaylistParamsModal: React.FC<
       <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-xl">
-            Customize Playlist Generation
+            {isGenerateAll 
+              ? "Generate Playlists For All Users" 
+              : "Customize Playlist Generation"}
           </DialogTitle>
           <DialogDescription>
-            Select audio features, set track count, and optionally name and
-            describe your playlist.
+            {isGenerateAll
+              ? "Create a personalized playlist for all users - provide a name and optional description." 
+              : "Select audio features, set track count, and optionally name and describe your playlist."}
           </DialogDescription>
         </DialogHeader>
 
@@ -265,86 +268,88 @@ const GeneratePlaylistParamsModal: React.FC<
               )}
             </div>
 
-            <div>
-              <Label className="text-base font-medium mb-3 block">
-                Audio Features (select at least one available)
-              </Label>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {audioFeaturesOptions.map((feature) => {
-                  const isFeatureAvailableFromStats =
-                    featureAvailability[feature.id] ?? false;
-                  return (
-                    <div
-                      key={feature.id}
-                      className="flex items-center space-x-2"
-                    >
-                      <Checkbox
-                        id={`feature-${feature.id}`}
-                        checked={
-                          isFeatureAvailableFromStats &&
-                          !!selectedFeatures[feature.id]
-                        }
-                        onCheckedChange={() => handleFeatureChange(feature.id)}
-                        disabled={
-                          isGenerateAll ||
-                          !isFeatureAvailableFromStats ||
-                          !anyFeatureMeetsCriteria
-                        }
-                      />
-                      <Label
-                        htmlFor={`feature-${feature.id}`}
-                        className={`font-normal cursor-pointer ${
-                          isGenerateAll ||
-                          !isFeatureAvailableFromStats ||
-                          !anyFeatureMeetsCriteria
-                            ? "text-muted-foreground italic"
-                            : ""
-                        }`}
+            {!isGenerateAll && (
+              <div>
+                <Label className="text-base font-medium mb-3 block">
+                  Audio Features (select at least one available)
+                </Label>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {audioFeaturesOptions.map((feature) => {
+                    const isFeatureAvailableFromStats =
+                      featureAvailability[feature.id] ?? false;
+                    return (
+                      <div
+                        key={feature.id}
+                        className="flex items-center space-x-2"
                       >
-                        {feature.label}
-                        {!isFeatureAvailableFromStats && (
-                          <span className="text-xs ml-1">(No data)</span>
-                        )}
-                      </Label>
-                    </div>
-                  );
-                })}
+                        <Checkbox
+                          id={`feature-${feature.id}`}
+                          checked={
+                            isFeatureAvailableFromStats &&
+                            !!selectedFeatures[feature.id]
+                          }
+                          onCheckedChange={() => handleFeatureChange(feature.id)}
+                          disabled={
+                            !isFeatureAvailableFromStats ||
+                            !anyFeatureMeetsCriteria
+                          }
+                        />
+                        <Label
+                          htmlFor={`feature-${feature.id}`}
+                          className={`font-normal cursor-pointer ${
+                            !isFeatureAvailableFromStats ||
+                            !anyFeatureMeetsCriteria
+                              ? "text-muted-foreground italic"
+                              : ""
+                          }`}
+                        >
+                          {feature.label}
+                          {!isFeatureAvailableFromStats && (
+                            <span className="text-xs ml-1">(No data)</span>
+                          )}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!atLeastOneFeatureSelected &&
+                  anyFeatureMeetsCriteria &&
+                  isOpen && (
+                    <p className="text-sm text-yellow-600 mt-2">
+                      Please select at least one available audio feature.
+                    </p>
+                  )}
               </div>
-              {!isGenerateAll && !atLeastOneFeatureSelected &&
-                anyFeatureMeetsCriteria &&
-                isOpen && (
-                  <p className="text-sm text-yellow-600 mt-2">
-                    Please select at least one available audio feature.
-                  </p>
-                )}
-            </div>
+            )}
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label
-                htmlFor="trackCount"
-                className="text-base font-medium col-span-2"
-              >
-                Number of Tracks
-              </Label>
-              <Input
-                id="trackCount"
-                type="number"
-                value={requestedTrackCount}
-                onChange={handleTrackCountChange}
-                min="10"
-                max="30"
-                className="col-span-2"
-                placeholder="10-30"
-                disabled={isGenerateAll || !anyFeatureMeetsCriteria}
-              />
-              {!isGenerateAll && !isTrackCountValid &&
-                Number.isInteger(Number(requestedTrackCount)) &&
-                String(requestedTrackCount) !== "" && (
-                  <p className="col-span-4 text-sm text-red-500 mt-1">
-                    Track count must be between 10 and 30.
-                  </p>
-                )}
-            </div>
+            {!isGenerateAll && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="trackCount"
+                  className="text-base font-medium col-span-2"
+                >
+                  Number of Tracks
+                </Label>
+                <Input
+                  id="trackCount"
+                  type="number"
+                  value={requestedTrackCount}
+                  onChange={handleTrackCountChange}
+                  min="10"
+                  max="30"
+                  className="col-span-2"
+                  placeholder="10-30"
+                  disabled={!anyFeatureMeetsCriteria}
+                />
+                {!isTrackCountValid &&
+                  Number.isInteger(Number(requestedTrackCount)) &&
+                  String(requestedTrackCount) !== "" && (
+                    <p className="col-span-4 text-sm text-red-500 mt-1">
+                      Track count must be between 10 and 30.
+                    </p>
+                  )}
+              </div>
+            )}
           </div>
         </div>
 
