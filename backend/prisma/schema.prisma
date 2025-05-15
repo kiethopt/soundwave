@@ -469,6 +469,7 @@ model ArtistRequest {
   status             RequestStatus @default(PENDING)
   rejectionReason    String?       @db.Text
   requestedLabelName String?
+  createdAt          DateTime      @default(now())
 
   userId        String
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -476,6 +477,7 @@ model ArtistRequest {
 
   @@index([userId])
   @@index([status])
+  @@index([createdAt])
   @@map("artist_requests")
 }
 

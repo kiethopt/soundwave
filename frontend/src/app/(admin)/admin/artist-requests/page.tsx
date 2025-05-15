@@ -460,19 +460,20 @@ export default function ArtistRequestManagement() {
                   <th className="py-3 px-6 text-left font-medium">Artist Name</th>
                   <th className="py-3 px-6 text-left font-medium">Email</th>
                   <th className="py-3 px-6 text-left font-medium">Requested Label</th>
+                  <th className="py-3 px-6 text-left font-medium">Submitted At</th>
                   <th className="py-3 px-6 text-left font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                    <td colSpan={5} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
                       Loading artist requests...
                     </td>
                   </tr>
                 ) : requests.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                    <td colSpan={5} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
                       No artist requests found
                     </td>
                   </tr>
@@ -498,6 +499,7 @@ export default function ArtistRequestManagement() {
                       </td>
                       <td className="py-4 px-6">{request.user?.email || 'N/A'}</td>
                       <td className="py-4 px-6">{request.requestedLabelName || 'N/A'}</td>
+                      <td className="py-4 px-6">{formatDate(request.createdAt)}</td>
                       <td className="py-4 px-6">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           request.status === 'PENDING' ? (theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800') :

@@ -917,3 +917,19 @@ export const reportSelect = {
     }
   }
 };
+
+const artistRoleRequestSelect = {
+  id: true,
+  artistName: true,
+  bio: true,
+  status: true,
+  requestedLabelName: true,
+  createdAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+};

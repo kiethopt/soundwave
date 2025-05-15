@@ -1661,8 +1661,7 @@ export const getArtistClaimRequests = async (req: Request) => {
           },
           {
             claimingUser: {
-              email: { contains: trimmedSearch, mode: "insensitive" },
-            },
+              email: { contains: trimmedSearch, mode: "insensitive" } },
           },
           {
             claimingUser: {
@@ -3368,7 +3367,7 @@ export const getUserListeningHistoryDetails = async (
  * Admin gets all label registration requests.
  */
 export const getAllLabelRegistrations = async (req: Request) => {
-  const { search, status, sortBy, sortOrder } = req.query;
+  const { search, status, sortBy, sortOrder, startDate, endDate } = req.query; // Added startDate and endDate
 
   const whereClause: Prisma.LabelRegistrationRequestWhereInput = {};
 
@@ -3401,6 +3400,37 @@ export const getAllLabelRegistrations = async (req: Request) => {
       whereClause.status = RequestStatus.PENDING;
     }
   }
+
+  // --- Add Date Filtering Logic ---
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (typeof startDate === 'string' && startDate) {
+    try {
+      const startOfDay = new Date(startDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = startOfDay;
+    } catch (e) {
+      console.error("Invalid start date format for Label Registrations:", startDate, e);
+    }
+  }
+  if (typeof endDate === 'string' && endDate) {
+    try {
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      dateFilter.lte = endOfDay;
+    } catch (e) {
+      console.error("Invalid end date format for Label Registrations:", endDate, e);
+    }
+  }
+
+  if (dateFilter.gte || dateFilter.lte) {
+    if (!whereClause.AND) {
+      whereClause.AND = [];
+    }
+    if (Array.isArray(whereClause.AND)) { // Ensure it's an array
+        whereClause.AND.push({ submittedAt: dateFilter });
+    }
+  }
+  // --- End Date Filtering Logic ---
 
   const orderByClause: Prisma.LabelRegistrationRequestOrderByWithRelationInput =
     {};
@@ -3765,10 +3795,9 @@ export const rejectLabelRegistration = async (
 export const getPendingArtistRoleRequests = async (req: Request) => {
   const { search, startDate, endDate, status } = req.query;
 
-  const where: Prisma.ArtistRequestWhereInput = {
-    status: RequestStatus.PENDING, // Default to PENDING
-  };
+  const where: Prisma.ArtistRequestWhereInput = {};
 
+  // Handle status filtering (copied from your existing logic, ensure it's what you want)
   if (
     status &&
     typeof status === "string" &&
@@ -3777,8 +3806,11 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
   ) {
     where.status = status as RequestStatus;
   } else if (status === "ALL") {
-    // If status is 'ALL', remove the default PENDING filter
     delete where.status;
+  } else {
+    if (status !== "ALL") {
+      where.status = RequestStatus.PENDING;
+    }
   }
 
   const andConditions: Prisma.ArtistRequestWhereInput[] = [];
@@ -3797,31 +3829,44 @@ export const getPendingArtistRoleRequests = async (req: Request) => {
     });
   }
 
+  // --- Direct Date Filtering for ArtistRequest.createdAt ---
   const dateFilter: { gte?: Date; lte?: Date } = {};
-  // Assuming ArtistRequest has a submission timestamp, e.g., 'createdAt' or 'submittedAt'
-  // Let's check the schema; ArtistRequest has no direct timestamp.
-  // We might need to sort by ID or add a timestamp to the model if date filtering is required.
-  // For now, date filtering will be omitted for ArtistRequest until schema is confirmed/updated.
-
-  if (andConditions.length > 0) {
-    if (where.AND) {
-      if (Array.isArray(where.AND)) {
-        where.AND.push(...andConditions);
-      } else {
-        where.AND = [where.AND, ...andConditions];
-      }
-    } else {
-      where.AND = andConditions;
+  if (typeof startDate === 'string' && startDate) {
+    try {
+      const startOfDay = new Date(startDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = startOfDay;
+    } catch (e) {
+      console.error("[Artist Role Requests] Invalid start date format:", startDate, e);
+    }
+  }
+  if (typeof endDate === 'string' && endDate) {
+    try {
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      dateFilter.lte = endOfDay;
+    } catch (e) {
+      console.error("[Artist Role Requests] Invalid end date format:", endDate, e);
     }
   }
 
-  // Define a select object for ArtistRequest, similar to artistRequestSelect for ArtistProfile
+  if (dateFilter.gte || dateFilter.lte) {
+    // Add createdAt filter directly to andConditions
+    andConditions.push({ createdAt: dateFilter });
+  }
+  // --- End Direct Date Filtering ---
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
+  }
+
   const artistRoleRequestSelect = {
     id: true,
     artistName: true,
     bio: true, // Include bio if needed for list view previews
     status: true,
     requestedLabelName: true,
+    createdAt: true, // <<< Ensure createdAt is selected
     // Add any other fields from ArtistRequest model you want to display in the list
     user: {
       // Include basic user info
