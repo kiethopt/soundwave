@@ -7,8 +7,7 @@ import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import {
@@ -18,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ConfirmDeleteModal } from '@/components/ui/admin-modals';
 import { EditAlbumModal } from '@/components/ui/artist-modals';
 
 interface SortConfig {
@@ -35,10 +33,6 @@ export default function SimpleAlbumManagement() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
-  const [deletingAlbum, setDeletingAlbum] = useState<Album | null>(null);
-  const [isBulkDeleteConfirm, setIsBulkDeleteConfirm] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -118,7 +112,6 @@ export default function SimpleAlbumManagement() {
 
   const refreshTable = useCallback(() => {
     fetchAlbums(currentPage, activeSearchTerm, statusFilter, genreFilter, sortConfig);
-    setSelectedAlbumIds(new Set());
   }, [currentPage, activeSearchTerm, statusFilter, genreFilter, sortConfig, fetchAlbums]);
 
   useEffect(() => {
@@ -147,27 +140,6 @@ export default function SimpleAlbumManagement() {
     setSortConfig({ key, direction });
   };
 
-  const handleSelectAll = (checked: boolean | 'indeterminate') => {
-    if (checked === true) {
-      const allIds = new Set(albums.map(a => a.id));
-      setSelectedAlbumIds(allIds);
-    } else {
-      setSelectedAlbumIds(new Set());
-    }
-  };
-
-  const handleSelectRow = (albumId: string, checked: boolean | 'indeterminate') => {
-    setSelectedAlbumIds(prev => {
-      const newSet = new Set(prev);
-      if (checked === true) {
-        newSet.add(albumId);
-      } else {
-        newSet.delete(albumId);
-      }
-      return newSet;
-    });
-  };
-
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -189,49 +161,8 @@ export default function SimpleAlbumManagement() {
       setSelectedGenres(album.genres?.map((g) => g.genre.id) || []);
       setSelectedLabelId(album.labelId || null);
       setIsEditModalOpen(true);
-    } else if (action === 'delete') {
-      setDeletingAlbum(album);
-      setIsBulkDeleteConfirm(false);
-      setIsDeleteModalOpen(true);
     } else if (action === 'toggleVisibility') {
       handleAlbumVisibility(album.id, album.isActive);
-    }
-  };
-
-  const handleDeleteConfirm = (ids: string[]) => {
-    if (ids.length === 0 && isBulkDeleteConfirm) {
-      handleBulkDeleteConfirm(Array.from(selectedAlbumIds));
-    } else if (ids.length === 1 && !isBulkDeleteConfirm && deletingAlbum) {
-      handleSingleDeleteConfirm(ids[0]);
-    } else {
-      console.error("Inconsistent state in handleDeleteConfirm");
-    }
-    setIsDeleteModalOpen(false);
-    setDeletingAlbum(null);
-    setIsBulkDeleteConfirm(false);
-  };
-
-  const handleSingleDeleteConfirm = async (albumId: string) => {
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      toast.error('Authentication required.');
-      return;
-    }
-    setActionLoading(albumId);
-    try {
-      await api.albums.delete(albumId, token);
-      toast.success(`Successfully deleted album.`);
-      refreshTable();
-      setSelectedAlbumIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(albumId);
-        return newSet;
-      });
-    } catch (err: any) {
-      console.error('Error deleting album:', err);
-      toast.error(err.message || 'Failed to delete album.');
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -279,57 +210,13 @@ export default function SimpleAlbumManagement() {
     }
   };
 
-  const handleBulkDeleteClick = () => {
-    if (selectedAlbumIds.size === 0) {
-      toast('No albums selected.', { icon: '⚠️' });
-      return;
-    }
-    setDeletingAlbum(null);
-    setIsBulkDeleteConfirm(true);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleBulkDeleteConfirm = async (albumIds: string[]) => {
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      toast.error('Authentication required.');
-      return;
-    }
-    setActionLoading('bulk-delete');
-    try {
-      await Promise.all(albumIds.map(id => api.albums.delete(id, token)));
-      toast.success(`Successfully deleted ${albumIds.length} album(s).`);
-      
-      let targetPage = currentPage;
-      if (albums.length === albumIds.length && currentPage > 1) {
-        targetPage = currentPage - 1;
-      }
-
-      if (targetPage !== currentPage) {
-        setCurrentPage(targetPage);
-      } else {
-        refreshTable();
-      }
-
-      setSelectedAlbumIds(new Set());
-    } catch (err: any) {
-      console.error('Error deleting albums:', err);
-      toast.error(err.message || 'Failed to delete albums.');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const handleRowClick = (album: Album, e: React.MouseEvent<HTMLTableRowElement>) => {
     const target = e.target as HTMLElement;
-    if (target.closest('[role="checkbox"]') || target.closest('button')) {
+    if (target.closest('button')) {
       return;
     }
     router.push(`/artist/albums/${album.id}`);
   };
-
-  const isAllSelected = albums.length > 0 && selectedAlbumIds.size === albums.length;
-  const isIndeterminate = selectedAlbumIds.size > 0 && selectedAlbumIds.size < albums.length;
 
   return (
     <div className={`container mx-auto space-y-6 p-4 pb-20 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -392,7 +279,7 @@ export default function SimpleAlbumManagement() {
         </div>
       </div>
 
-      {loading && !deletingAlbum && !editingAlbum && <p>Loading albums...</p>}
+      {loading && !editingAlbum && <p>Loading albums...</p>}
       {error && <p className="text-red-500">{error}</p>}
 
       {!error && (
@@ -401,16 +288,7 @@ export default function SimpleAlbumManagement() {
             <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
                 <tr>
-                  <th scope="col" className="p-4 rounded-tl-md">
-                     <Checkbox
-                       id="select-all-checkbox"
-                       checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
-                       onCheckedChange={handleSelectAll}
-                       aria-label="Select all rows on this page"
-                       className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
-                       disabled={loading || actionLoading !== null}
-                     />
-                  </th>
+                  <th scope="col" className="py-3 px-6 rounded-tl-md">No.</th>
                   <th 
                     scope="col" 
                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
@@ -497,21 +375,14 @@ export default function SimpleAlbumManagement() {
               </thead>
               <tbody>
                 {albums.length > 0 ? (
-                  albums.map((album) => (
+                  albums.map((album, index) => (
                     <tr
                       key={album.id}
                       onClick={(e) => handleRowClick(album, e)}
-                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedAlbumIds.has(album.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === album.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${actionLoading === album.id ? 'opacity-50 pointer-events-none' : ''}`}
                     >
-                      <td className="w-4 p-4">
-                         <Checkbox
-                           id={`select-row-${album.id}`}
-                           checked={selectedAlbumIds.has(album.id)}
-                           onCheckedChange={(checked) => handleSelectRow(album.id, checked)}
-                           aria-label={`Select row for album ${album.title}`}
-                           className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
-                           disabled={loading || actionLoading !== null}
-                         />
+                      <td className={`py-4 px-6 rounded-l-md ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {(currentPage - 1) * limit + index + 1}
                       </td>
                       <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                         {album.title}
@@ -532,16 +403,6 @@ export default function SimpleAlbumManagement() {
                       <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
                       <td className="py-4 px-6">
                          <div className="flex items-center justify-center gap-1">
-                           {/* <Button
-                             variant="ghost"
-                             size="icon"
-                             className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
-                             onClick={(e) => { e.stopPropagation(); handleAction('delete', album); }}
-                             aria-label={`Delete album ${album.title}`}
-                             disabled={loading || actionLoading !== null}
-                           >
-                             <Trash2 className="h-4 w-4" />
-                           </Button> */}
                            <Button
                              variant="ghost"
                              size="icon"
@@ -558,7 +419,7 @@ export default function SimpleAlbumManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-4 px-6 text-center">No albums found {activeSearchTerm || statusFilter !== 'ALL' || genreFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
+                    <td colSpan={9} className="py-4 px-6 text-center">No albums found {activeSearchTerm || statusFilter !== 'ALL' || genreFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
                   </tr>
                 )}
               </tbody>
@@ -567,17 +428,6 @@ export default function SimpleAlbumManagement() {
 
           <div className="flex justify-between items-center mt-4">
             <div className="min-w-[200px]">
-              {selectedAlbumIds.size > 0 && (
-                <Button
-                  onClick={handleBulkDeleteClick}
-                  variant="destructive"
-                  size="default"
-                  disabled={loading || actionLoading !== null}
-                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Selected ({selectedAlbumIds.size})
-                </Button>
-              )}
             </div>
             <div className="flex justify-end">
               {totalPages > 1 && (
@@ -605,20 +455,6 @@ export default function SimpleAlbumManagement() {
           </div>
         </>
       )}
-
-      <ConfirmDeleteModal
-        item={isBulkDeleteConfirm ? null : (deletingAlbum ? { id: deletingAlbum.id, name: deletingAlbum.title, email: '' } : null)}
-        count={isBulkDeleteConfirm ? selectedAlbumIds.size : undefined}
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-            setIsDeleteModalOpen(false);
-            setDeletingAlbum(null);
-            setIsBulkDeleteConfirm(false);
-        }}
-        onConfirm={handleDeleteConfirm}
-        theme={theme}
-        entityType="album"
-      />
 
       <EditAlbumModal
         album={editingAlbum}
