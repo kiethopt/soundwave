@@ -1263,7 +1263,7 @@ const getArtistClaimRequests = async (req) => {
                     },
                     {
                         claimingUser: {
-                            email: { contains: trimmedSearch, mode: "insensitive" },
+                            email: { contains: trimmedSearch, mode: "insensitive" }
                         },
                     },
                     {
@@ -2486,7 +2486,7 @@ const getUserListeningHistoryDetails = async (adminExecutingId, targetUserId, re
 };
 exports.getUserListeningHistoryDetails = getUserListeningHistoryDetails;
 const getAllLabelRegistrations = async (req) => {
-    const { search, status, sortBy, sortOrder } = req.query;
+    const { search, status, sortBy, sortOrder, startDate, endDate } = req.query;
     const whereClause = {};
     if (search && typeof search === "string") {
         whereClause.OR = [
@@ -2509,6 +2509,35 @@ const getAllLabelRegistrations = async (req) => {
         }
         else if (!status) {
             whereClause.status = client_1.RequestStatus.PENDING;
+        }
+    }
+    const dateFilter = {};
+    if (typeof startDate === 'string' && startDate) {
+        try {
+            const startOfDay = new Date(startDate);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            dateFilter.gte = startOfDay;
+        }
+        catch (e) {
+            console.error("Invalid start date format for Label Registrations:", startDate, e);
+        }
+    }
+    if (typeof endDate === 'string' && endDate) {
+        try {
+            const endOfDay = new Date(endDate);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+            dateFilter.lte = endOfDay;
+        }
+        catch (e) {
+            console.error("Invalid end date format for Label Registrations:", endDate, e);
+        }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+        if (!whereClause.AND) {
+            whereClause.AND = [];
+        }
+        if (Array.isArray(whereClause.AND)) {
+            whereClause.AND.push({ submittedAt: dateFilter });
         }
     }
     const orderByClause = {};
@@ -2791,9 +2820,7 @@ const rejectLabelRegistration = async (adminUserId, registrationId, rejectionRea
 exports.rejectLabelRegistration = rejectLabelRegistration;
 const getPendingArtistRoleRequests = async (req) => {
     const { search, startDate, endDate, status } = req.query;
-    const where = {
-        status: client_1.RequestStatus.PENDING,
-    };
+    const where = {};
     if (status &&
         typeof status === "string" &&
         status !== "ALL" &&
@@ -2802,6 +2829,11 @@ const getPendingArtistRoleRequests = async (req) => {
     }
     else if (status === "ALL") {
         delete where.status;
+    }
+    else {
+        if (status !== "ALL") {
+            where.status = client_1.RequestStatus.PENDING;
+        }
     }
     const andConditions = [];
     if (search && typeof search === "string" && search.trim()) {
@@ -2818,18 +2850,31 @@ const getPendingArtistRoleRequests = async (req) => {
         });
     }
     const dateFilter = {};
+    if (typeof startDate === 'string' && startDate) {
+        try {
+            const startOfDay = new Date(startDate);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            dateFilter.gte = startOfDay;
+        }
+        catch (e) {
+            console.error("[Artist Role Requests] Invalid start date format:", startDate, e);
+        }
+    }
+    if (typeof endDate === 'string' && endDate) {
+        try {
+            const endOfDay = new Date(endDate);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+            dateFilter.lte = endOfDay;
+        }
+        catch (e) {
+            console.error("[Artist Role Requests] Invalid end date format:", endDate, e);
+        }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+        andConditions.push({ createdAt: dateFilter });
+    }
     if (andConditions.length > 0) {
-        if (where.AND) {
-            if (Array.isArray(where.AND)) {
-                where.AND.push(...andConditions);
-            }
-            else {
-                where.AND = [where.AND, ...andConditions];
-            }
-        }
-        else {
-            where.AND = andConditions;
-        }
+        where.AND = andConditions;
     }
     const artistRoleRequestSelect = {
         id: true,
@@ -2837,6 +2882,7 @@ const getPendingArtistRoleRequests = async (req) => {
         bio: true,
         status: true,
         requestedLabelName: true,
+        createdAt: true,
         user: {
             select: {
                 id: true,

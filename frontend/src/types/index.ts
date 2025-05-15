@@ -179,6 +179,7 @@ export interface ArtistRequest {
   status: RequestStatus;
   requestedLabelName?: string | null;
   rejectionReason?: string | null;
+  createdAt?: string;
   user: {
     id: string;
     name?: string | null;
