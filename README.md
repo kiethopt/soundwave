@@ -151,10 +151,9 @@ Mentor: **Mrs. Nguyen Thi Thanh**
 ---
 
 ## 10. Screenshots / Demo  
+![Group03_Defense](https://github.com/user-attachments/assets/aa0dd67b-d22d-4ddb-9069-79daf676cdbb)
 
-> *(Optional section – add UI screenshots or links to your video demo if available)*  
-Example placeholder:  
-![App UI](https://via.placeholder.com/600x400.png?text=Soundwave+Dashboard)
+
 
 ---
 
