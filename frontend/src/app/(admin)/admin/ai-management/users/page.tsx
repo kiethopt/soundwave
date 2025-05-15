@@ -530,7 +530,7 @@ export default function AiUserManagementPage() {
     >
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold flex items-center">
-          <Bot className="mr-3 h-8 w-8 text-primary" /> AI Playlist Management
+          <Bot className="mr-3 h-8 w-8 text-primary" /> System Playlist Management
         </h1>
         <div className="flex items-center gap-2">
           <Button
@@ -540,27 +540,8 @@ export default function AiUserManagementPage() {
             onClick={handleOpenGenerateAllModal}
             disabled={loading || users.length === 0 || isGeneratingAll}
           >
-            {selectedUserIds.size > 0
-              ? `Generate (${selectedUserIds.size}) User${
-                  selectedUserIds.size > 1 ? "s" : ""
-                }`
-              : "Generate All User"}
+            {"Generate All User"}
           </Button>
-          {selectedUserIds.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleBulkDeleteClick}
-              disabled={actionLoading === "bulk-delete"}
-            >
-              {actionLoading === "bulk-delete" ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              {`Delete (${selectedUserIds.size}) Selected`}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -601,19 +582,6 @@ export default function AiUserManagementPage() {
         <Table className="min-w-full divide-y divide-border">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[50px] px-6 py-3 text-center">
-                <Checkbox
-                  checked={
-                    selectedUserIds.size === users.length && users.length > 0
-                      ? true
-                      : selectedUserIds.size > 0
-                      ? "indeterminate"
-                      : false
-                  }
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all users"
-                />
-              </TableHead>
               <TableHead
                 className="w-[200px] px-6 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort("name")}
@@ -663,7 +631,7 @@ export default function AiUserManagementPage() {
             {loading && users.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={6}
                   className="px-6 py-10 text-center text-muted-foreground"
                 >
                   <div className="flex flex-col items-center justify-center">
@@ -676,7 +644,7 @@ export default function AiUserManagementPage() {
             {!loading && users.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={6}
                   className="px-6 py-10 text-center text-muted-foreground"
                 >
                   No users found matching your criteria.
@@ -688,18 +656,7 @@ export default function AiUserManagementPage() {
                 key={user.id}
                 onClick={(e) => handleRowClick(user, e)}
                 className="hover:bg-muted/50 cursor-pointer group rounded-lg transition-colors"
-                aria-selected={selectedUserIds.has(user.id)}
               >
-                <TableCell className="w-[50px] px-6 py-4 text-center">
-                  <Checkbox
-                    checked={selectedUserIds.has(user.id)}
-                    onCheckedChange={(checked) =>
-                      handleSelectRow(user.id, checked)
-                    }
-                    aria-labelledby={`user-name-${user.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </TableCell>
                 <TableCell className="px-6 py-4">
                   <div className="flex items-center space-x-4">
                     <img
