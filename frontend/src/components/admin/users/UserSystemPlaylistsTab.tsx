@@ -564,39 +564,53 @@ export const UserSystemPlaylistsTab = ({
                       {playlist.tracks && playlist.tracks.length > 0 ? (
                         <div className="flex justify-center -space-x-2">
                           {playlist.tracks.slice(0, 3).map((pt, index) => {
-                            if (!pt || !pt.track) {
+                            let trackToRender: (Pick<Track, "id" | "title" | "coverUrl"> & { artist?: Pick<ArtistProfile, "artistName"> | null }) | null = null;
+                            const keySuffix = `-${playlist.id}-${index}`;
+
+                            if (pt && pt.track && (pt.track.id || pt.track.title || pt.track.coverUrl)) {
+                              trackToRender = pt.track;
+                            } else if (pt && typeof pt === 'object' && ('coverUrl' in pt || 'id' in pt || 'title' in pt) && !(pt as any).track) {
+                              // If pt.track is not valid/present, check if pt itself is the track object
+                              trackToRender = pt as any;
+                            }
+
+                            if (trackToRender && trackToRender.coverUrl) {
+                              return (
+                                <img
+                                  key={(trackToRender.id || 'track') + keySuffix}
+                                  src={trackToRender.coverUrl}
+                                  alt={trackToRender.title || "Track cover"}
+                                  title={`${trackToRender.title || "Unknown Title"} by ${
+                                    trackToRender.artist?.artistName || "Unknown Artist"
+                                  }`}
+                                  className="h-12 w-12 rounded-full object-cover border-2 border-primary/30 shadow"
+                                />
+                              );
+                            } else if (trackToRender) {
+                              // Track data exists, but no coverUrl
                               return (
                                 <div
-                                  key={`placeholder-${playlist.id}-${index}`}
+                                  key={(trackToRender.id || 'default-track') + keySuffix}
+                                  className="h-12 w-12 rounded-full border-2 border-primary/30 bg-muted flex items-center justify-center text-xs shadow"
+                                  title={trackToRender.title || "Unknown Title"}
+                                >
+                                  <img
+                                    src="/images/default-track.jpg"
+                                    alt="Default cover"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              );
+                            } else {
+                              // No valid track data found for this item
+                              return (
+                                <div
+                                  key={'placeholder' + keySuffix}
                                   className="h-12 w-12 rounded-full border-2 border-dashed border-muted-foreground/50 bg-muted flex items-center justify-center text-xs shadow"
                                   title="Invalid track data"
                                 />
                               );
                             }
-                            const track = pt.track;
-                            return track.coverUrl ? (
-                              <img
-                                key={track.id}
-                                src={track.coverUrl}
-                                alt={track.title || "Track cover"}
-                                title={`${track.title || "Unknown Title"} by ${
-                                  track.artist?.artistName || "Unknown Artist"
-                                }`}
-                                className="h-12 w-12 rounded-full object-cover border-2 border-primary/30 shadow"
-                              />
-                            ) : (
-                              <div
-                                key={track.id}
-                                className="h-12 w-12 rounded-full border-2 border-primary/30 bg-muted flex items-center justify-center text-xs shadow"
-                                title={track.title || "Unknown Title"}
-                              >
-                                <img
-                                  src="/images/default-track.jpg"
-                                  alt="Default cover"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            );
                           })}
                         </div>
                       ) : (

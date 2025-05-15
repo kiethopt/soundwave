@@ -27,6 +27,8 @@ export default function Home() {
   const [personalizedPlaylists, setPersonalizedPlaylists] = useState<
     Playlist[]
   >([]);
+  const [detailedPersonalizedPlaylists, setDetailedPersonalizedPlaylists] = useState<Playlist[]>([]);
+  const [fetchingPlaylistDetails, setFetchingPlaylistDetails] = useState(false);
   const [topTracks, setTopTracks] = useState<Track[]>([]);
   const [userPlayHistory, setUserPlayHistory] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,53 @@ export default function Home() {
 
     fetchHomeData();
   }, [token, isAuthenticated]);
+
+  useEffect(() => {
+    const fetchAllPlaylistDetails = async () => {
+      if (personalizedPlaylists.length === 0 || !isAuthenticated) {
+        setDetailedPersonalizedPlaylists([]);
+        return;
+      }
+
+      setFetchingPlaylistDetails(true);
+      const currentToken = localStorage.getItem("userToken");
+      if (!currentToken) {
+        console.error("No token for fetching playlist details");
+        // Fallback: use personalizedPlaylists as is, tracks won't have covers for composite.
+        setDetailedPersonalizedPlaylists(personalizedPlaylists.map(p => ({...p, tracks: p.tracks || []})));
+        setFetchingPlaylistDetails(false);
+        return;
+      }
+
+      const promises = personalizedPlaylists.map(async (p) => {
+        // Only fetch if tracks are not already sufficiently detailed (e.g., missing or just IDs)
+        // A simple check: if tracks array is missing or empty.
+        if (!p.tracks || p.tracks.length === 0) {
+          try {
+            const response = await api.playlists.getById(p.id, currentToken);
+            if (response.success && response.data) {
+              return { ...response.data, tracks: response.data.tracks || [] }; // Ensure tracks is an array
+            }
+            return { ...p, tracks: [] }; // Return original with empty tracks if fetch fails
+          } catch (error) {
+            console.error(`Failed to fetch details for playlist ${p.id}:`, error);
+            return { ...p, tracks: [] }; // Return original with empty tracks on error
+          }
+        }
+        return { ...p, tracks: p.tracks || [] }; // Already has tracks or no need to fetch, ensure tracks array
+      });
+
+      const results = await Promise.all(promises);
+      setDetailedPersonalizedPlaylists(results);
+      setFetchingPlaylistDetails(false);
+    };
+
+    if (isAuthenticated) {
+      fetchAllPlaylistDetails();
+    } else {
+      setDetailedPersonalizedPlaylists([]);
+    }
+  }, [personalizedPlaylists, isAuthenticated]);
 
   useEffect(() => {
     if (dominantColor) {
@@ -397,10 +446,10 @@ export default function Home() {
         )}
       </div>
 
-      {isAuthenticated && user && personalizedPlaylists.length > 0 && (
+      {isAuthenticated && user && detailedPersonalizedPlaylists.length > 0 && (
         <Section title={`Suggest for ${user.name || user.username || 'You'}`}>
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-            {personalizedPlaylists.map((playlist) => (
+            {detailedPersonalizedPlaylists.map((playlist) => (
               <div
                 key={playlist.id}
                 className="cursor-pointer flex-shrink-0 w-40"
@@ -409,44 +458,89 @@ export default function Home() {
                 onMouseLeave={() => setHoveredAlbum(null)}
               >
                 <div className="flex flex-col space-y-2">
-                  <div className="relative aspect-square overflow-hidden rounded-lg">
-                    <Image
-                      src={playlist.coverUrl || "/images/default-playlist.jpg"}
-                      alt={playlist.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <div
-                      className={`absolute inset-0 transition-all duration-150 ${
-                        hoveredAlbum === `playlist-${playlist.id}`
-                          ? "bg-black/30"
-                          : "bg-black/0"
-                      }`}
-                    ></div>
+                  <div className="relative aspect-square overflow-hidden rounded-lg group bg-neutral-800/50">
+                    {(playlist.coverUrl || (playlist.tracks && playlist.tracks.length === 0)) && (
+                      <Image
+                        src={playlist.coverUrl || "/images/default-playlist.jpg"}
+                        alt=""
+                        fill
+                        className={`object-cover transition-all duration-300 ${hoveredAlbum === `playlist-${playlist.id}` ? 'scale-110 blur-[1px] brightness-75' : ''}`}
+                      />
+                    )}
+                    {!playlist.coverUrl && playlist.tracks && playlist.tracks.length > 0 && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-neutral-700 to-neutral-800"></div>
+                    )}
 
-                    <div className="absolute top-2 right-2 bg-black/40 rounded-full p-0.5">
+                    {playlist.tracks && playlist.tracks.length > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10 p-1">
+                        <div className="flex items-center justify-center w-full h-full relative">
+                          {playlist.tracks[1] && (
+                            <div className="absolute left-[-5%] top-[25%] w-[45%] h-[45%] transform -rotate-[15deg] origin-center">
+                              <Image
+                                src={playlist.tracks[1].coverUrl || '/images/default-track-small.jpg'}
+                                alt=""
+                                layout="fill"
+                                className="object-cover rounded-full border-2 border-black/50 shadow-md"
+                              />
+                            </div>
+                          )}
+                          {playlist.tracks[0] && (
+                            <div className="relative w-[55%] h-[55%] z-20">
+                              <Image
+                                src={playlist.tracks[0].coverUrl || '/images/default-track-large.jpg'}
+                                alt=""
+                                layout="fill"
+                                className="object-cover rounded-full border-2 border-black/70 shadow-lg"
+                              />
+                            </div>
+                          )}
+                          {playlist.tracks[2] && (
+                            <div className="absolute right-[-5%] top-[25%] w-[45%] h-[45%] transform rotate-[15deg] origin-center">
+                              <Image
+                                src={playlist.tracks[2].coverUrl || '/images/default-track-small.jpg'}
+                                alt=""
+                                layout="fill"
+                                className="object-cover rounded-full border-2 border-black/50 shadow-md"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!playlist.coverUrl && (!playlist.tracks || playlist.tracks.length === 0) && (
+                      <Image
+                        src={"/images/default-playlist.jpg"}
+                        alt={playlist.name}
+                        fill
+                        className="object-cover rounded-lg opacity-50"
+                      />
+                    )}
+
+                    <div className="absolute top-2 right-2 bg-black/40 rounded-full p-0.5 z-30">
                       <Image
                         src="/images/googleGemini_icon.png"
-                        width={28}
-                        height={28}
+                        width={24}
+                        height={24}
                         alt="Gemini"
                         className="rounded-full"
                       />
                     </div>
 
                     {hoveredAlbum === `playlist-${playlist.id}` && (
-                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center z-30">
                         <button
                           className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
                           onClick={(e) => handlePlayPlaylist(playlist, e)}
+                          aria-label={`Play ${playlist.name}`}
                         >
-                          <Play className="w-4 h-4" />
+                          <Play className="w-4 h-4" /> 
                         </button>
                       </div>
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium line-clamp-1">
+                    <p className="text-sm font-medium line-clamp-1 pt-2">
                       {playlist.name}
                     </p>
                     <p className="text-xs text-muted-foreground line-clamp-1">
