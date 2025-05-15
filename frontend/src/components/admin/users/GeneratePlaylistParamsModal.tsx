@@ -26,6 +26,7 @@ interface GeneratePlaylistParamsModalProps {
   }) => void;
   isLoading?: boolean;
   featureAvailability?: Record<string, boolean>;
+  isGenerateAll?: boolean;
 }
 
 const audioFeaturesOptions = [
@@ -46,6 +47,7 @@ const GeneratePlaylistParamsModal: React.FC<
   onGenerate,
   isLoading = false,
   featureAvailability = {},
+  isGenerateAll = false,
 }) => {
   const [selectedFeatures, setSelectedFeatures] = useState<
     Record<string, boolean>
@@ -112,6 +114,13 @@ const GeneratePlaylistParamsModal: React.FC<
   }, [playlistDescription]);
 
   const canGenerate = useMemo(() => {
+    if (isGenerateAll) {
+      return (
+        isPlaylistNameValid &&
+        isPlaylistDescriptionValid &&
+        !isLoading
+      );
+    }
     return (
       anyFeatureMeetsCriteria &&
       atLeastOneFeatureSelected &&
@@ -127,10 +136,20 @@ const GeneratePlaylistParamsModal: React.FC<
     isPlaylistNameValid,
     isPlaylistDescriptionValid,
     isLoading,
+    isGenerateAll,
   ]);
 
   const handleSubmit = () => {
     if (!canGenerate) return;
+    if (isGenerateAll) {
+      onGenerate({
+        focusOnFeatures: [],
+        requestedTrackCount: 20,
+        playlistName: playlistName.trim(),
+        playlistDescription: playlistDescription.trim(),
+      });
+      return;
+    }
 
     const activeFeatures = audioFeaturesOptions
       .filter(
@@ -167,7 +186,7 @@ const GeneratePlaylistParamsModal: React.FC<
         </DialogHeader>
 
         <div className="flex-grow overflow-y-auto pr-5 pl-1 py-4">
-          {!anyFeatureMeetsCriteria && isOpen && (
+          {!isGenerateAll && !anyFeatureMeetsCriteria && isOpen && (
             <div className="my-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md">
               <div className="flex items-center">
                 <AlertTriangle className="h-5 w-5 mr-2" />
@@ -267,6 +286,7 @@ const GeneratePlaylistParamsModal: React.FC<
                         }
                         onCheckedChange={() => handleFeatureChange(feature.id)}
                         disabled={
+                          isGenerateAll ||
                           !isFeatureAvailableFromStats ||
                           !anyFeatureMeetsCriteria
                         }
@@ -274,6 +294,7 @@ const GeneratePlaylistParamsModal: React.FC<
                       <Label
                         htmlFor={`feature-${feature.id}`}
                         className={`font-normal cursor-pointer ${
+                          isGenerateAll ||
                           !isFeatureAvailableFromStats ||
                           !anyFeatureMeetsCriteria
                             ? "text-muted-foreground italic"
@@ -289,7 +310,7 @@ const GeneratePlaylistParamsModal: React.FC<
                   );
                 })}
               </div>
-              {!atLeastOneFeatureSelected &&
+              {!isGenerateAll && !atLeastOneFeatureSelected &&
                 anyFeatureMeetsCriteria &&
                 isOpen && (
                   <p className="text-sm text-yellow-600 mt-2">
@@ -314,9 +335,9 @@ const GeneratePlaylistParamsModal: React.FC<
                 max="30"
                 className="col-span-2"
                 placeholder="10-30"
-                disabled={!anyFeatureMeetsCriteria}
+                disabled={isGenerateAll || !anyFeatureMeetsCriteria}
               />
-              {!isTrackCountValid &&
+              {!isGenerateAll && !isTrackCountValid &&
                 Number.isInteger(Number(requestedTrackCount)) &&
                 String(requestedTrackCount) !== "" && (
                   <p className="col-span-4 text-sm text-red-500 mt-1">

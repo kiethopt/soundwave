@@ -603,15 +603,12 @@ export const api = {
         playlistName?: string;
         playlistDescription?: string;
       },
-      token?: string
+      token: string
     ) => {
       return fetchWithAuth(
         `/api/admin/users/${userId}/system-playlists/generate`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify(params),
         },
         token

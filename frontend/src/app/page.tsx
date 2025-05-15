@@ -517,15 +517,7 @@ export default function Home() {
                       />
                     )}
 
-                    <div className="absolute top-2 right-2 bg-black/40 rounded-full p-0.5 z-30">
-                      <Image
-                        src="/images/googleGemini_icon.png"
-                        width={24}
-                        height={24}
-                        alt="Gemini"
-                        className="rounded-full"
-                      />
-                    </div>
+                    
 
                     {hoveredAlbum === `playlist-${playlist.id}` && (
                       <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center z-30">
