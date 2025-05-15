@@ -669,19 +669,32 @@ export default function NewTrack() {
               {/* Release Date & Time */}
               <div className="space-y-1.5">
                 <UILabel htmlFor="releaseDate" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Release Date & Time *</UILabel>
-                <Input
-                  type="datetime-local"
-                  id="releaseDate"
-                  name="releaseDate"
-                  value={trackData.releaseDate}
-                  onChange={handleInputChange}
-                  className={cn(
-                    'w-full',
-                    theme === 'light' ? 'bg-white border-gray-300' : 'bg-white/[0.07] border-white/[0.1]',
-                    theme === 'dark' ? 'date-input-dark' : ''
-                  )}
-                  required
-                />
+                <div className="flex">
+                  <div className="flex-1">
+                    <Input
+                      type="date"
+                      id="releaseDate"
+                      name="releaseDate"
+                      value={trackData.releaseDate.split('T')[0]}
+                      onChange={handleInputChange}
+                      className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm h-10 px-3 ${theme === 'dark' ? 'bg-neutral-700 border-neutral-600 text-white' : 'border-gray-300'}`}
+                      required
+                      disabled
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      type="time"
+                      id="releaseTime"
+                      name="releaseTime"
+                      value={trackData.releaseDate.split('T')[1]?.substring(0,5) || ''}
+                      onChange={handleInputChange}
+                      className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm h-10 px-3 ${theme === 'dark' ? 'bg-neutral-700 border-neutral-600 text-white' : 'border-gray-300'}`}
+                      required
+                      disabled
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Display Artist's Default Label (Read-only) - TO BE REPLACED */}

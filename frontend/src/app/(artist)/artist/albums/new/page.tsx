@@ -290,6 +290,7 @@ export default function NewAlbum() {
                      theme === 'dark' ? 'date-input-dark' : ''
                    )}
                    required
+                   disabled
                  />
                </div>
 
