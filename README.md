@@ -69,11 +69,11 @@ Develop a music streaming platform that supports Vietnamese artists in publishin
 ### Flow: Artist Upload → Scan → Publish  
 1. Artist uploads audio via dashboard.  
 2. System checks copyright instantly.  
-3. Admin reviews if flagged, otherwise content is published directly.  
-
-📊 *(Optional)* Include a diagram or flowchart here.  
-Example placeholder:  
-![Workflow Diagram](https://via.placeholder.com/600x200.png?text=Upload+Flow)
+3. Admin reviews if flagged, otherwise content is published directly.
+4. 
+![Group03_Defense (1)](https://github.com/user-attachments/assets/d9b6267b-30ef-4deb-be1a-9c9d98a67b5d)
+![Group03_Defense (2)](https://github.com/user-attachments/assets/a8327603-0ad5-4d60-851e-73ebb562c72d)
+![Group03_Defense (3)](https://github.com/user-attachments/assets/69d1e8db-6568-4fff-8ba1-4d93c409e7c1)
 
 ---
 
@@ -152,7 +152,8 @@ Mentor: **Mrs. Nguyen Thi Thanh**
 
 ## 10. Screenshots / Demo  
 ![Group03_Defense](https://github.com/user-attachments/assets/aa0dd67b-d22d-4ddb-9069-79daf676cdbb)
-
+![z6595328132989_d8e3360dbda917ec161c7e8114922a10](https://github.com/user-attachments/assets/d4c35f44-6b83-4a31-bf43-97df5c6f90a4)
+![z6595331920246_35435786bbc802fd204070e83abd26c0](https://github.com/user-attachments/assets/c21a1e74-2873-419b-a337-d835cc28aa4f)
 
 
 ---
