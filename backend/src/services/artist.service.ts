@@ -489,7 +489,7 @@ export class ArtistService {
             playCount: 'desc',
           },
         },
-        take: 7,
+        take: 15,
       }),
       // Follower records for trend (6 months)
       prisma.userFollow.findMany({

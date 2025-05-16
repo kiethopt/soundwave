@@ -101,7 +101,8 @@ export default function UserProfilePage({
 
         if (userResponse) {
           setUser(userResponse);
-          if (userResponse.playlists) {
+          userResponse.playlists = userResponse.playlists.filter((p:Playlist) => p.type !== "SYSTEM") || [];
+          if (userResponse.playlists) {8
             setPublicPlaylists(userResponse.playlists);
           }
         }

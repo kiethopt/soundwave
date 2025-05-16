@@ -182,16 +182,11 @@ export default function UserProfilePage({
                 onClick={() => router.push(`/artist/profile/${artist.id}`)}
               >
                 <div className="relative w-full mb-4">
-                  <Link href={`/artist/${artist.id}`}>
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4 flex-shrink-0">
-                      <Image
-                        src={artist.avatar || "/images/default-avatar.png"}
-                        alt={artist.artistName}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </Link>
+                  <img
+                    src={artist.avatar || DEFAULT_AVATAR}
+                    alt={artist.artistName}
+                    className="w-full aspect-square object-cover rounded-full"
+                  />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -225,16 +220,11 @@ export default function UserProfilePage({
                 onClick={() => router.push(`/profile/${user.id}`)}
               >
                 <div className="w-full mb-4">
-                  <Link href={`/profile/${user.id}`}>
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4 flex-shrink-0">
-                      <Image
-                        src={user.avatar || "/images/default-avatar.png"}
-                        alt={user.name || user.username || "User"}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </Link>
+                <img
+                  src={user.avatar || DEFAULT_AVATAR}
+                  alt={user.name}
+                  className="w-full aspect-square object-cover rounded-full"
+                />
                 </div>
                 <div className="w-full text-left mt-1">
                   <h3 className="font-medium truncate text-white w-full">
